@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# Pre-commit: the two structural assertions only. Fast, no build.
+# The full gate (typecheck, lint, unit tests, build) runs in CI.
+#
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+bash scripts/assert-no-anti-patterns.sh
+bash scripts/assert-operations-doc.sh

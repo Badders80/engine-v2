@@ -1,0 +1,18 @@
+{
+  "name": "engine-v2",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
+    "typecheck": "pnpm --recursive --if-present run typecheck",
+    "lint": "pnpm --recursive --if-present run lint",
+    "test": "bash scripts/assert-no-anti-patterns.sh && bash scripts/assert-operations-doc.sh && pnpm --recursive --if-present run test",
+    "test:anti-patterns": "bash scripts/assert-no-anti-patterns.sh",
+    "test:operations-doc": "bash scripts/assert-operations-doc.sh",
+    "build": "pnpm --recursive --if-present run build",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
+  }
+}

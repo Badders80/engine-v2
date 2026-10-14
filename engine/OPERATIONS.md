@@ -38,6 +38,16 @@ Prudentia, Hottathanafantasy, and First Gear stay finished static pages. They ar
 
 The commercial terms typed on the DSL, from the owner's deal, are payment style (`subscription_float` or `upfront`), close style (`fourteen_day` or `three_x_remaining`), investor split, wholesale cost, listed stake, step size, term start, end date, and distribution schedule. The investor split must sit between 50% and 85%. 75% is what an empty form shows. It is not a horse's split. The engine calculates the retail price and the monthly amount.
 
+### Click-path: adding a horse
+
+1. Open `/dsl/new` on the engine.
+2. Paste the loveracing.nz link and press Load. The page reads the link, shows the fields it found, and shows the race record it will store as one blob.
+3. Correct anything the load got wrong. Sire and dam are names on the horse. The three soft slots are yours to write.
+4. Save. One save writes the horse, the trainer, and the owner, and the slug comes from the legal name. You land on the read view.
+5. Fill the soft slots, add the images, then open the edit page to set the commercial terms and the status. The read view is `/dsl/<id>`; the edit view is `/dsl/<id>/edit`.
+
+An unregistered horse is typed by hand on the same page, with its sire and dam entered by hand. It saves at Coming Soon and no further. The engine refuses every status past that until the horse is registered. Branding choices on the page are shown to you and are not stored: those controls carry no field name, so nothing about them reaches the database.
+
 ## Images
 
 Public horse images go in the new R2 bucket, in a folder named from the slug, files named `01` upward. The database stores `image_count` only. The old bucket and the old media keys are not reused. This step waits on a Cloudflare token. The landing page's own background art can stay as static files in the website app.

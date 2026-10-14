@@ -50,7 +50,68 @@ An unregistered horse is typed by hand on the same page, with its sire and dam e
 
 ## Images
 
-Public horse images go in the new R2 bucket, in a folder named from the slug, files named `01` upward. The database stores `image_count` only. The old bucket and the old media keys are not reused. This step waits on a Cloudflare token. The landing page's own background art can stay as static files in the website app.
+Public horse images go in the R2 bucket `evolution-v2-horse-images`, in a folder named from the horse slug, files named `01` upward, with no file extension. So Lady Ketchikan's first image is the key `lady-ketchikan/01`. The database stores `image_count` and nothing else: there is no path column, no slug-to-path lookup, and no redirect table. A rename moves the folder, and nothing else has to be updated.
+
+Three is the minimum before a DSL can be Available. More are allowed. The old bucket and the old media keys are not reused. The landing page's own background art stays as static files in the website app.
+
+KYC files and proof-of-address files never come here. They stay in private Supabase Storage. The uploader refuses a content type that is not an image, and refuses a key under a reserved private prefix, so a passport scan or a rates bill cannot reach the public bucket by mistake.
+
+The storage module is `engine/src/lib/storage.ts`. It reads the five `R2_*` variables from `engine/.env.local` at call time. Every one of them is required and none is defaulted: a missing value stops the upload and names what is missing, rather than publishing a dead link. The key and URL builders are pure functions; the client is built per call, so importing the module needs no credentials.
+
+### Click-path: uploading a horse's images
+
+1. In Cloudflare: R2 → Manage R2 API Tokens → Create API Token, permission **Object Read & Write**, scoped to `evolution-v2-horse-images`. Copy the Access Key ID and Secret Access Key into `engine/.env.local`. They are shown once.
+2. In Cloudflare: R2 → `evolution-v2-horse-images` → Settings. Public access must be allowed for the r2.dev subdomain, or the images will not load on the site. Copy the public URL shown there into `R2_PUBLIC_URL`. r2.dev subdomains are per bucket, so this is the value for this bucket and not one copied from another.
+3. Name the files in order on disk. `01` is the lead image, and the number you upload under is the order on the page.
+4. Upload each file, one at a time, with the content type set to `image/webp`. The key carries no extension, so nothing can infer the type: without the flag the browser is handed a download instead of an image.
+5. Open `{R2_PUBLIC_URL}/{slug}/01` in a browser. If it renders, the public access and the content type are both right.
+6. Write `image_count` on the horse row. It is the length of the run you uploaded, and it is what the Available gate reads.
+
+The five variables, as they appear in `engine/.env.local`:
+
+```
+R2_ACCOUNT_ID="4a90e0c2bf572bab73cb6fbb38d49577"
+R2_ACCESS_KEY_ID="<Object Read & Write token>"
+R2_SECRET_ACCESS_KEY="<shown once>"
+R2_BUCKET_NAME="evolution-v2-horse-images"
+R2_PUBLIC_URL="https://<bucket subdomain>.r2.dev"
+```
+
+Uploading three images for Lady Ketchikan, with the S3 keys exported into the shell as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`:
+
+```bash
+BUCKET="evolution-v2-horse-images"
+ENDPOINT="https://4a90e0c2bf572bab73cb6fbb38d49577.r2.cloudflarestorage.com"
+
+for n in 01 02 03; do
+  aws s3api put-object \
+    --bucket "$BUCKET" \
+    --key "lady-ketchikan/$n" \
+    --body "./lady-ketchikan/$n.webp" \
+    --content-type image/webp \
+    --endpoint-url "$ENDPOINT"
+done
+```
+
+`wrangler r2 object put` does the same job if you are signed in to wrangler instead:
+
+```bash
+wrangler r2 object put "evolution-v2-horse-images/lady-ketchikan/01" \
+  --file "./lady-ketchikan/01.webp" --content-type image/webp --remote
+```
+
+Setting the count on the horse, after the upload, and publishing the DSL:
+
+```sql
+update horses set image_count = 3 where slug = 'lady-ketchikan';
+
+update dsls set status = 'available', published = true
+where horse_id = (select id from horses where slug = 'lady-ketchikan');
+```
+
+The second statement only succeeds when the run is complete: the constraint trigger refuses `available` unless `published = true`, the split is set, the wholesale rate is above zero, the horse is `registered`, and `image_count >= 3`.
+
+Check the run before writing the count. A folder must be `01..NN` with no gap and no repeat, because that is what `image_count` means. `imageCountFromKeys(slug, keys)` in the storage module does that check over a listing: a stray `03` with no `02` is refused rather than counted, so the row cannot drift from the bucket.
 
 ## Documents
 

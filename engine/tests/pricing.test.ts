@@ -7,6 +7,7 @@ import {
   FLOAT_TOTAL_MONTHS,
   QUALIFICATION_PAID_UP_MONTHS,
   REFUND_SENTENCE,
+  effectiveMinStake,
   floatTotal,
   investorReturnPctFrom,
   isInvestorReturnPctInRange,
@@ -112,6 +113,36 @@ describe('validateStake', () => {
 
   it('throws when the step is zero', () => {
     expect(() => validateStake(5, 0)).toThrow()
+  })
+
+  it('accepts fractional stakes that are whole multiples of a fractional step', () => {
+    // IEEE-754 trap: 0.3 % 0.1 is 0.09999999999999998, so a raw float modulo
+    // rejects stakes the database accepts. numeric(5,2): mod(0.30, 0.10) = 0.
+    expect(() => validateStake(0.3, 0.1)).not.toThrow()
+    expect(() => validateStake(0.6, 0.1)).not.toThrow()
+    expect(() => validateStake(0.7, 0.1)).not.toThrow()
+    expect(() => validateStake(1.2, 0.1)).not.toThrow()
+  })
+
+  it('still throws on a fractional stake that is a real non-multiple', () => {
+    expect(() => validateStake(0.35, 0.1)).toThrow()
+    expect(() => validateStake(0.25, 0.1)).toThrow()
+  })
+})
+
+describe('effectiveMinStake', () => {
+  it('drops to the remaining stake when the remainder is smaller', () => {
+    expect(effectiveMinStake(5, 2)).toBe(2)
+    expect(effectiveMinStake(0.5, 0.2)).toBe(0.2)
+  })
+
+  it('keeps the declared minimum when the remainder is larger', () => {
+    expect(effectiveMinStake(5, 12)).toBe(5)
+  })
+
+  it('is the orphan remainder rule: min of the two, and nothing else', () => {
+    expect(effectiveMinStake(5, 5)).toBe(5)
+    expect(effectiveMinStake(1, 0)).toBe(0)
   })
 })
 

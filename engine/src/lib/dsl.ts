@@ -229,6 +229,12 @@ async function resolveOwner(draft: OwnerDraft, store: DslStore): Promise<OwnerRo
  * The trainer and the owner are reused when one already exists with the same
  * name and stable, or the same entity. The horse is keyed by the slug from its
  * legal name.
+ *
+ * The four rows go out as separate statements, so the save can die between
+ * them: a horse row that landed without its DSL row is an orphan. A later save
+ * that produces the same slug adopts that orphan and updates it, rather than
+ * refusing the slug and locking the horse out for good. A horse that already
+ * has a DSL is still a real collision and is still refused.
  */
 export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Result<SavedDsl>> {
   const checked = checkDraft(input)
@@ -236,7 +242,7 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
 
   const slug = slugFromLegalName(input.horse.legalName)
   const existing = await store.findHorseBySlug(slug)
-  if (existing) {
+  if (existing !== null && (await store.countDslsByHorse(existing.id)) > 0) {
     return {
       ok: false,
       reason: `a horse with the slug '${slug}' already exists; a rename changes the slug`,
@@ -246,7 +252,7 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
   const trainer = await resolveTrainer(input.trainer, store)
   const owner = await resolveOwner(input.owner, store)
 
-  const horse = await store.insertHorse({
+  const horseFields = {
     slug,
     legalName: input.horse.legalName.trim(),
     foalingDate: input.horse.foalingDate,
@@ -262,11 +268,19 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
     aboutHorse: text(input.horse.aboutHorse),
     racingOutlookAndPedigree: text(input.horse.racingOutlookAndPedigree),
     raceExpectation: text(input.horse.raceExpectation),
-    imageCount: input.horse.imageCount ?? 0,
+    // An adopted orphan keeps the images already uploaded to it, so a save that
+    // follows an upload cannot silently drop the horse back under the three
+    // images that `00008_dsl_availability_trigger.sql` requires.
+    imageCount: input.horse.imageCount ?? existing?.imageCount ?? 0,
     raceRecord: input.horse.raceRecord ?? {},
     trainerId: trainer.id,
     ownerId: owner.id,
-  })
+  }
+
+  const horse =
+    existing === null
+      ? await store.insertHorse(horseFields)
+      : await store.updateHorse(existing.id, horseFields)
 
   const dsl = await store.insertDsl({
     horseId: horse.id,

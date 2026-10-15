@@ -95,12 +95,28 @@ export function investorReturnPctFrom(split?: number | null): number | null {
  * `step` is required and has no default: a guessed step silently mis-prices a
  * stake. The `undefined` guard is here for untyped callers, since TypeScript
  * already refuses an omitted argument.
+ *
+ * The comparison runs in integer basis points, not raw floats. IEEE-754 makes
+ * `0.3 % 0.1` come out as `0.09999999999999998`, so a raw modulo rejects stakes
+ * the database accepts; Postgres `numeric(5,2)` computes `mod(0.30, 0.10) = 0`.
+ * Rounding to hundredths is exact for every stake and step the schema stores.
  */
 export function validateStake(stake: number, step: number): void {
   if (typeof step !== 'number' || !Number.isFinite(step) || step <= 0) {
     throw new Error(`step must be a positive number (received ${String(step)})`)
   }
-  if (stake % step !== 0) {
+  if (Math.round(stake * 100) % Math.round(step * 100) !== 0) {
     throw new Error(`stake ${stake} is not a multiple of step ${step}`)
   }
+}
+
+/**
+ * The orphan remainder rule: the smallest amount that may still be bought.
+ *
+ * When the unallocated remainder of a DSL is smaller than the stated minimum,
+ * the remainder itself becomes buyable, so the last slice does not strand. This
+ * is the whole rule: it is a minimum, not a floor, a default, or a discount.
+ */
+export function effectiveMinStake(minStake: number, stakeRemaining: number): number {
+  return Math.min(minStake, stakeRemaining)
 }

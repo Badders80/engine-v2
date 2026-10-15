@@ -16,7 +16,7 @@ import {
   type SaveDslInput,
   type SavedDsl,
 } from '../src/lib/dsl'
-import { createInMemoryDslStore, type InMemoryDslStore } from '../src/lib/dslStore'
+import { createInMemoryDslStore, type DslStore, type InMemoryDslStore } from '../src/lib/dslStore'
 import { retailPerPercentFromWholesale } from '../src/lib/pricing'
 
 /** Stands in for a branding choice made on the page. It must never be stored. */
@@ -76,6 +76,25 @@ function input(overrides: Partial<SaveDslInput> = {}): SaveDslInput {
 async function ok(result: Awaited<ReturnType<typeof saveDsl>>): Promise<SavedDsl> {
   if (!result.ok) throw new Error(`expected a save, got: ${result.reason}`)
   return result.value
+}
+
+/**
+ * A store that loses the last leg of the save exactly once, the way a failed
+ * `dsls.insert` over HTTP does: trainer, owner, and horse land, the DSL does
+ * not. The next call behaves normally, which is the retry the operator makes.
+ */
+function failingFirstDslInsert(base: InMemoryDslStore): DslStore {
+  let failNext = true
+  return {
+    ...base,
+    async insertDsl(row) {
+      if (failNext) {
+        failNext = false
+        throw new Error('dsls insert failed')
+      }
+      return base.insertDsl(row)
+    },
+  }
 }
 
 let store: InMemoryDslStore
@@ -339,5 +358,45 @@ describe('the soft slots are the three on the horse', () => {
     expect(saved.horse.aboutHorse).toBeNull()
     expect(saved.horse.racingOutlookAndPedigree).toBeNull()
     expect(saved.horse.raceExpectation).toBeNull()
+  })
+})
+
+describe('a save abandoned at its last leg does not lock the horse out', () => {
+  it('reuses the orphan horse instead of refusing its slug on retry', async () => {
+    const flaky = failingFirstDslInsert(store)
+
+    await expect(saveDsl(input(), flaky)).rejects.toThrow(/dsls insert failed/)
+    expect(store.dump().horses).toHaveLength(1)
+    expect(store.dump().dsls).toHaveLength(0)
+
+    const retry = await ok(await saveDsl(input(), flaky))
+    const rows = store.dump()
+    expect(rows.horses).toHaveLength(1)
+    expect(rows.dsls).toHaveLength(1)
+    expect(retry.dsl.horseId).toBe(retry.horse.id)
+    expect(rows.dsls[0].horseId).toBe(rows.horses[0].id)
+  })
+
+  it('takes the corrected values from the resubmission onto the orphan', async () => {
+    const flaky = failingFirstDslInsert(store)
+    await expect(saveDsl(input(), flaky)).rejects.toThrow(/dsls insert failed/)
+
+    const retry = await ok(
+      await saveDsl(
+        input({ horse: { ...input().horse, colour: 'Chestnut', imageCount: 3 } }),
+        flaky,
+      ),
+    )
+    expect(retry.horse.colour).toBe('Chestnut')
+    expect(retry.horse.imageCount).toBe(3)
+    expect(store.dump().horses).toHaveLength(1)
+  })
+
+  it('still refuses a slug collision once the horse has a DSL of its own', async () => {
+    await ok(await saveDsl(input(), store))
+    const second = await saveDsl(input(), store)
+    expect(second.ok).toBe(false)
+    expect(store.dump().horses).toHaveLength(1)
+    expect(store.dump().dsls).toHaveLength(1)
   })
 })

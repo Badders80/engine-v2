@@ -14,6 +14,11 @@
  *   redirect.
  * - No branding field is read. The branding controls on the page carry no name
  *   attribute, so they are never submitted and can never reach the database.
+ *
+ * The image upload is the second write path, and the only one that touches the
+ * public bucket. It exists because `00008_dsl_availability_trigger.sql` refuses
+ * `status = 'available'` below three images, so without it no listing could ever
+ * be published as available.
  */
 
 import { revalidatePath } from 'next/cache'
@@ -28,11 +33,14 @@ import {
   type HorseDraft,
   type OwnerDraft,
   type Result,
-  type SavedDsl,
   type SaveDslInput,
   type TrainerDraft,
 } from '@/lib/dsl'
+import type { HorseRow } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
+import { uploadPublicImage } from '@/lib/storage'
+
+import { loadDslView } from './data'
 
 function store() {
   return createSupabaseDslStore(supabaseClientFromEnv())
@@ -134,10 +142,15 @@ function toInput(form: FormData): Result<SaveDslInput> {
   return { ok: true, value: { horse, trainer, owner, dsl } }
 }
 
-/** A missing environment or a dead connection comes back as a reason, not a crash. */
-async function attempt(save: () => Promise<Result<SavedDsl>>): Promise<Result<SavedDsl>> {
+/**
+ * A missing environment or a dead connection comes back as a reason, not a crash.
+ *
+ * This unwraps a `Result` and never wraps one: the run hands back the result it
+ * already has, and only a thrown error is turned into one.
+ */
+async function attempt<T>(run: () => Promise<Result<T>>): Promise<Result<T>> {
   try {
-    return await save()
+    return await run()
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : 'the save failed' }
   }
@@ -177,4 +190,46 @@ export async function updateDslAction(form: FormData): Promise<void> {
 
   revalidatePath(`/dsl/${dslId}`)
   redirect(`/dsl/${dslId}`)
+}
+
+/**
+ * Upload one horse image and advance the stored count.
+ *
+ * Images are numbered `01` upward with no gap and no extension, so the next
+ * number is one past the count already on the horse: the stored figure and the
+ * bucket cannot drift apart. The key is built inside `uploadPublicImage` from
+ * the slug and that number, so the operator cannot name a path, and a non-image
+ * is refused before anything is written.
+ */
+export async function uploadHorseImageAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const file = form.get('image')
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`${back}?error=${encodeURIComponent('choose an image file to upload')}`)
+  }
+
+  const uploaded = await attempt<HorseRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const { horse } = view
+    const imageNumber = horse.imageCount + 1
+
+    await uploadPublicImage({
+      slug: horse.slug,
+      imageNumber,
+      body: new Uint8Array(await file.arrayBuffer()),
+      contentType: file.type,
+    })
+
+    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: imageNumber }) }
+  })
+
+  if (!uploaded.ok) redirect(`${back}?error=${encodeURIComponent(uploaded.reason)}`)
+
+  revalidatePath(back)
+  redirect(back)
 }

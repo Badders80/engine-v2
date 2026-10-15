@@ -380,6 +380,16 @@ export function createSupabaseDslStore(client: SupabaseClient): DslStore {
       return data === null ? null : toDsl(data)
     },
 
+    async countDslsByHorse(horseId) {
+      const { count, error } = await client
+        .from('dsls')
+        .select('id', { count: 'exact', head: true })
+        .eq('horse_id', horseId)
+
+      if (error) fail('dsls', error.message)
+      return count ?? 0
+    },
+
     async listDsls() {
       const { data, error } = await client
         .from('dsls')

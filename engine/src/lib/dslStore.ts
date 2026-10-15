@@ -107,6 +107,7 @@ export interface DslStore {
   updateHorse(id: string, patch: Partial<NewHorse>): Promise<HorseRow>
   findDslById(id: string): Promise<DslRow | null>
   findDslByHorseAndEndDate(horseId: string, endDate: string): Promise<DslRow | null>
+  countDslsByHorse(horseId: string): Promise<number>
   listDsls(): Promise<DslRow[]>
   insertDsl(row: NewDsl): Promise<DslRow>
   updateDsl(id: string, patch: Partial<NewDsl>): Promise<DslRow>
@@ -174,6 +175,9 @@ export function createInMemoryDslStore(): InMemoryDslStore {
     },
     async findDslByHorseAndEndDate(horseId, endDate) {
       return dsls.find((row) => row.horseId === horseId && row.endDate === endDate) ?? null
+    },
+    async countDslsByHorse(horseId) {
+      return dsls.filter((row) => row.horseId === horseId).length
     },
     async findTrainerById(id) {
       return trainers.find((row) => row.id === id) ?? null

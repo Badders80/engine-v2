@@ -1,1 +1,262 @@
 @import 'tailwindcss';
+
+/* ===========================================================================
+   Step 6a — the V2 theme, compiled from DESIGN.md (see ./DESIGN.md at the app root).
+
+   Three tiers, and the tier matters:
+     1. @theme        — Tailwind-namespaced keys only. These generate utilities.
+     2. @utility      — everything outside a Tailwind namespace (z, durations,
+                        scales). A bare custom property would generate nothing.
+     3. comments      — layout values and the component variant enums. They are
+                        documented rules, not fake utilities.
+
+   Retired, must never appear: ash #575757, smoke #454545, hairline #050505,
+   stage-black #000000, the l1-l4 ladder.
+   Trap: --color-muted is an alias onto the raised SURFACE (#111111) and is
+   surface-only. `text-muted` renders near-black type on a near-black canvas.
+   =========================================================================== */
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #030303;
+  --color-surface: #0a0a0a;
+  --color-raised: #111111;
+
+  /* Structure */
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-edge: #9a9aa0;
+  --color-disabled: #62666d;
+
+  /* Text */
+  --color-heading: #f8fafc;
+  --color-ink: rgba(255, 255, 255, 0.5);
+  --color-hover: #b9b3a9;
+  --color-muted-foreground: #7c7c7c;
+
+  /* Accent */
+  --color-gold: #d4a964;
+  --color-gold-hover: #c39853;
+  --color-on-gold: #0a0a0a;
+  --color-on-light: #0a0a0a;
+
+  /* Semantic */
+  --color-spot-mint: #00e599;
+  --color-status-active: #10b981;
+  --color-status-pending: #f59e0b;
+  --color-status-closed: #738396;
+  --color-destructive: #ef4444;
+
+  /* Legal document surface — scoped to .legal-doc */
+  --color-legal-surface: #ffffff;
+  --color-legal-ink: #111111;
+  --color-legal-surface-alt: #f5f5f5;
+  --color-legal-border: #dddddd;
+  --color-legal-checkbox: #b98a2f;
+
+  /* Type families */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-serif: var(--font-instrument-serif);
+
+  /* Type scale */
+  --text-micro: 10px;
+  --text-label: 11px;
+  --text-body-small: 15px;
+  --text-body: 16px;
+  --text-card-heading: 18px;
+  --text-section-heading: 36px;
+  --text-section-heading-wide: 48px;
+  --text-display: 64px;
+
+  /* Weights. 600 is not a step — it maps to 500. */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+
+  /* Leading */
+  --leading-none: 1;
+  --leading-display: 1.05;
+  --leading-heading: 1.25;
+  --leading-body: 1.625;
+
+  /* Tracking */
+  --tracking-label: 0.2em;
+  --tracking-nav: 0.15em;
+  --tracking-tag: 0.05em;
+  --tracking-display: -0.04em;
+
+  /* Radius. The bare `rounded` utility reads --radius; `bare` in DESIGN.md is
+     frontmatter-only and is not itself a utility name. rounded-none (0) and
+     rounded-full (9999px) are hardcoded in the utility and both legal. */
+  --radius: 8px;
+  --radius-xs: 8px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 24px;
+  --radius-2xl: 24px;
+  --radius-3xl: 24px;
+  --radius-4xl: 24px;
+  --radius-pill: 9999px;
+
+  /* Spacing */
+  --spacing-section: 224px;
+  --spacing-app-header-top: 128px;
+  --spacing-app-header-bottom: 96px;
+
+  /* Elevation */
+  --shadow-panel: 0 0 60px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 0 120px rgba(0, 0, 0, 0.98);
+  --shadow-float: 0 30px 80px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0 20px 40px rgba(0, 0, 0, 0.45);
+  --shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-glow-success: 0 0 8px rgba(16, 185, 129, 0.6);
+  --shadow-glow-gold: 0 0 12px rgba(212, 169, 100, 0.25);
+
+  /* Eases */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Tier 2 — @utility. Outside every Tailwind theme namespace, so these cannot be
+   @theme properties: a bare custom property generates no utility at all.
+   --------------------------------------------------------------------------- */
+
+/* z-ladder. `z: local [0,10,20]` is intra-component stacking and uses Tailwind's
+   own z-* utilities, so it is deliberately not bound here. */
+@utility z-grain {
+  z-index: -1;
+}
+@utility z-sticky {
+  z-index: 30;
+}
+@utility z-nav {
+  z-index: 40;
+}
+@utility z-drawer {
+  z-index: 50;
+}
+@utility z-modal {
+  z-index: 60;
+}
+
+/* Durations. micro animates a state change, so it carries both. */
+@utility duration-micro {
+  transition-duration: 140ms;
+  animation-duration: 140ms;
+}
+@utility duration-hover {
+  transition-duration: 200ms;
+}
+@utility duration-step {
+  transition-duration: 220ms;
+}
+@utility duration-collapse {
+  transition-duration: 300ms;
+}
+@utility duration-modal-enter {
+  transition-duration: 240ms;
+}
+@utility duration-modal-exit {
+  transition-duration: 160ms;
+}
+@utility duration-shimmer {
+  animation-duration: 2000ms;
+}
+
+/* Scales use Tailwind v4's own scale variables, never transform: scale(). */
+@utility scale-press {
+  --tw-scale-x: 0.98;
+  --tw-scale-y: 0.98;
+  --tw-scale-z: 0.98;
+  scale: var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z);
+}
+@utility scale-lift {
+  --tw-scale-x: 1.02;
+  --tw-scale-y: 1.02;
+  --tw-scale-z: 1.02;
+  scale: var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z);
+}
+
+/* ---------------------------------------------------------------------------
+   Named type roles. DESIGN.md §3 rule 4: never a raw generic — font-sans and
+   font-serif resolve differently per OS. Only named roles.
+   --------------------------------------------------------------------------- */
+
+@utility label-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+@utility label-action {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+@utility label-spec {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+@utility label-badge {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+/* The one reserved-drama role: an italic gold word inside a headline, and
+   nothing else. Named, so no component ever reaches for `font-serif`. */
+@utility type-accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------------
+   Tier 3 — documented rules. These generate no utilities.
+   layout: container max-w-6xl (1152px, every page surface and all chrome)
+           gutter [px-12, md:px-16, lg:px-20]
+           chrome_collapse 768px
+           touch_target 44px
+   components (variant enums, declared not built here):
+           listing-card [standard, featured] · status-badge [active, pending, settled]
+           navigation [transparent, solid] · footer [with-tagline, links-only]
+           mobile-bar [default] · menu-drawer [default]
+           button [solid, ghost] treatments [SolidPill, GhostPill, GlowPill]
+           figure-row [default, money] unit [stacked, inline]
+           form-field [field, capsule]
+   --------------------------------------------------------------------------- */
+
+/* The "As Featured In" marquee. DESIGN.md's motion block carries no marquee
+   duration, so this is a 6a-local constant and is named as such rather than
+   dressed up as a token. */
+@keyframes marquee-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@utility animate-marquee {
+  animation-name: marquee-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-duration: 40000ms;
+}
+
+/* Body owns the face. No component sets font-sans or font-serif. */
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: var(--leading-body);
+}

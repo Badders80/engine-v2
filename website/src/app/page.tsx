@@ -1,8 +1,16 @@
 import Image from 'next/image'
+import Link from 'next/link'
+
+import { LOGO_PATH, SITE_URL } from '../lib/site'
 
 // Step 6a landing page. The nine sections locked in audit/design/README.md
 // (decision 2, 2026-10-15). Reads zero rows from Postgres — nothing here waits
 // on a policy or on data.
+//
+// Step 6b-ii added the site half of the search layer: the organisation and the
+// website are carried here (PLAN.md:80), and the two marketplace calls to action
+// are links at last rather than paragraphs. The nine sections are otherwise
+// untouched, and the page still reads zero rows.
 //
 // Note on the hero: no horse or divider photography exists on disk (OPEN-2), so
 // the hero image stage is not built in 6a. The stage treatment is the lockup on
@@ -100,9 +108,46 @@ const PARTNERS = [
 
 const SHELL = 'mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20'
 
+/**
+ * The organisation and the website, and nothing else.
+ *
+ * `PLAN.md:80` puts both on the landing page. The horse's own structured data
+ * lives on its horse page at `/marketplace/[slug]`, never here (`PLAN.md:85`).
+ *
+ * Every URL is absolute and built from `SITE_URL`, because a canonical on the
+ * apex host is the mistake `PLAN.md:84` rules out. The logo is a path composed
+ * with the same origin rather than written out, so the `www` host has one home.
+ */
+const STRUCTURED_DATA = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: 'Evolution Stables',
+      url: SITE_URL,
+      description:
+        'Digital syndication for thoroughbred ownership. Regulated, transparent, and built on the horse.',
+      logo: `${SITE_URL}${LOGO_PATH}`,
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: 'Evolution Stables',
+      publisher: { '@id': `${SITE_URL}/#organization` },
+    },
+  ],
+}
+
 export default function Page() {
   return (
     <main className="bg-canvas text-ink">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+      />
+
       {/* 1 · Hero — horizontal brand lockup over the stage. No button. */}
       <section className={`${SHELL} pt-32 pb-24`}>
         <Image
@@ -174,9 +219,12 @@ export default function Page() {
             </li>
           ))}
         </ol>
-        <p className="label-action mt-16 inline-block rounded-pill border border-gold px-8 py-4 text-gold">
+        <Link
+          href="/marketplace"
+          className="label-action mt-16 inline-block rounded-pill border border-gold px-8 py-4 text-gold"
+        >
           Browse the marketplace
-        </p>
+        </Link>
       </section>
 
       {/* 6 · News & Updates — static shell in 6a, zero rows read. */}
@@ -233,9 +281,12 @@ export default function Page() {
         <h2 className="max-w-3xl text-section-heading-wide leading-display tracking-display text-heading">
           The Future of Ownership Has Arrived
         </h2>
-        <p className="label-action mt-12 inline-block rounded-pill bg-gold px-8 py-4 text-on-gold">
+        <Link
+          href="/marketplace"
+          className="label-action mt-12 inline-block rounded-pill bg-gold px-8 py-4 text-on-gold"
+        >
           Explore the marketplace
-        </p>
+        </Link>
       </section>
 
       <footer className={`${SHELL} border-t border-border py-16`}>

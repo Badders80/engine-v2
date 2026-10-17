@@ -18,6 +18,11 @@ const LISTINGS = join(SRC, 'lib', 'listings.ts')
 // The one file allowed to declare a status colour, because it is where the tokens
 // are defined. Same exemption scripts/assert-design-tokens.sh already makes.
 const THEME = join(SRC, 'app', 'globals.css')
+// Step 6b-ii. The one component that owns the status mapping, and therefore the
+// only file besides the theme that may name a status label or a status colour.
+// Two fences below existed so 6b-ii could not inherit a half-built map; 6b-ii built
+// the map, so each is narrowed to this single path rather than removed.
+const STATUS_MODULE = join(SRC, 'lib', 'status.ts')
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -148,24 +153,29 @@ describe('the fences that fail silently', () => {
     }
   })
 
-  it('renders no status label, leaving that to 6b-ii', () => {
+  it('renders a status label only in the status module', () => {
     // DESIGN.md applies uppercase in the component and keeps source strings in
-    // sentence case, so the uppercase forms are the ones that must not appear here.
+    // sentence case, so the uppercase forms are the ones that matter. 6b-i held
+    // this fence open for 6b-ii; the map now lives at src/lib/status.ts, so a
+    // status label anywhere else means a second, competing map has appeared.
     const labels = ['COMING SOON', 'AVAILABLE', 'FULLY ALLOCATED', 'COMPLETED']
     for (const { path, text } of SOURCES) {
+      if (path === STATUS_MODULE) continue
       for (const label of labels) {
         expect(text, `${path} carries the status label ${label}`).not.toContain(label)
       }
     }
   })
 
-  it('carries no status colour or design status key outside the theme file', () => {
+  it('carries a status colour or design status key only in the theme and the status module', () => {
     // globals.css declares --color-status-active/pending/closed; that is the token
-    // file doing its job, and 6a put them there. Everywhere else, a status colour
-    // or a DESIGN.md status key means a component has started building 6b-ii's map.
+    // file doing its job, and 6a put them there. src/lib/status.ts is the ruled
+    // translation, which is where those keys are meant to be consumed. Anywhere
+    // else, a status colour or a DESIGN.md status key means a component has grown
+    // its own private map.
     const statusKeys = ['status-active', 'status-pending', 'status-closed', 'fully_subscribed', 'coming_soon_details']
     for (const { path, text } of SOURCES) {
-      if (path === THEME) continue
+      if (path === THEME || path === STATUS_MODULE) continue
       for (const key of statusKeys) {
         expect(text, `${path} carries ${key}`).not.toContain(key)
       }

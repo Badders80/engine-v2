@@ -179,6 +179,45 @@ Local stack, REST at `127.0.0.1:54421`, as `anon`. The database held one fixture
 
 `published` is what puts a DSL on the site. An unpublished DSL is absent from the marketplace, absent from the sitemap, and rendered nowhere. And because the site reads `dsls` and joins outward, a horse with no DSL has no public page however complete it is.
 
+## The availability trigger, and the marketplace
+
+`00008_dsl_availability_trigger.sql` is a constraint trigger: a DSL may only sit at `available` when it is complete — published, priced, split assigned, and backed by a registered horse with at least three images. `image_count` and `registered` live on the horse, so it cannot be a CHECK constraint.
+
+**Nothing in this repo had ever executed it.** No test imports a database driver, no test opens a connection, and CI runs the suite with no database service, so every mention of `00008` across `engine/` was prose in a comment. `PLAN.md:333` parks the check "against the local stack before the first listing goes live", and step 6b-ii ships that listing — so it is this step's gate. It is recorded here rather than in `engine/tests/`, which must stay hermetic.
+
+### Recorded probe, 2026-10-17 — the trigger
+
+Local stack, Postgres at `127.0.0.1:54422`. A fixture was seeded first, because a probe against an empty database answers `[]` to every question and proves nothing — the vacuous green that let the missing `GRANT` survive step 6b-i's first draft. The fixture was one horse at `image_count = 2` and `registered = true`, two published DSLs on that horse with different end dates, one unpublished DSL, and a second horse carrying no DSL at all. It was removed afterwards and the database is empty again.
+
+| What was attempted | Observed |
+|---|---|
+| `update dsls set status = 'available'`, horse at 2 images | **Refused** — `cannot be available: horse … has 2 image(s), three is the minimum` |
+| the same update again after `image_count = 3` | **Accepted** — `status = 'available'` |
+| `status = 'available'` on the unpublished DSL | **Refused** — `cannot be available: published is false` |
+| `status = 'available'` with `investor_split` null | **Refused** — `cannot be available: investor_split is null` |
+
+Both directions are recorded deliberately. A trigger that refuses everything and a trigger that allows everything look identical when only one of them is tested.
+
+### Recorded probe, 2026-10-17 — the marketplace's own query
+
+The same fixture read as `anon`, through the exact select the site issues, so the page's query is proven rather than approximated. Two published DSLs sharing one slug is the state `PLAN.md:297` describes, and it is here on purpose.
+
+| Request | Observed |
+|---|---|
+| `dsls?select=<the site's select>&published=eq.true` | two rows, both `horses.slug = probe-horse` — the reader returns every published DSL on a horse, not just the first |
+| `dsls?select=id`, unfiltered | the two published rows only; the unpublished one is absent |
+| `dsls?…&horses.slug=eq.probe-unpublished` | `[]` — a slug with no published DSL resolves to no page |
+| `accounts?select=id` | `42501 permission denied for table accounts` |
+| `sales?select=id` | `42501 permission denied for table sales` |
+
+The two money figures came back as stored — `109` against a wholesale of `100`, and `130` against `120` — which is the site reading generated columns rather than computing them.
+
+### What an operator has to know when listing
+
+Three images minimum, the horse registered, the split assigned, and `published` true, or the DSL cannot sit at Available.
+
+The trigger fires on `dsls` writes only. Clearing a horse's `registered`, or dropping `image_count` below three, leaves an already-Available DSL standing — the gap parked in `PLAN.md` § Parked, which closes when the horse editor is built.
+
 ## Not operated yet
 
 These attach to the same rows later. They are not part of the first sale: a fuller investor profile, reservations, a race-by-race table, a payout engine, and automated monthly charges. Payment default, prize freeze, and forfeiture are printed procedures. A system that runs them is not part of this outcome.

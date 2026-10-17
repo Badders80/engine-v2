@@ -137,8 +137,17 @@ export async function listPublishedListings(): Promise<Listing[]> {
   return (data as unknown as ListingRow[]).map(toListing)
 }
 
-/** One published DSL by its horse's slug. Null when the slug names nothing published. */
-export async function getListingBySlug(slug: string): Promise<Listing | null> {
+/**
+ * Every published DSL on the horse named by `slug`.
+ *
+ * Plural on purpose. `PLAN.md:297` rules that a horse may carry more than one DSL
+ * and that the public URL is one page per horse, so the page needs all of them: a
+ * reader returning the first row would silently drop a published offering. The
+ * unique constraint on `dsls` is `(horse_id, end_date)`, not `horse_id`, so a
+ * second row is a legal state rather than a data error. An empty array means the
+ * slug names nothing published, and the caller decides that is a 404.
+ */
+export async function getListingsBySlug(slug: string): Promise<Listing[]> {
   const { data, error } = await createReadClient()
     .from('dsls')
     .select(LISTING_SELECT)
@@ -146,9 +155,8 @@ export async function getListingBySlug(slug: string): Promise<Listing | null> {
     .eq('horses.slug', slug)
 
   if (error) {
-    throw new Error(`getListingBySlug failed: ${error.message}`)
+    throw new Error(`getListingsBySlug failed: ${error.message}`)
   }
 
-  const rows = data as unknown as ListingRow[]
-  return rows.length > 0 ? toListing(rows[0]) : null
+  return (data as unknown as ListingRow[]).map(toListing)
 }

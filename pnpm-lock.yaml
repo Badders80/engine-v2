@@ -59,6 +59,9 @@ importers:
 
   website:
     dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.117.3
+        version: 2.117.3
       next:
         specifier: 15.5.27
         version: 15.5.27(@types/node@24.19.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

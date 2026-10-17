@@ -140,6 +140,45 @@ One surface. The same five screens on a phone and on a desktop. The layout reflo
 4. Pay. The browser goes to Stripe Checkout.
 5. Return. MyStable. Pending until the sale row exists. The stake is not called owned before that.
 
+## Read policies, and what the public site can see
+
+Migration `00009_website_read_policies.sql` is the whole of what the public site can read. Before it, every table was deny-by-default and the site could read nothing at all.
+
+### Click-path: applying the policies
+
+1. From the repo root, run `supabase migration up --local`. This applies the pending migrations to the local stack on 544xx and leaves whatever is already loaded alone.
+2. Do **not** run `supabase db reset`. It reapplies the whole series from empty and discards local rows.
+
+### The grants are part of the policies
+
+A policy with no matching `GRANT` is inert, and this caught us. Supabase sets default privileges on schema `public` twice — once for `supabase_admin`, once for `postgres` — and the `postgres` set gives `anon` and `authenticated` only `Dxtm`: truncate, references, trigger, maintain. No `r`. Every table in this series was created by `postgres`, so an anon read answered
+
+```
+{"code":"42501","message":"permission denied for table dsls",
+ "hint":"Grant the required privileges to the current role with: GRANT SELECT ON public.dsls TO anon;"}
+```
+
+rather than returning rows — and it did so before the policies landed as well as after. `00009` therefore grants select on the four public tables to `anon` and `authenticated`, and on `accounts` and `sales` to `authenticated` only. `scripts/assert-read-policies.sh` fails the build if any of the six grants disappears.
+
+### Recorded probe, 2026-10-17
+
+Local stack, REST at `127.0.0.1:54421`, as `anon`. The database held one fixture horse, two DSLs of which one was published, one account and one sale. The fixture was removed afterwards; the database is empty again and the six policies remain.
+
+| Request | Observed |
+|---|---|
+| `dsls?select=id,published` | `[{"id":"00000000-0000-0000-0000-0000000000d1","published":true}]` — the published row only |
+| `dsls?select=id&published=is.false` | `[]` |
+| `horses?select=id,slug` | `[{"id":"00000000-0000-0000-0000-0000000000c1","slug":"fixture-probe-horse"}]` |
+| `accounts?select=id` | `42501 permission denied for table accounts` |
+| `sales?select=id` | `42501 permission denied for table sales` |
+| `dsls?select=id,status,horses(slug,legal_name)` | the published row, with its horse embedded |
+
+`accounts` and `sales` answer with a permission error rather than `[]`, and that is intended: `anon` holds no grant on either and no visitor path reads them. Their policies are for the signed-in owner, proven the same day by assuming `authenticated` with `sub` set to the fixture account id — the owner read 1 account and 1 sale, a different account id read 0 of each.
+
+### What an operator has to know when listing
+
+`published` is what puts a DSL on the site. An unpublished DSL is absent from the marketplace, absent from the sitemap, and rendered nowhere. And because the site reads `dsls` and joins outward, a horse with no DSL has no public page however complete it is.
+
 ## Not operated yet
 
 These attach to the same rows later. They are not part of the first sale: a fuller investor profile, reservations, a race-by-race table, a payout engine, and automated monthly charges. Payment default, prize freeze, and forfeiture are printed procedures. A system that runs them is not part of this outcome.

@@ -95,7 +95,7 @@ const PARTNERS = [
   { src: '/images/partners/stephen-grey-racing.png', alt: 'Stephen Grey Racing', width: 160, height: 40 },
   { src: '/images/partners/tokinvest-light.png', alt: 'Tokinvest', width: 150, height: 40 },
   { src: '/images/partners/trackside-nz.png', alt: 'Trackside NZ', width: 150, height: 40 },
-  { src: '/images/partners/wexford-stables.png', alt: 'Wexford Stables', width: 150, height: 40 },
+  { src: '/images/partners/wexford-stables.jpg', alt: 'Wexford Stables', width: 150, height: 40 },
 ]
 
 const SHELL = 'mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20'

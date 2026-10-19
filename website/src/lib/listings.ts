@@ -12,8 +12,9 @@
  * colour here. Mapping the enum onto the design vocabulary is step 6b-ii's job,
  * and keeping it out of this file is what makes the two steps separable.
  *
- * No ordering is applied. Neither PLAN.md nor OUTCOME.md states a marketplace
- * sort order, so none is invented here; the grid's order is a 6b-ii question.
+ * Ordering is applied by `sortForMarketplace` and nowhere else. The query holds
+ * no server-side order clause, so the ruled sequence is one pure function this
+ * suite can see rather than a PostgREST clause no test can reach.
  */
 
 import { createReadClient } from './supabaseRead'
@@ -121,6 +122,64 @@ export function toListing(row: ListingRow): Listing {
       imageCount: row.horses.image_count,
     },
   }
+}
+
+/**
+ * The ruled marketplace order. Founder ruling 2026-10-20.
+ *
+ * Ranked by status, most buyable first, and keyed on the database enum — the
+ * value `Listing.status` already carries — so no design key and no label enters
+ * the read layer. `fully_allocated` precedes `completed` because a fully
+ * subscribed offer is still a live record of the horse; `completed` is terminal.
+ */
+export const MARKETPLACE_STATUS_RANK: Record<DslStatus, number> = {
+  available: 0,
+  coming_soon: 1,
+  fully_allocated: 2,
+  completed: 3,
+}
+
+/**
+ * The rank of a status, or an error. A value outside the four members is a
+ * translation failure rather than an ordering question: the design law makes an
+ * unrecognised status an error, so it throws here too instead of sorting to an
+ * arbitrary place.
+ */
+export function marketplaceRank(status: string): number {
+  const rank = (MARKETPLACE_STATUS_RANK as Record<string, number | undefined>)[status]
+  if (rank === undefined) {
+    throw new Error(`No marketplace rank for DSL status: ${status}`)
+  }
+  return rank
+}
+
+/**
+ * The marketplace grid's order, and the only place it is applied. Pure, and it
+ * returns a new array: the read layer's rows are never rearranged in place.
+ *
+ * Within a status rank the soonest-closing offer comes first (`end_date`
+ * ascending). Ties fall back to the horse's legal name, then to the DSL id, so
+ * the order is total even when two rows share a status, a date and a name. The
+ * sitemap is deliberately unaffected — it consumes `listPublishedListings()`
+ * directly, and a sitemap has no order to rule.
+ */
+export function sortForMarketplace(listings: Listing[]): Listing[] {
+  // Validate before sorting. A comparator only runs when there are two or more
+  // rows, so a lone unrecognised status would otherwise reach the grid
+  // unchallenged — and the design law makes that value an error, not a row.
+  for (const listing of listings) marketplaceRank(listing.status)
+
+  return [...listings].sort((a, b) => {
+    const byRank = marketplaceRank(a.status) - marketplaceRank(b.status)
+    if (byRank !== 0) return byRank
+
+    if (a.endDate !== b.endDate) return a.endDate < b.endDate ? -1 : 1
+
+    const byName = a.horse.legalName.localeCompare(b.horse.legalName)
+    if (byName !== 0) return byName
+
+    return a.id.localeCompare(b.id)
+  })
 }
 
 /** Every published DSL, Coming Soon included. Unpublished rows are absent by policy. */

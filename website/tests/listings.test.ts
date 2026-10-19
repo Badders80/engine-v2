@@ -4,7 +4,14 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { toListing, type ListingRow } from '../src/lib/listings'
+import {
+  DSL_STATUS_VALUES,
+  MARKETPLACE_STATUS_RANK,
+  sortForMarketplace,
+  toListing,
+  type Listing,
+  type ListingRow,
+} from '../src/lib/listings'
 
 // Hermetic by construction. Nothing here opens a connection and nothing imports
 // a database driver: CI runs `pnpm test` with no database service at all, so the
@@ -97,6 +104,92 @@ describe('the listing projection', () => {
   })
 })
 
+type ListingOverrides = Omit<Partial<ListingRow>, 'horses'> & {
+  horses?: Partial<ListingRow['horses']>
+}
+
+/** One Listing from the fixture row, changing only what a test names. */
+function listing(overrides: ListingOverrides = {}): Listing {
+  return toListing({
+    ...ROW,
+    ...overrides,
+    horses: { ...ROW.horses, ...overrides.horses },
+  })
+}
+
+describe('the marketplace order', () => {
+  it('ranks every status the read layer can carry', () => {
+    // Exhaustive by type, but this pins it: a fifth enum value added to the
+    // database would fail here rather than silently sort to the end.
+    expect(Object.keys(MARKETPLACE_STATUS_RANK).sort()).toEqual([...DSL_STATUS_VALUES].sort())
+  })
+
+  it('orders available, then coming soon, then fully allocated, then completed', () => {
+    const unordered = ['completed', 'fully_allocated', 'coming_soon', 'available'].map(
+      (status, index) => listing({ id: `dsl-${index}`, status, end_date: '2027-01-01' }),
+    )
+
+    expect(sortForMarketplace(unordered).map((item) => item.status)).toEqual([
+      'available',
+      'coming_soon',
+      'fully_allocated',
+      'completed',
+    ])
+  })
+
+  it('breaks a status tie by the soonest end date, then by horse name', () => {
+    const unordered = [
+      listing({
+        id: 'b',
+        status: 'available',
+        end_date: '2027-06-30',
+        horses: { slug: 'zeta', legal_name: 'Zeta' },
+      }),
+      listing({
+        id: 'a',
+        status: 'available',
+        end_date: '2027-01-31',
+        horses: { slug: 'alpha', legal_name: 'Alpha' },
+      }),
+      listing({
+        id: 'c',
+        status: 'available',
+        end_date: '2027-06-30',
+        horses: { slug: 'beta', legal_name: 'Beta' },
+      }),
+      listing({
+        id: 'd',
+        status: 'available',
+        end_date: '2027-01-31',
+        horses: { slug: 'gamma', legal_name: 'Gamma' },
+      }),
+    ]
+
+    expect(sortForMarketplace(unordered).map((item) => item.id)).toEqual(['a', 'd', 'c', 'b'])
+  })
+
+  it('throws on a status outside the four members rather than placing it', () => {
+    // Same rule as the status map: an unrecognised value is an error, not a row
+    // that quietly lands at the bottom of the grid.
+    const unknown = { ...listing(), status: 'something_else' as unknown as Listing['status'] }
+
+    expect(() => sortForMarketplace([unknown])).toThrow(/something_else/)
+  })
+
+  it('returns a new array and leaves the read layer in place', () => {
+    const input = [
+      listing({ id: 'b', status: 'completed' }),
+      listing({ id: 'a', status: 'available' }),
+    ]
+    const before = [...input]
+
+    const sorted = sortForMarketplace(input)
+
+    expect(input).toEqual(before)
+    expect(sorted).not.toBe(input)
+  })
+})
+
 describe('the reads originate at dsls', () => {
   it('never reads a fenced table directly', () => {
     // `published` lives only on dsls. horses, trainers and owners are readable to
@@ -119,9 +212,10 @@ describe('the reads originate at dsls', () => {
     expect(readFileSync(LISTINGS, 'utf8')).toContain('horses!inner(')
   })
 
-  it('applies no ordering, because no ordering rule exists', () => {
-    // Neither PLAN.md nor OUTCOME.md states a marketplace sort order. Sorting here
-    // would be an invented rule; the grid's order is a 6b-ii question.
+  it('holds the ruled order in one pure function, not in the query', () => {
+    // The founder ruled the sequence 2026-10-20: available, coming_soon,
+    // fully_allocated, completed. It lives in sortForMarketplace, where this suite
+    // can grade it; a PostgREST `.order(` clause would be invisible from here.
     expect(readFileSync(LISTINGS, 'utf8')).not.toMatch(/\.order\(/)
   })
 

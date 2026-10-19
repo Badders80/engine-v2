@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import StatusBadge from '../../components/StatusBadge'
-import { listPublishedListings, type Listing } from '../../lib/listings'
+import { listPublishedListings, sortForMarketplace, type Listing } from '../../lib/listings'
 import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../lib/site'
 
 /**
@@ -21,8 +21,10 @@ import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../lib/s
  * request also satisfies PLAN.md:90 — the first response carries the horse name,
  * the status, and the image as HTML.
  *
- * No ordering. Neither PLAN.md nor OUTCOME.md states a marketplace sort order, so
- * none is invented here; 6b-i pinned the same absence for the read layer.
+ * The grid's order is ruled, 2026-10-20: `available`, `coming_soon`,
+ * `fully_allocated`, `completed`, and within a rank the soonest-closing offer
+ * first. It is applied by `sortForMarketplace` — one pure function with its own
+ * tests — so this page holds no ordering logic of its own.
  */
 
 export const dynamic = 'force-dynamic'
@@ -104,7 +106,7 @@ function ListingCard({ listing }: { listing: Listing }) {
 }
 
 export default async function MarketplacePage() {
-  const listings = await listPublishedListings()
+  const listings = sortForMarketplace(await listPublishedListings())
 
   return (
     <main className="bg-canvas text-ink">

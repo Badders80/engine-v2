@@ -16,6 +16,30 @@ The first payment is the one the webhook records. Later monthly charges, failed 
 
 The price is the rules module, copied from `sandbox/rebuild/src/lib/pricing.ts`. Listed price is wholesale cost times 1.05 times 1.03, rounded up to the next whole dollar. The first payment is five months: 3 months reserve plus 2 months prepaid. Refunds follow the Refund section of `OUTCOME.md`.
 
+## Payment models
+
+Two models, locked 2026-10-20. `upfront` collects 100% of the lease term at checkout and charges nothing after. `subscription_float` collects five months upfront (3 months deposit reserve + 2 months prepaid) and then bills monthly. `upfront` is available for any term. A term of 5 months or less must use `upfront`, because the five-month initial payment already covers the whole term. A term of 6 months or more may use either, defaulting to `subscription_float`.
+
+The rule is enforced from one inclusive-month count, defined in `engine/src/lib/term.ts` and mirrored by `public.dsl_term_months`:
+
+- the save gate, `checkCommercialTerms` in `engine/src/lib/dsl.ts`, shared by create and edit;
+- the payment field, `engine/src/app/dsl/PaymentModelField.tsx`, which forces and locks `upfront` at 5 months or less;
+- the database, the trigger in `supabase/migrations/00010_payment_model_eligibility.sql`.
+
+The field is a convenience, not the gate. With JavaScript off, the save still refuses the illegal combination, and the database refuses it even if the application gate is bypassed.
+
+### Recorded probe, 2026-10-20 — migration 00010
+
+Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422`. One seeded horse, three writes, fixture removed in the same session:
+
+```
+5-month subscription_float  -> ERROR: a 5-month term must use upfront; subscription_float requires 6 months or more
+5-month upfront             -> INSERT 0 1
+6-month subscription_float  -> INSERT 0 1
+```
+
+After cleanup, `dsls` and `horses` both returned to 0 rows.
+
 ## Identity and private files
 
 Signup and login are Supabase Auth, Google or email. Full name is collected at signup. The account row stores full name, email, and KYC status.

@@ -29,6 +29,7 @@ import {
   type TrainerRow,
 } from './dslStore'
 import { isInvestorReturnPctInRange, retailPerPercentFromWholesale, validateStake } from './pricing'
+import { paymentModelAllowed, termMonthsBetween } from './term'
 
 export const DSL_STATUSES = DSL_STATUS_VALUES
 
@@ -191,6 +192,18 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
     validateStake(listedStake, step)
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : 'invalid stake shape' }
+  }
+
+  const termMonths = termMonthsBetween(dsl.termStart, dsl.endDate)
+  if (termMonths === null || termMonths < 1) {
+    return { ok: false, reason: 'term dates are invalid' }
+  }
+
+  if (!paymentModelAllowed(dsl.paymentModel, termMonths)) {
+    return {
+      ok: false,
+      reason: `a ${termMonths}-month term must use upfront; subscription_float requires 6 months or more`,
+    }
   }
 
   return { ok: true }

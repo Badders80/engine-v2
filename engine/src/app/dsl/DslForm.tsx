@@ -11,6 +11,8 @@
 
 import type { DslDraft, HorseDraft } from '@/lib/dsl'
 
+import { PaymentModelField } from './PaymentModelField'
+
 export type DslFormDefaults = {
   horse?: Partial<HorseDraft>
   trainer?: {
@@ -235,13 +237,11 @@ export function DslForm({ action, submitLabel, defaults = {}, error = null, dslI
           />
         </label>
 
-        <label>
-          Payment style
-          <select name="paymentModel" defaultValue={dsl.paymentModel ?? 'subscription_float'}>
-            <option value="subscription_float">subscription_float</option>
-            <option value="upfront">upfront</option>
-          </select>
-        </label>
+        <PaymentModelField
+          defaultValue={dsl.paymentModel ?? 'subscription_float'}
+          defaultTermStart={dsl.termStart ?? ''}
+          defaultEndDate={dsl.endDate ?? ''}
+        />
 
         <label>
           Close style

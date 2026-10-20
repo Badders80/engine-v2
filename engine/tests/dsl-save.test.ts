@@ -400,3 +400,93 @@ describe('a save abandoned at its last leg does not lock the horse out', () => {
     expect(store.dump().dsls).toHaveLength(1)
   })
 })
+
+describe('the payment-model rule holds on save', () => {
+  const shortTerms = [
+    { termStart: '2026-01-01', endDate: '2026-03-31' }, // 3 months
+    { termStart: '2026-01-01', endDate: '2026-04-30' }, // 4 months
+    { termStart: '2026-01-01', endDate: '2026-05-31' }, // 5 months
+  ]
+
+  it('refuses subscription_float at 3, 4, and 5 months, writing nothing', async () => {
+    for (const dates of shortTerms) {
+      const scoped = createInMemoryDslStore()
+      const result = await saveDsl(
+        input({ dsl: draft({ ...dates, paymentModel: 'subscription_float' }) }),
+        scoped,
+      )
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected the short float to be refused')
+      expect(result.reason).toMatch(/must use upfront/)
+      expect(scoped.dump().horses).toHaveLength(0)
+      expect(scoped.dump().dsls).toHaveLength(0)
+    }
+  })
+
+  it('accepts upfront at 5 months', async () => {
+    const saved = await ok(
+      await saveDsl(
+        input({
+          dsl: draft({
+            termStart: '2026-01-01',
+            endDate: '2026-05-31',
+            paymentModel: 'upfront',
+          }),
+        }),
+        store,
+      ),
+    )
+    expect(saved.dsl.paymentModel).toBe('upfront')
+  })
+
+  it('accepts either model at 6 months', async () => {
+    for (const paymentModel of ['subscription_float', 'upfront'] as const) {
+      const scoped = createInMemoryDslStore()
+      const saved = await ok(
+        await saveDsl(
+          input({
+            dsl: draft({
+              termStart: '2026-01-01',
+              endDate: '2026-06-01',
+              paymentModel,
+            }),
+          }),
+          scoped,
+        ),
+      )
+      expect(saved.dsl.paymentModel).toBe(paymentModel)
+    }
+  })
+
+  it('accepts upfront at 18 months', async () => {
+    const saved = await ok(
+      await saveDsl(
+        input({
+          dsl: draft({
+            termStart: '2026-01-01',
+            endDate: '2027-06-30',
+            paymentModel: 'upfront',
+          }),
+        }),
+        store,
+      ),
+    )
+    expect(saved.dsl.paymentModel).toBe('upfront')
+  })
+
+  it('refuses invalid term dates, writing nothing', async () => {
+    for (const dates of [
+      { termStart: '2026-01-01', endDate: '2026-13-01' },
+      { termStart: '2026-06-01', endDate: '2026-05-31' },
+    ]) {
+      const scoped = createInMemoryDslStore()
+      const result = await saveDsl(input({ dsl: draft(dates) }), scoped)
+
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('expected the invalid term to be refused')
+      expect(result.reason).toMatch(/term dates are invalid/)
+      expect(scoped.dump().horses).toHaveLength(0)
+    }
+  })
+})

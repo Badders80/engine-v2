@@ -322,3 +322,44 @@ describe('the rules specific to editing', () => {
     expect(rows.dsls).toHaveLength(1)
   })
 })
+
+describe('the payment-model rule holds on edit', () => {
+  it('refuses to move an existing float to a 5-month term, leaving the row alone', async () => {
+    const seedRow = await seed()
+    const result = await updateDsl(
+      edit(seedRow, {
+        dsl: draft({ termStart: '2026-01-01', endDate: '2026-05-31' }),
+      }),
+      store,
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected the short float to be refused')
+    expect(result.reason).toMatch(/must use upfront/)
+
+    const stored = store.dump().dsls[0]
+    expect(stored.paymentModel).toBe('subscription_float')
+    expect(stored.termStart).toBe('2026-11-01')
+    expect(stored.endDate).toBe('2029-05-01')
+  })
+
+  it('accepts the same 5-month term once the model is upfront', async () => {
+    const seedRow = await seed()
+    const saved = await ok(
+      await updateDsl(
+        edit(seedRow, {
+          dsl: draft({
+            termStart: '2026-01-01',
+            endDate: '2026-05-31',
+            paymentModel: 'upfront',
+          }),
+        }),
+        store,
+      ),
+    )
+
+    expect(saved.dsl.paymentModel).toBe('upfront')
+    expect(saved.dsl.termStart).toBe('2026-01-01')
+    expect(saved.dsl.endDate).toBe('2026-05-31')
+  })
+})

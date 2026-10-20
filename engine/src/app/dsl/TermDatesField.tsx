@@ -14,19 +14,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { termMonthsBetween } from '@/lib/term'
+import { isMonthEnd, isMonthStart, termMonthsBetween } from '@/lib/term'
 
 type Props = {
   defaultTermStart?: string
   defaultEndDate?: string
 }
 
-const MESSAGE =
-  'A term starts on the 1st of a month and ends on the last day of a month, and the end must follow the start.'
-
 function problem(start: string, end: string): string | null {
   if (start === '' || end === '') return null
-  return termMonthsBetween(start, end) === null ? MESSAGE : null
+  if (!isMonthStart(start)) return 'The term start must be the 1st of a month.'
+  if (!isMonthEnd(end)) return 'The end date must be the last day of its month.'
+  if (termMonthsBetween(start, end) === null) return 'The end date must follow the start date.'
+  return null
 }
 
 export function TermDatesField({ defaultTermStart = '', defaultEndDate = '' }: Props) {

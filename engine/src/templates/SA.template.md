@@ -60,7 +60,7 @@ Members pay for the duration of their participation under one of two models spec
 
 - **Subscription Float Model:**
   - **Initial payment:** 5 months of this stake's monthly payment, comprising 3 months security deposit reserve and 2 months prepaid (the current calendar month and 1 month in advance).
-  - **Monthly payment:** {{pricing.monthly_lease_payment_unit_nzd}} per month per 1% stake, billed on the 1st of each calendar month, maintaining a constant 5-month float buffer.
+  - **Monthly payment:** {{pricing.monthly_lease_payment_unit_nzd}} per month per 1% stake, billed on the 1st of each calendar month, maintaining a 5-month float buffer, drawn down in the final months of the term.
   - **First recurring payment:** Billed on the 1st of the calendar month following join, paying for Month 3 in advance.
 - **Upfront Model:** A single payment covering 100% of the lease term collected at checkout with zero subsequent monthly charges.
 

@@ -98,7 +98,7 @@ Participation operates under one of two payment structures:
 
 - **Subscription Float Model:**
   - An initial payment representing 5 months of the stake rate (3 months security deposit reserve + 2 months prepaid: current calendar month and 1 month in advance).
-  - Ongoing monthly payments of {{pricing.monthly_lease_payment_unit_nzd}} per 1% stake billed on the 1st of each month commencing on the 1st of the month following join (paying for Month 3 in advance), maintaining a constant 5-month float buffer.
+  - Ongoing monthly payments of {{pricing.monthly_lease_payment_unit_nzd}} per 1% stake billed on the 1st of each month commencing on the 1st of the month following join (paying for Month 3 in advance), maintaining a 5-month float buffer, drawn down in the final months of the term.
 - **Upfront Model:** 100% of the lease term payment collected at checkout with zero subsequent charges.
 
 ---

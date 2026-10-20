@@ -60,7 +60,7 @@ function input(overrides: Overrides = {}): LegalPackInput {
 }
 
 const FLOAT_TERMS = { termStart: '2026-01-01', endDate: '2026-05-31' } // 5 months
-const SIX_MONTHS = { termStart: '2026-01-01', endDate: '2026-06-01' } // 6 months
+const SIX_MONTHS = { termStart: '2026-01-01', endDate: '2026-06-30' } // 6 months
 const THREE_MONTHS = { termStart: '2026-01-01', endDate: '2026-03-31' } // 3 months
 const EIGHTEEN_MONTHS = { termStart: '2026-01-01', endDate: '2027-06-30' } // 18 months
 

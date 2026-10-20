@@ -24,7 +24,7 @@ const BRANDING_SENTINEL = 'BRANDING-SENTINEL-NOT-STORED'
 
 function draft(overrides: Partial<DslDraft> = {}): DslDraft {
   return {
-    endDate: '2029-05-01',
+    endDate: '2029-05-31',
     termStart: '2026-11-01',
     paymentModel: 'subscription_float',
     closeStyle: 'fourteen_day',
@@ -448,7 +448,7 @@ describe('the payment-model rule holds on save', () => {
           input({
             dsl: draft({
               termStart: '2026-01-01',
-              endDate: '2026-06-01',
+              endDate: '2026-06-30',
               paymentModel,
             }),
           }),
@@ -479,6 +479,9 @@ describe('the payment-model rule holds on save', () => {
     for (const dates of [
       { termStart: '2026-01-01', endDate: '2026-13-01' },
       { termStart: '2026-06-01', endDate: '2026-05-31' },
+      { termStart: '2026-03-20', endDate: '2026-03-01' },
+      { termStart: '2026-01-15', endDate: '2026-06-30' },
+      { termStart: '2026-01-01', endDate: '2026-06-15' },
     ]) {
       const scoped = createInMemoryDslStore()
       const result = await saveDsl(input({ dsl: draft(dates) }), scoped)

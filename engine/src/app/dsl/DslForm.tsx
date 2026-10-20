@@ -12,6 +12,7 @@
 import type { DslDraft, HorseDraft } from '@/lib/dsl'
 
 import { PaymentModelField } from './PaymentModelField'
+import { TermDatesField } from './TermDatesField'
 
 export type DslFormDefaults = {
   horse?: Partial<HorseDraft>
@@ -293,15 +294,10 @@ export function DslForm({ action, submitLabel, defaults = {}, error = null, dslI
           <input type="number" step="0.01" name="step" defaultValue={dsl.step ?? ''} required />
         </label>
 
-        <label>
-          Term start
-          <input type="date" name="termStart" defaultValue={dsl.termStart ?? ''} required />
-        </label>
-
-        <label>
-          End date
-          <input type="date" name="endDate" defaultValue={dsl.endDate ?? ''} required />
-        </label>
+        <TermDatesField
+          defaultTermStart={dsl.termStart ?? ''}
+          defaultEndDate={dsl.endDate ?? ''}
+        />
 
         <label>
           Distribution schedule

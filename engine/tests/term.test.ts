@@ -8,19 +8,20 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { paymentModelAllowed, termMonthsBetween } from '../src/lib/term'
+import {
+  isMonthEnd,
+  isMonthStart,
+  paymentModelAllowed,
+  termMonthsBetween,
+} from '../src/lib/term'
 
 describe('inclusive full-calendar months', () => {
   it('counts 1 January to 31 May as five months', () => {
     expect(termMonthsBetween('2026-01-01', '2026-05-31')).toBe(5)
   })
 
-  it('counts 1 January to 1 June as six months', () => {
-    expect(termMonthsBetween('2026-01-01', '2026-06-01')).toBe(6)
-  })
-
-  it('counts by calendar months, not by days', () => {
-    expect(termMonthsBetween('2026-01-15', '2026-06-30')).toBe(6)
+  it('counts 1 January to 30 June as six months', () => {
+    expect(termMonthsBetween('2026-01-01', '2026-06-30')).toBe(6)
   })
 
   it('counts an 18-month term', () => {
@@ -35,8 +36,20 @@ describe('inclusive full-calendar months', () => {
     expect(termMonthsBetween('2026-11-01', '2027-01-31')).toBe(3)
   })
 
-  it('returns zero when the end precedes the start', () => {
-    expect(termMonthsBetween('2026-06-01', '2026-05-31')).toBe(0)
+  it('refuses a start that is not the first of its month', () => {
+    expect(termMonthsBetween('2026-01-15', '2026-06-30')).toBeNull()
+  })
+
+  it('refuses an end that is not the last day of its month', () => {
+    expect(termMonthsBetween('2026-01-01', '2026-06-15')).toBeNull()
+  })
+
+  it('refuses a same-month term that ends before it starts', () => {
+    expect(termMonthsBetween('2026-03-20', '2026-03-01')).toBeNull()
+  })
+
+  it('refuses a cross-month term that ends before it starts', () => {
+    expect(termMonthsBetween('2026-06-01', '2026-05-31')).toBeNull()
   })
 
   it('returns null for a malformed or impossible date', () => {
@@ -50,6 +63,22 @@ describe('inclusive full-calendar months', () => {
     ]) {
       expect(termMonthsBetween(start, end)).toBeNull()
     }
+  })
+})
+
+describe('the month-boundary predicates', () => {
+  it('recognises the first of a month', () => {
+    expect(isMonthStart('2026-01-01')).toBe(true)
+    expect(isMonthStart('2026-01-02')).toBe(false)
+    expect(isMonthStart('nope')).toBe(false)
+  })
+
+  it('recognises the last day, including February in a leap year', () => {
+    expect(isMonthEnd('2026-01-31')).toBe(true)
+    expect(isMonthEnd('2024-02-29')).toBe(true)
+    expect(isMonthEnd('2026-02-28')).toBe(true)
+    expect(isMonthEnd('2026-02-27')).toBe(false)
+    expect(isMonthEnd('2026-04-30')).toBe(true)
   })
 })
 

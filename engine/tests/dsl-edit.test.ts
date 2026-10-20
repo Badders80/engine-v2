@@ -21,7 +21,7 @@ import { retailPerPercentFromWholesale } from '../src/lib/pricing'
 
 function draft(overrides: Partial<DslDraft> = {}): DslDraft {
   return {
-    endDate: '2029-05-01',
+    endDate: '2029-05-31',
     termStart: '2026-11-01',
     paymentModel: 'subscription_float',
     closeStyle: 'fourteen_day',
@@ -268,16 +268,16 @@ describe('the rules specific to editing', () => {
   it('refuses an end date this horse already has a DSL for', async () => {
     const seedRow = await seed()
     // The store gives the inserted row its own id, so the seeded one is harmless.
-    await store.insertDsl({ ...seedRow.dsl, endDate: '2030-05-01' })
+    await store.insertDsl({ ...seedRow.dsl, endDate: '2030-05-31' })
 
     const result = await updateDsl(
-      edit(seedRow, { dsl: draft({ endDate: '2030-05-01' }) }),
+      edit(seedRow, { dsl: draft({ endDate: '2030-05-31' }) }),
       store,
     )
 
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected a refusal')
-    expect(result.reason).toMatch(/2030-05-01/)
+    expect(result.reason).toMatch(/2030-05-31/)
     expect(store.dump().dsls).toHaveLength(2)
   })
 
@@ -340,7 +340,7 @@ describe('the payment-model rule holds on edit', () => {
     const stored = store.dump().dsls[0]
     expect(stored.paymentModel).toBe('subscription_float')
     expect(stored.termStart).toBe('2026-11-01')
-    expect(stored.endDate).toBe('2029-05-01')
+    expect(stored.endDate).toBe('2029-05-31')
   })
 
   it('accepts the same 5-month term once the model is upfront', async () => {

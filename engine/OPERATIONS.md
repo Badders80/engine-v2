@@ -27,6 +27,8 @@ The rule is enforced from one inclusive-month count, defined in `engine/src/lib/
 - the database, the trigger in `supabase/migrations/00010_payment_model_eligibility.sql`;
 - the compiler, `engine/src/lib/legal/compile.ts`, which refuses to produce a document for an illegal combination.
 
+A legal term starts on the **1st** of a month and ends on the **last day** of a month, and it must end after it starts. The templates count the lease term in full calendar months, so a mid-month date is not a term. The form warns on a bad pair (`TermDatesField`), the save refuses it, and migration `00011` refuses it at the database. Ruling of 2026-10-20.
+
 The field is a convenience, not the gate. With JavaScript off, the save still refuses the illegal combination, and the database refuses it even if the application gate is bypassed.
 
 ### Recorded probe, 2026-10-20 — migration 00010
@@ -37,6 +39,22 @@ Applied with `supabase migration up --local`, then run with `psql` against `127.
 5-month subscription_float  -> ERROR: a 5-month term must use upfront; subscription_float requires 6 months or more
 5-month upfront             -> INSERT 0 1
 6-month subscription_float  -> INSERT 0 1
+```
+
+After cleanup, `dsls` and `horses` both returned to 0 rows.
+
+### Recorded probe, 2026-10-20 — migration 00011
+
+Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422` on one seeded horse, fixture removed in the same session:
+
+```
+2026-01-15 -> 2026-06-30, upfront            -> ERROR: a term starts on the 1st and ends on the last day of a month, and the end must follow the start
+2026-01-01 -> 2026-06-15, upfront            -> ERROR: a term starts on the 1st and ends on the last day of a month, and the end must follow the start
+2026-03-20 -> 2026-03-01, upfront            -> ERROR: a term starts on the 1st and ends on the last day of a month, and the end must follow the start
+2026-06-01 -> 2026-05-31, upfront            -> ERROR: a term starts on the 1st and ends on the last day of a month, and the end must follow the start
+2026-01-01 -> 2026-05-31, subscription_float -> ERROR: a 5-month term must use upfront; subscription_float requires 6 months or more
+2026-01-01 -> 2026-05-31, upfront            -> INSERT 0 1
+2026-01-01 -> 2026-06-30, subscription_float -> INSERT 0 1
 ```
 
 After cleanup, `dsls` and `horses` both returned to 0 rows.

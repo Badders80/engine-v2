@@ -24,7 +24,8 @@ The rule is enforced from one inclusive-month count, defined in `engine/src/lib/
 
 - the save gate, `checkCommercialTerms` in `engine/src/lib/dsl.ts`, shared by create and edit;
 - the payment field, `engine/src/app/dsl/PaymentModelField.tsx`, which forces and locks `upfront` at 5 months or less;
-- the database, the trigger in `supabase/migrations/00010_payment_model_eligibility.sql`.
+- the database, the trigger in `supabase/migrations/00010_payment_model_eligibility.sql`;
+- the compiler, `engine/src/lib/legal/compile.ts`, which refuses to produce a document for an illegal combination.
 
 The field is a convenience, not the gate. With JavaScript off, the save still refuses the illegal combination, and the database refuses it even if the application gate is bypassed.
 
@@ -142,6 +143,36 @@ Check the run before writing the count. A folder must be `01..NN` with no gap an
 The engine compiles the PDS and the SA as markdown from the horse, the trainer, and the DSL. The promoter line on every document is Alex Baddeley, Evolution Stables Ltd. The buyer accepts both in the buy flow, including the four declarations named in `PLAN.md`. The webhook stores the markdown and the hashes on the sale. A later edit to the horse does not change a document already sold.
 
 The legal check is the principles note in the repo, cited to the September 2026 Rules of Racing PDF and the Fixed Monthly pro-forma. The Word files are not filled in.
+
+The compiler lives in `engine/src/lib/legal/`. It loads `SA.template.md`, `PDS.template.md`, and the four files under `engine/src/templates/blocks/`, substitutes every `{{token}}` from `tokens.ts`, and returns both Markdown strings with their SHA-256. It writes no prose: every sentence comes from a file under `engine/src/templates/`. A missing required value, an unknown token, a dangling brace, or a banned term stops the compile with the column or token named.
+
+### Click-path: previewing the documents
+
+1. Open `/dsl/<id>` on the engine.
+2. Follow **Legal preview**.
+3. Set the stake, the buyer name, and the execution date, then press Compile.
+4. The page shows both documents and their SHA-256.
+
+The preview writes no sale row, stores no document, and creates no PDF. Step 8 replaces the three inputs with the real account and the sale write.
+
+### Changing a legal template
+
+The six prose files are pinned in `engine/src/templates/SHA256SUMS`. An edit is deliberate or it is drift:
+
+1. Edit the prose file under `engine/src/templates/`.
+2. Run `pnpm test:legal-templates`. The hash check fails, which is the point.
+3. Re-pin the manifest with the six paths in this order:
+
+```
+sha256sum engine/src/templates/PDS.template.md engine/src/templates/SA.template.md \
+  engine/src/templates/blocks/pds-costs-summary.float.md \
+  engine/src/templates/blocks/pds-costs-summary.upfront.md \
+  engine/src/templates/blocks/pds-close-style.fourteen-day.md \
+  engine/src/templates/blocks/pds-close-style.three-x-remaining.md \
+  > engine/src/templates/SHA256SUMS
+```
+
+4. Run `pnpm verify`. The static gate, the compiler tests, and the build must pass.
 
 ## Emails
 

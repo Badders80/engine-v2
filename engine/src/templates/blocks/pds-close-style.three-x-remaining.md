@@ -1,0 +1,1 @@
+**Early Sale / Buyout:** If the horse is sold or bought out prior to the conclusion of the lease term, investors will receive a payout equivalent to 3× the remaining lease value per 1% stake, distributed pro-rata. This process is triggered by the owner, not Evolution Stables.

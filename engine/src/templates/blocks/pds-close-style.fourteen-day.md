@@ -1,0 +1,1 @@
+**Lessor 14-Day Break:** This syndicate operates under the Standard 14-Day Notice mechanism stipulated by the horse owner, matching the underlying Head Lease agreement. The lease may be terminated upon 14 calendar days' written notice when the underlying head lease concludes or the horse is retired. This process is triggered exclusively by the owner, not Evolution Stables.

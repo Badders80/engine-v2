@@ -1,0 +1,6 @@
+3b9067744bd007b306c70b63bcd4f730be4217a182a9cb14fdabbf7029c2fe93  engine/src/templates/PDS.template.md
+99d553779ef557d8700211a667e98c65b4fd9e7be9b472a950821b75664cadb8  engine/src/templates/SA.template.md
+ac693a7b56e81b1a60deb8b0eec7881f1d1844b5fa9290182a71a1d38e92d05d  engine/src/templates/blocks/pds-costs-summary.float.md
+7f9c562741f6b71295df375cff14772d9ffa385da1affa3a1cb131557f3e7997  engine/src/templates/blocks/pds-costs-summary.upfront.md
+f62e7f97d02250cfe2155634f5d86afd8768100124fcc894b2d32ca6f1747809  engine/src/templates/blocks/pds-close-style.fourteen-day.md
+176595d81562d0d9a8c39d2e4f6a195c8073108330eca6ade5a9f40b94edd457  engine/src/templates/blocks/pds-close-style.three-x-remaining.md

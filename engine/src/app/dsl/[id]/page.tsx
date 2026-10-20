@@ -59,7 +59,9 @@ export default async function Page({
       <h1>{horse.legalName}</h1>
       <p>
         {dsl.status}, {dsl.published ? 'published' : 'unpublished'} ·{' '}
-        <Link href={`/dsl/${dsl.id}/edit`}>Edit</Link> · <Link href="/dsl/new">New DSL</Link>
+        <Link href={`/dsl/${dsl.id}/edit`}>Edit</Link> ·{' '}
+        <Link href={`/dsl/${dsl.id}/legal`}>Legal preview</Link> ·{' '}
+        <Link href="/dsl/new">New DSL</Link>
       </p>
 
       {error !== undefined && <p role="alert">{error}</p>}

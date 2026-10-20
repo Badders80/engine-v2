@@ -1,0 +1,2 @@
+- {{pricing.monthly_lease_payment_unit_nzd}} per month per 1% stake, recurring monthly for the duration of the investment.
+- A one-time upfront payment of {{pricing.float_per_percent_nzd}} per 1% stake covers the deposit and initial payment.

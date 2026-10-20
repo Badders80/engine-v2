@@ -1,0 +1,1 @@
+- **Lease fee:** {{pricing.upfront_per_percent_nzd}} per 1% stake (fixed, covers all costs for the term).

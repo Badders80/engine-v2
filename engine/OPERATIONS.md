@@ -213,6 +213,23 @@ One surface. The same five screens on a phone and on a desktop. The layout reflo
 4. Pay. The browser goes to Stripe Checkout.
 5. Return. MyStable. Pending until the sale row exists. The stake is not called owned before that.
 
+### Engine purchase and webhook endpoints (step 8a)
+
+The engine serves five JSON routes for the purchase flow and Stripe webhook:
+
+- `POST /api/purchase/quote` — calls `computeQuote` (`engine/src/lib/purchase.ts`), which wires `effectiveMinStake(dsl.minStake, dsl.stakeRemaining)` (`engine/src/lib/pricing.ts:120`) so a remainder below `min_stake` can be bought whole without leaving orphan inventory, checks `stake % step === 0` in basis points, reads the DSL's stored/generated retail rate (`monthlyRetailPerPercent`) without recomputing `wholesale × 1.05 × 1.03`, and reads the DSL's `investorSplit` (refusing `null` with no `75` fallback).
+- `POST /api/purchase/documents` — calls `compileBuyerDocuments` (`engine/src/lib/purchase.ts`), which validates stake and calls `compileLegalPack` with `account.fullName` mapped from `accounts.full_name`, returning the PDS and SA Markdown and their SHA-256 hashes.
+- `POST /api/purchase/identity` — calls `beginOrConfirmIdentity` (`engine/src/lib/purchase.ts`), requiring PDS + SA acceptance and the four SA declarations verbatim before advancing. Verified accounts (`account.kycStatus === 'verified'`) confirm their name and skip Stripe Identity; unverified accounts start a Stripe Identity `VerificationSession` (`type: 'document'`); `'failed'` and `'pending'` accounts are refused Checkout.
+- `POST /api/purchase/checkout` — calls `openCheckoutSession` (`engine/src/lib/purchase.ts`), requiring `account.kycStatus === 'verified'`, `dsl.status === 'available'`, and `dsl.published === true`, creating a hosted Stripe Checkout session in `payment` mode, and writing no `sales` row at session creation.
+- `POST /api/stripe/webhook` — reads the raw request body, verifies `Stripe-Signature` with HMAC-SHA256 and a 300-second tolerance (`verifyStripeSignature` in `engine/src/lib/stripe.ts`), and calls `recordWebhookEvent` (`engine/src/lib/purchase.ts`). Idempotent on `sales.stripe_session_id`. On `checkout.session.completed`, compiles the PDS and SA at execution, writes the frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` to `public.sales`, decrements `dsls.stake_remaining`, and flips `dsls.status` to `'fully_allocated'` when `stake_remaining` reaches `0`. Card-decline events (`payment_intent.payment_failed`) write no `sales` row. Later edits or renames via `updateDsl` leave existing `sales` rows untouched.
+
+Required environment variables in `engine/.env.local` for live/test Stripe calls:
+
+```
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+```
+
 ## Read policies, and what the public site can see
 
 Migration `00009_website_read_policies.sql` is the whole of what the public site can read. Before it, every table was deny-by-default and the site could read nothing at all.

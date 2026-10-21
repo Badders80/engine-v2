@@ -68,9 +68,9 @@ describe('the operator guide stays single', () => {
 })
 
 describe('one DSL page, not a suite of them', () => {
-  it('keeps the dsl route and nothing beside it but the root', () => {
+  it('keeps the dsl route and the purchase/stripe api route and nothing beside them', () => {
     const routes = appRoutes('engine')
-    const unexpected = routes.filter((name) => !['dsl'].includes(name))
+    const unexpected = routes.filter((name) => !['dsl', 'api'].includes(name))
     expect(unexpected).toEqual([])
   })
 })

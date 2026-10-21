@@ -194,14 +194,36 @@ sha256sum engine/src/templates/PDS.template.md engine/src/templates/SA.template.
 
 ## Emails
 
-The engine sends four, and no others.
+The engine sends four, and no others (`engine/src/lib/email.ts`, `EMAIL_KINDS`):
 
-- Sale written: to the buyer, with the stake, the amount, and a link to MyStable.
-- KYC failed: to the buyer.
-- Sale succeeded: to the founder.
-- Checkout or the webhook failed for a reason that is ours: to the founder.
+- **Sale written (`buyer_sale_written`)**: sent to the buyer (`sale.email`) by `recordWebhookEvent` (`engine/src/lib/purchase.ts`) when a new `checkout.session.completed` writes the `sales` row and updates `dsls.stake_remaining` (`idempotentReplay === false`). Includes the purchased `stake`, the paid `amount`, and the canonical link to MyStable (`https://www.evolutionstables.nz/mystable`).
+- **KYC failed (`buyer_kyc_failed`)**: sent to the buyer (`account.email`) by `recordWebhookEvent` when `identity.verification_session.requires_input` or `identity.verification_session.canceled` flips `accounts.kyc_status` to `'failed'`.
+- **Sale succeeded (`founder_sale_succeeded`)**: sent to the founder (`ENGINE_FOUNDER_EMAIL`) alongside `buyer_sale_written` on a new `checkout.session.completed` (`idempotentReplay === false`). Includes the buyer's printed name, buyer email, horse legal name, `stake`, `amount`, and `stripeSessionId`.
+- **Checkout or webhook failed for a reason that is ours (`founder_our_fault_failure`)**: sent to the founder (`ENGINE_FOUNDER_EMAIL`) with `stage` (`'checkout'` or `'webhook'`) and `reason` when `stripe.createCheckoutSession` throws in `openCheckoutSession` or when `recordWebhookEvent` fails on missing metadata, document compilation failure, missing DSL, or store write failure (after rolling back any inserted `sales` row via `deleteSaleById` so zero `sales` rows remain).
 
-The sender that replaces Gmail SMTP is named here when it is chosen, before the public buy path.
+What sends **no** email:
+- Card decline (`payment_intent.payment_failed`) and expired/cancelled Checkout (`checkout.session.expired`) write no `sales` row and send zero emails.
+- Idempotent webhook replay (`idempotentReplay === true` on an existing `sales.stripe_session_id`) sends zero duplicate emails.
+- Buyer-fault validation rejections in `openCheckoutSession` (unaccepted documents, unverified KYC, or invalid stake) send zero founder emails.
+
+Required environment variables in `engine/.env.local` for `createEmailSenderFromEnv()` (`POST /api/purchase/checkout` and `POST /api/stripe/webhook`):
+
+```
+ENGINE_EMAIL_API_URL="https://api.resend.com/emails"
+ENGINE_EMAIL_API_KEY="re_..."
+ENGINE_EMAIL_FROM="Evolution Stables <no-reply@evolutionstables.nz>"
+ENGINE_FOUNDER_EMAIL="alex@evolutionstables.nz"
+```
+
+The HTTP API sender configured via `ENGINE_EMAIL_API_URL` and `ENGINE_EMAIL_API_KEY` replaces Gmail SMTP (`nodemailer` / `smtp.gmail.com` are forbidden across the repo). `website/` holds none of these variables and never sends emails.
+
+To verify the email module and fences locally:
+
+```bash
+bash scripts/assert-email-fences.sh
+pnpm --filter engine test
+pnpm verify
+```
 
 ## Buy flow, as the buyer sees it
 

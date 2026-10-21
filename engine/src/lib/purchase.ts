@@ -18,6 +18,11 @@
  */
 
 import type { DslRow, PaymentModel } from './dslStore'
+import {
+  createInMemoryEmailSender,
+  sendEngineEmail,
+  type EmailSender,
+} from './email'
 import { compileLegalPack, type LegalPack } from './legal/compile'
 import type { LegalCorpus } from './legal/templates'
 import {
@@ -334,6 +339,7 @@ export async function openCheckoutSession(
   },
   store: PurchaseStore,
   stripe: StripeGateway,
+  emailSender: EmailSender = createInMemoryEmailSender(),
 ): Promise<Result<{ checkoutSessionId: string; checkoutUrl: string; quote: PurchaseQuote }>> {
   const accepted = verifyDocumentAcceptance(input.acceptance)
   if (!accepted.ok) return accepted
@@ -354,17 +360,32 @@ export async function openCheckoutSession(
   if (!quoteResult.ok) return quoteResult
 
   const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
-  const session = await stripe.createCheckoutSession({
-    dslId: input.dslId,
-    accountId: account.id,
-    horseLegalName: quoteResult.value.horseLegalName,
-    stake: quoteResult.value.stake,
-    amountNzd: quoteResult.value.initialPaymentNzd,
-    executedDate,
-    stripeIdentityId: input.stripeIdentityId ?? null,
-    successUrl: input.successUrl,
-    cancelUrl: input.cancelUrl,
-  })
+  let session: { id: string; url: string }
+  try {
+    session = await stripe.createCheckoutSession({
+      dslId: input.dslId,
+      accountId: account.id,
+      horseLegalName: quoteResult.value.horseLegalName,
+      stake: quoteResult.value.stake,
+      amountNzd: quoteResult.value.initialPaymentNzd,
+      executedDate,
+      stripeIdentityId: input.stripeIdentityId ?? null,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+    })
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : 'failed to create Stripe Checkout session'
+    await sendEngineEmail(
+      {
+        kind: 'founder_our_fault_failure',
+        stage: 'checkout',
+        reason,
+      },
+      emailSender,
+    )
+    return { ok: false, reason }
+  }
 
   return {
     ok: true,
@@ -390,7 +411,20 @@ export async function recordWebhookEvent(
   event: StripeWebhookEvent,
   store: PurchaseStore,
   corpus?: LegalCorpus,
+  emailSender: EmailSender = createInMemoryEmailSender(),
 ): Promise<Result<WebhookResult>> {
+  async function failWebhook(reason: string): Promise<Result<WebhookResult>> {
+    await sendEngineEmail(
+      {
+        kind: 'founder_our_fault_failure',
+        stage: 'webhook',
+        reason,
+      },
+      emailSender,
+    )
+    return { ok: false, reason }
+  }
+
   const obj = event.data.object ?? {}
   const metadata =
     typeof obj.metadata === 'object' && obj.metadata !== null
@@ -400,12 +434,18 @@ export async function recordWebhookEvent(
   if (event.type === 'identity.verification_session.verified') {
     const accountId = metadataString(metadata, 'account_id')
     if (accountId === '') {
-      return { ok: false, reason: 'identity event is missing metadata.account_id' }
+      return failWebhook('identity event is missing metadata.account_id')
     }
-    const updated = await store.updateAccountKycStatus(accountId, 'verified')
-    return {
-      ok: true,
-      value: { action: 'kyc_updated', accountId: updated.id, kycStatus: updated.kycStatus },
+    try {
+      const updated = await store.updateAccountKycStatus(accountId, 'verified')
+      return {
+        ok: true,
+        value: { action: 'kyc_updated', accountId: updated.id, kycStatus: updated.kycStatus },
+      }
+    } catch (error) {
+      return failWebhook(
+        error instanceof Error ? error.message : 'failed to update verified KYC status',
+      )
     }
   }
 
@@ -415,9 +455,23 @@ export async function recordWebhookEvent(
   ) {
     const accountId = metadataString(metadata, 'account_id')
     if (accountId === '') {
-      return { ok: false, reason: 'identity event is missing metadata.account_id' }
+      return failWebhook('identity event is missing metadata.account_id')
     }
-    const updated = await store.updateAccountKycStatus(accountId, 'failed')
+    let updated: AccountRow
+    try {
+      updated = await store.updateAccountKycStatus(accountId, 'failed')
+    } catch (error) {
+      return failWebhook(
+        error instanceof Error ? error.message : 'failed to update failed KYC status',
+      )
+    }
+    await sendEngineEmail(
+      {
+        kind: 'buyer_kyc_failed',
+        account: updated,
+      },
+      emailSender,
+    )
     return {
       ok: true,
       value: { action: 'kyc_updated', accountId: updated.id, kycStatus: updated.kycStatus },
@@ -435,7 +489,7 @@ export async function recordWebhookEvent(
 
   const stripeSessionId = typeof obj.id === 'string' ? obj.id.trim() : ''
   if (stripeSessionId === '') {
-    return { ok: false, reason: 'checkout.session.completed is missing session id' }
+    return failWebhook('checkout.session.completed is missing session id')
   }
 
   const existingSale = await store.findSaleByStripeSessionId(stripeSessionId)
@@ -456,10 +510,9 @@ export async function recordWebhookEvent(
   const stripeIdentityId = stripeIdentityIdRaw !== '' ? stripeIdentityIdRaw : null
 
   if (dslId === '' || accountId === '' || !Number.isFinite(stake) || stake <= 0) {
-    return {
-      ok: false,
-      reason: 'checkout.session.completed is missing required metadata (dsl_id, account_id, stake)',
-    }
+    return failWebhook(
+      'checkout.session.completed is missing required metadata (dsl_id, account_id, stake)',
+    )
   }
 
   const compiled = await compileBuyerDocuments(
@@ -467,35 +520,62 @@ export async function recordWebhookEvent(
     store,
     corpus,
   )
-  if (!compiled.ok) return compiled
+  if (!compiled.ok) return failWebhook(compiled.reason)
 
   const { account, quote, pack } = compiled.value
   const dsl = await store.findDslById(dslId)
-  if (dsl === null) return { ok: false, reason: `DSL ${dslId} does not exist` }
+  if (dsl === null) return failWebhook(`DSL ${dslId} does not exist`)
 
-  const sale = await store.insertSale({
-    dslId: dsl.id,
-    userId: account.id,
-    printedName: account.fullName,
-    email: account.email,
-    stake: quote.stake,
-    amount: quote.initialPaymentNzd,
-    stripeSessionId,
-    stripeIdentityId,
-    pdsMarkdown: pack.pds.markdown,
-    saMarkdown: pack.sa.markdown,
-    pdsHash: pack.pds.hash,
-    saHash: pack.sa.hash,
-  })
+  let sale: SaleRow | null = null
+  try {
+    sale = await store.insertSale({
+      dslId: dsl.id,
+      userId: account.id,
+      printedName: account.fullName,
+      email: account.email,
+      stake: quote.stake,
+      amount: quote.initialPaymentNzd,
+      stripeSessionId,
+      stripeIdentityId,
+      pdsMarkdown: pack.pds.markdown,
+      saMarkdown: pack.sa.markdown,
+      pdsHash: pack.pds.hash,
+      saHash: pack.sa.hash,
+    })
 
-  const remainingCents = Math.round(dsl.stakeRemaining * 100) - Math.round(quote.stake * 100)
-  const nextRemaining = Math.max(0, remainingCents) / 100
-  const nextStatus = nextRemaining === 0 ? 'fully_allocated' : dsl.status
+    const remainingCents = Math.round(dsl.stakeRemaining * 100) - Math.round(quote.stake * 100)
+    const nextRemaining = Math.max(0, remainingCents) / 100
+    const nextStatus = nextRemaining === 0 ? 'fully_allocated' : dsl.status
 
-  await store.updateDsl(dsl.id, {
-    stakeRemaining: nextRemaining,
-    status: nextStatus,
-  })
+    await store.updateDsl(dsl.id, {
+      stakeRemaining: nextRemaining,
+      status: nextStatus,
+    })
+  } catch (error) {
+    if (sale !== null) {
+      await store.deleteSaleById(sale.id)
+    }
+    const reason =
+      error instanceof Error ? error.message : 'failed to persist sale and update DSL'
+    return failWebhook(reason)
+  }
+
+  await sendEngineEmail(
+    {
+      kind: 'buyer_sale_written',
+      sale,
+      horseLegalName: quote.horseLegalName,
+    },
+    emailSender,
+  )
+  await sendEngineEmail(
+    {
+      kind: 'founder_sale_succeeded',
+      sale,
+      horseLegalName: quote.horseLegalName,
+    },
+    emailSender,
+  )
 
   return {
     ok: true,

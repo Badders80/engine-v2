@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 
+import { createEmailSenderFromEnv } from '@/lib/email'
 import { openCheckoutSession, type DocumentAcceptanceInput } from '@/lib/purchase'
 import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 import { createStripeGatewayFromEnv } from '@/lib/stripe'
@@ -59,6 +60,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const store = createSupabasePurchaseStore()
     const stripe = createStripeGatewayFromEnv()
+    const emailSender = createEmailSenderFromEnv()
     const result = await openCheckoutSession(
       {
         dslId,
@@ -72,6 +74,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       store,
       stripe,
+      emailSender,
     )
 
     if (!result.ok) {

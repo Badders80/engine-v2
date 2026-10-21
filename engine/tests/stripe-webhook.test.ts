@@ -13,6 +13,7 @@ import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 import { saveDsl } from '../src/lib/dsl'
+import { createInMemoryEmailSender } from '../src/lib/email'
 import { recordWebhookEvent } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore } from '../src/lib/purchaseStore'
 import { verifyStripeSignature } from '../src/lib/stripe'
@@ -202,6 +203,7 @@ describe('Step 8a — recordWebhookEvent', () => {
 
   it('writes no sale row on payment_intent.payment_failed or checkout.session.expired', async () => {
     const { store, dsl } = await setupStore()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
 
     const declined = await recordWebhookEvent(
       {
@@ -210,14 +212,18 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'pi_failed_1' } },
       },
       store,
+      undefined,
+      emailSender,
     )
     expect(declined.ok).toBe(true)
     expect(store.dump().sales).toHaveLength(0)
+    expect(emailSender.sent).toHaveLength(0)
     expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
   })
 
   it('updates account kycStatus on identity.verification_session events', async () => {
     const { store, account } = await setupStore()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
     await store.updateAccountKycStatus(account.id, 'pending')
 
     const failed = await recordWebhookEvent(
@@ -227,9 +233,13 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'vs_1', metadata: { account_id: account.id } } },
       },
       store,
+      undefined,
+      emailSender,
     )
     expect(failed.ok).toBe(true)
     expect((await store.findAccountById(account.id))?.kycStatus).toBe('failed')
+    expect(emailSender.sent).toHaveLength(1)
+    expect(emailSender.sent[0].kind).toBe('buyer_kyc_failed')
 
     const verified = await recordWebhookEvent(
       {
@@ -238,8 +248,11 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'vs_1', metadata: { account_id: account.id } } },
       },
       store,
+      undefined,
+      emailSender,
     )
     expect(verified.ok).toBe(true)
     expect((await store.findAccountById(account.id))?.kycStatus).toBe('verified')
+    expect(emailSender.sent).toHaveLength(1)
   })
 })

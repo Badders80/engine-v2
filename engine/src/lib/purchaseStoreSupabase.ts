@@ -169,5 +169,10 @@ export function createSupabasePurchaseStore(
       if (error) fail('sales', error.message)
       return toSale(data)
     },
+
+    async deleteSaleById(id) {
+      const { error } = await client.from('sales').delete().eq('id', id)
+      if (error) fail('sales', error.message)
+    },
   }
 }

@@ -66,6 +66,7 @@ export interface PurchaseStore extends DslStore {
   findSaleByStripeSessionId(stripeSessionId: string): Promise<SaleRow | null>
   listSalesByUserId(userId: string): Promise<SaleRow[]>
   insertSale(row: NewSale): Promise<SaleRow>
+  deleteSaleById(id: string): Promise<void>
 }
 
 export type PurchaseStoreSnapshot = StoreSnapshot & {
@@ -146,6 +147,13 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       }
       sales.push(created)
       return { ...created }
+    },
+
+    async deleteSaleById(id) {
+      const index = sales.findIndex((row) => row.id === id)
+      if (index !== -1) {
+        sales.splice(index, 1)
+      }
     },
 
     dump(): PurchaseStoreSnapshot {

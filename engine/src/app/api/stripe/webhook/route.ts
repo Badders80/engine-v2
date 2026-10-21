@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server'
 
+import { createEmailSenderFromEnv } from '@/lib/email'
 import { recordWebhookEvent } from '@/lib/purchase'
 import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 import { STRIPE_WEBHOOK_SECRET_ENV, verifyStripeSignature } from '@/lib/stripe'
@@ -32,7 +33,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const store = createSupabasePurchaseStore()
-    const result = await recordWebhookEvent(event, store)
+    const emailSender = createEmailSenderFromEnv()
+    const result = await recordWebhookEvent(event, store, undefined, emailSender)
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 })
     }

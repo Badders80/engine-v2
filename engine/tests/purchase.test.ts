@@ -20,6 +20,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { saveDsl, updateDsl, type SaveDslInput } from '../src/lib/dsl'
+import { createInMemoryEmailSender } from '../src/lib/email'
 import { REFUND_SENTENCE } from '../src/lib/pricing'
 import {
   beginOrConfirmIdentity,
@@ -342,6 +343,7 @@ describe('Step 8a — Identity and Checkout gates', () => {
     const store = createInMemoryPurchaseStore()
     const { dsl } = await seedAvailableDsl(store)
     const stripe = fakeStripe()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
 
     const account = await store.insertAccount({
       id: 'acc-checkout',
@@ -361,9 +363,11 @@ describe('Step 8a — Identity and Checkout gates', () => {
       },
       store,
       stripe,
+      emailSender,
     )
     expect(blocked.ok).toBe(false)
     expect(stripe.checkoutCalls).toBe(0)
+    expect(emailSender.sent).toHaveLength(0)
 
     await store.updateAccountKycStatus(account.id, 'verified')
     const opened = await openCheckoutSession(
@@ -377,10 +381,12 @@ describe('Step 8a — Identity and Checkout gates', () => {
       },
       store,
       stripe,
+      emailSender,
     )
     expect(opened.ok).toBe(true)
     expect(stripe.checkoutCalls).toBe(1)
     expect(store.dump().sales).toHaveLength(0)
+    expect(emailSender.sent).toHaveLength(0)
   })
 })
 

@@ -4,6 +4,8 @@ import localFont from 'next/font/local'
 import { Instrument_Serif } from 'next/font/google'
 import './globals.css'
 
+import { Footer } from '../components/Footer'
+import { NavBar } from '../components/NavBar'
 import { OG_IMAGE, SITE_URL } from '../lib/site'
 
 // Geist Mono — financials, hashes, countdowns, tabular figures, and the
@@ -64,7 +66,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${geistMono.variable} ${instrumentSerif.variable}`}>
-      <body>{children}</body>
+      <body className="flex min-h-screen flex-col bg-canvas text-ink">
+        <NavBar />
+        <div className="flex-1">{children}</div>
+        <Footer />
+      </body>
     </html>
   )
 }

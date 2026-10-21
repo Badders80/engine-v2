@@ -230,6 +230,29 @@ STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
 
+### Website buy flow, signup trigger, and MyStable (step 8b)
+
+- Migration `00012_accounts_signup.sql` defines `public.handle_auth_user_created()` and the `on_auth_user_created` trigger on `auth.users`. Every signup requires `full_name` in `raw_user_meta_data` and populates `public.accounts` (`id`, `full_name`, `email`, `kyc_status = 'unverified'`) so Checkout never creates a second profile.
+- `website/src/components/BuyFlowModal.tsx` renders the five screens (`Terms` → `Documents` → `Identity` → `Pay` → `Return`) on `/marketplace/[slug]`. It renders only on `available` listings and only when `WEBSITE_BUY_ENABLED=true` in `website/.env.local`; `coming_soon`, `fully_allocated`, and `completed` listings never show a Buy Now control.
+- `website/src/lib/mystable.ts` is the sole module in `website/src/` permitted to query `accounts` and `sales` (enforced by `scripts/assert-purchase-fences.sh` and `website/tests/listings.test.ts`). `/mystable` (`force-dynamic`) displays a pending notice when returning from Stripe Checkout (`?session_id=...`) before the webhook writes the matching `sales` row, and displays the stake, amount paid, and frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` once written.
+
+### Recorded probe, 2026-10-21 — migration 00012 and sales
+
+Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422`. Fixture removed in the same session:
+
+```
+auth.users insert without full_name          -> ERROR: signup requires full_name in user metadata
+auth.users insert with full_name             -> public.accounts row created (Aroha Williams, aroha@example.co.nz, unverified)
+sales insert (cs_test_probe_00012, 5%, 1775) -> INSERT 0 1
+duplicate stripe_session_id insert           -> ERROR: duplicate key value violates unique constraint "sales_stripe_session_id_key"
+authenticated (sub = owner) select accounts  -> 1 row
+authenticated (sub = owner) select sales     -> 1 row (5.00, 1775.00, cs_test_probe_00012, pds_hash, sa_hash)
+authenticated (sub = other) select accounts  -> 0 rows
+authenticated (sub = other) select sales     -> 0 rows
+```
+
+After cleanup, `sales`, `accounts`, `dsls`, `horses`, and `auth.users` all returned to 0 rows.
+
 ## Read policies, and what the public site can see
 
 Migration `00009_website_read_policies.sql` is the whole of what the public site can read. Before it, every table was deny-by-default and the site could read nothing at all.

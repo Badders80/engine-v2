@@ -1,11 +1,22 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import BuyFlowModal from '../../../components/BuyFlowModal'
 import StatusBadge from '../../../components/StatusBadge'
+import { AUTH_TOKEN_COOKIE } from '../../../lib/auth'
+import {
+  canRenderBuyNow,
+  fetchEngineQuote,
+  requireInvestorSplit,
+  WEBSITE_BUY_ENABLED_ENV,
+  WEBSITE_ENGINE_URL_ENV,
+} from '../../../lib/engineClient'
 import { getListingsBySlug, type Listing } from '../../../lib/listings'
+import { readMyStable, type AccountProfile } from '../../../lib/mystable'
 import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../../lib/site'
 import { viewForStatus } from '../../../lib/status'
 
@@ -108,7 +119,18 @@ function Figure({
   )
 }
 
-function DslBlock({ listing }: { listing: Listing }) {
+async function DslBlock({
+  listing,
+  account,
+}: {
+  listing: Listing
+  account: AccountProfile | null
+}) {
+  const buyEnabled = canRenderBuyNow(listing.status, process.env[WEBSITE_BUY_ENABLED_ENV])
+  const initialQuote = buyEnabled ? await fetchEngineQuote({ dslId: listing.id }) : null
+  const splitDisplay =
+    listing.investorSplit !== null ? `${String(requireInvestorSplit(listing.investorSplit))}%` : null
+
   return (
     <section className="mt-16 rounded-lg border border-border bg-surface p-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -131,11 +153,28 @@ function DslBlock({ listing }: { listing: Listing }) {
           value={`$${String(listing.wholesaleMonthlyTotal)}`}
           unit="at 100%"
         />
+        {splitDisplay ? <Figure label="Investor split" value={splitDisplay} /> : null}
         <Figure label="Term start" value={listing.termStart} />
         <Figure label="End date" value={listing.endDate} />
         <Figure label="Payment model" value={listing.paymentModel} />
         <Figure label="Close style" value={listing.closeStyle} />
       </dl>
+
+      {buyEnabled && initialQuote ? (
+        <BuyFlowModal
+          dslId={listing.id}
+          status={listing.status}
+          horseSlug={listing.horse.slug}
+          horseLegalName={listing.horse.legalName}
+          investorSplit={listing.investorSplit}
+          initialQuote={initialQuote}
+          accountId={account?.id ?? null}
+          accountFullName={account?.fullName ?? null}
+          accountKycStatus={account?.kycStatus ?? null}
+          engineBaseUrl={process.env[WEBSITE_ENGINE_URL_ENV]}
+          buyEnabled={buyEnabled}
+        />
+      ) : null}
     </section>
   )
 }
@@ -149,6 +188,19 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
   // `published`, so a slug that names only unpublished work arrives here as an
   // empty array and leaves as a not-found.
   if (!first) notFound()
+
+  const anyBuyEnabled = listings.some((listing) =>
+    canRenderBuyNow(listing.status, process.env[WEBSITE_BUY_ENABLED_ENV]),
+  )
+  let account: AccountProfile | null = null
+  if (anyBuyEnabled) {
+    const cookieStore = await cookies()
+    const token = cookieStore.get(AUTH_TOKEN_COOKIE)?.value ?? null
+    if (token) {
+      const stable = await readMyStable({ accessToken: token })
+      account = stable.account
+    }
+  }
 
   const { horse } = first
   const hero = heroImageUrl(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
@@ -207,7 +259,7 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
         {/* More than one block is a legal state, not a data error: one horse may
             carry a separate DSL per end date (`PLAN.md:297`). */}
         {listings.map((listing) => (
-          <DslBlock key={listing.id} listing={listing} />
+          <DslBlock key={listing.id} listing={listing} account={account} />
         ))}
       </div>
     </main>

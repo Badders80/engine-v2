@@ -36,6 +36,7 @@ export type ListingRow = {
   term_start: string
   payment_model: string
   close_style: string
+  investor_split: number | null
   listed_stake: number
   min_stake: number
   step: number
@@ -58,6 +59,7 @@ export type Listing = {
   termStart: string
   paymentModel: string
   closeStyle: string
+  investorSplit: number | null
   listedStake: number
   minStake: number
   step: number
@@ -86,6 +88,7 @@ const LISTING_SELECT = [
   'term_start',
   'payment_model',
   'close_style',
+  'investor_split',
   'listed_stake',
   'min_stake',
   'step',
@@ -108,6 +111,7 @@ export function toListing(row: ListingRow): Listing {
     termStart: row.term_start,
     paymentModel: row.payment_model,
     closeStyle: row.close_style,
+    investorSplit: row.investor_split,
     listedStake: row.listed_stake,
     minStake: row.min_stake,
     step: row.step,

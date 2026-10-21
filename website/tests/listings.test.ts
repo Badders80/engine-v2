@@ -22,6 +22,7 @@ import {
 const APP_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const SRC = join(APP_ROOT, 'src')
 const LISTINGS = join(SRC, 'lib', 'listings.ts')
+const MYSTABLE = join(SRC, 'lib', 'mystable.ts')
 // The one file allowed to declare a status colour, because it is where the tokens
 // are defined. Same exemption scripts/assert-design-tokens.sh already makes.
 const THEME = join(SRC, 'app', 'globals.css')
@@ -48,6 +49,7 @@ const ROW: ListingRow = {
   term_start: '2026-07-01',
   payment_model: 'upfront',
   close_style: 'fourteen_day',
+  investor_split: 70,
   listed_stake: 100,
   min_stake: 2.5,
   step: 0.1,
@@ -72,6 +74,7 @@ describe('the listing projection', () => {
       termStart: '2026-07-01',
       paymentModel: 'upfront',
       closeStyle: 'fourteen_day',
+      investorSplit: 70,
       listedStake: 100,
       minStake: 2.5,
       step: 0.1,
@@ -194,7 +197,9 @@ describe('the reads originate at dsls', () => {
   it('never reads a fenced table directly', () => {
     // `published` lives only on dsls. horses, trainers and owners are readable to
     // anon in full, so reaching them directly leaks unpublished and unregistered
-    // rows. Every read starts at dsls and embeds outward.
+    // rows. Every public read starts at dsls and embeds outward.
+    // Step 8b narrows this fence by one path: `website/src/lib/mystable.ts` reads
+    // the authenticated investor's own `accounts` and `sales` rows (migration 00009).
     const reads = SOURCES.flatMap(({ path, text }) =>
       [...text.matchAll(/\.from\(\s*['"]([a-z_]+)['"]/g)].map((match) => ({
         path,
@@ -204,7 +209,14 @@ describe('the reads originate at dsls', () => {
 
     expect(reads.length).toBeGreaterThan(0)
     for (const { path, table } of reads) {
-      expect(table, `${path} reads ${table} directly`).toBe('dsls')
+      if (path === MYSTABLE) {
+        expect(
+          ['accounts', 'sales'],
+          `${path} reads disallowed table ${table}`,
+        ).toContain(table)
+      } else {
+        expect(table, `${path} reads ${table} directly`).toBe('dsls')
+      }
     }
   })
 

@@ -36,7 +36,7 @@ function sampleSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslI
       aboutHorse: 'Strong staying mare with a late-maturing frame.',
       racingOutlookAndPedigree: 'Out of a Group-placed dam; staying family.',
       raceExpectation: 'Targeting 2000m handicaps this prep.',
-      imageCount: 4,
+      imageCount: 3,
       raceRecord: { starts: 3, wins: 1 },
     },
     trainer: {
@@ -125,6 +125,11 @@ function fakeGateway(): StripeGateway {
   }
 }
 
+/** Hermetic stand-in for R2: CI has no bucket. */
+function fakeImages(count = 3) {
+  return { countImages: async () => count }
+}
+
 describe('B6 — reserve at Checkout', () => {
   it('takes the stake out of the listing as soon as Checkout opens', async () => {
     const store = createInMemoryPurchaseStore()
@@ -145,6 +150,8 @@ describe('B6 — reserve at Checkout', () => {
       },
       store,
       fakeGateway(),
+      undefined,
+      fakeImages(),
     )
     expect(opened.ok).toBe(true)
 

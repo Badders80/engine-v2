@@ -22,7 +22,13 @@
  * The old media bucket and its keys are not referenced anywhere in this file.
  */
 
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 
 /** Minimum images on a horse before a DSL may be Available. */
 export const MIN_IMAGES_FOR_AVAILABLE = 3
@@ -293,4 +299,90 @@ export async function uploadPublicImage(input: UploadPublicImageInput): Promise<
   )
 
   return { key, url: publicImageUrl(key, config.publicUrl) }
+}
+
+export type PublicImage = {
+  imageNumber: number
+  key: string
+  url: string
+}
+
+/**
+ * The images actually present for a horse, in order.
+ *
+ * This is the only thing that may set `horses.image_count`. The folder must run
+ * `01..NN` with no gap, so `imageCountFromKeys` refuses a stray object rather
+ * than counting it — a manual R2 write that breaks the run is an error the
+ * operator has to see, not a number that quietly disagrees with the bucket.
+ */
+export async function listPublicImages(input: {
+  slug: string
+  env?: EnvLike
+}): Promise<PublicImage[]> {
+  assertSlug(input.slug)
+  const config = storageConfig(input.env)
+  const client = createClient(config)
+  const prefix = `${input.slug}/`
+  const listing = { keys: [] as string[], token: undefined as string | undefined }
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucketName,
+        Prefix: prefix,
+        ContinuationToken: listing.token,
+      }),
+    )
+    for (const object of page.Contents ?? []) {
+      if (object.Key !== undefined) listing.keys.push(object.Key)
+    }
+    listing.token = page.IsTruncated === true ? page.NextContinuationToken : undefined
+  } while (listing.token !== undefined)
+
+  const count = imageCountFromKeys(input.slug, listing.keys)
+  return Array.from({ length: count }, (_, index) => {
+    const key = imageKey(input.slug, index + 1)
+    return { imageNumber: index + 1, key, url: publicImageUrl(key, config.publicUrl) }
+  })
+}
+
+/**
+ * Removes one image and closes the gap it leaves.
+ *
+ * The key contract is `01..NN` with no gap, so deleting `02` of three means
+ * copying `03` onto `02` and deleting `03`. Anything else leaves a hole that
+ * `imageCountFromKeys` would refuse on the next read.
+ */
+export async function deletePublicImage(input: {
+  slug: string
+  imageNumber: number
+  env?: EnvLike
+}): Promise<void> {
+  const images = await listPublicImages(input)
+  if (input.imageNumber < 1 || input.imageNumber > images.length) {
+    throw new Error(
+      `${input.slug} has ${images.length} image(s); ${input.imageNumber} cannot be removed`,
+    )
+  }
+
+  const config = storageConfig(input.env)
+  const client = createClient(config)
+
+  const moves = images.length - input.imageNumber
+  for (const offset of Array.from({ length: moves }, (_, index) => index)) {
+    const from = input.imageNumber + offset
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: config.bucketName,
+        CopySource: `${config.bucketName}/${imageKey(input.slug, from + 1)}`,
+        Key: imageKey(input.slug, from),
+      }),
+    )
+  }
+
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucketName,
+      Key: imageKey(input.slug, images.length),
+    }),
+  )
 }

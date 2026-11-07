@@ -4,7 +4,16 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { heroImageUrl, imageKey, OG_IMAGE, publicImageUrl, SITE_URL, sitemapUrls } from '../src/lib/site'
+import {
+  galleryImageUrls,
+  heroImageUrl,
+  imageKey,
+  OG_IMAGE,
+  publicImageUrl,
+  SITE_URL,
+  sitemapUrls,
+  WEBSITE_IMAGE_CAP,
+} from '../src/lib/site'
 
 // Hermetic: pure functions and two source scans. Nothing here opens a connection,
 // which is the point — CI runs `pnpm test` with no database service at all.
@@ -163,5 +172,29 @@ describe('the plurality fence', () => {
   it('reads through the one agreed query shape', () => {
     expect(listings).toContain('horses!inner(')
     expect(listings).toContain(".eq('published', true)")
+  })
+})
+
+describe('the gallery cap', () => {
+  it('shows images two onward, in key order, and not the hero', () => {
+    const urls = galleryImageUrls('lady-ketchikan', 4, 'https://cdn.example.com')
+    expect(urls).toEqual([
+      'https://cdn.example.com/lady-ketchikan/02',
+      'https://cdn.example.com/lady-ketchikan/03',
+      'https://cdn.example.com/lady-ketchikan/04',
+    ])
+  })
+
+  it('stops at eight however many the bucket holds', () => {
+    expect(WEBSITE_IMAGE_CAP).toBe(8)
+    const urls = galleryImageUrls('lady-ketchikan', 12, 'https://cdn.example.com')
+    expect(urls).toHaveLength(7)
+    expect(urls.at(-1)).toBe('https://cdn.example.com/lady-ketchikan/08')
+  })
+
+  it('is empty for one image or no origin', () => {
+    expect(galleryImageUrls('lady-ketchikan', 1, 'https://cdn.example.com')).toEqual([])
+    expect(galleryImageUrls('lady-ketchikan', 4)).toEqual([])
+    expect(galleryImageUrls('lady-ketchikan', 4, '')).toEqual([])
   })
 })

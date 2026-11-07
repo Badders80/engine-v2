@@ -278,6 +278,36 @@ A listing whose remaining stake is fully held stays `available`; the website hid
 - `website/src/components/BuyFlowModal.tsx` renders the five screens (`Terms` → `Documents` → `Identity` → `Pay` → `Return`) on `/marketplace/[slug]`. It renders only on `available` listings and only when `WEBSITE_BUY_ENABLED=true` in `website/.env.local`; `coming_soon`, `fully_allocated`, and `completed` listings never show a Buy Now control.
 - `website/src/lib/mystable.ts` is the sole module in `website/src/` permitted to query `accounts` and `sales` (enforced by `scripts/assert-purchase-fences.sh` and `website/tests/listings.test.ts`). `/mystable` (`force-dynamic`) displays a pending notice when returning from Stripe Checkout (`?session_id=...`) before the webhook writes the matching `sales` row, and displays the stake, amount paid, and frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` once written.
 
+## Horse images (B7)
+
+Images live in the public R2 bucket under `{horse-slug}/01`, `/02`, … with no file extension. The number **is** the order: `01` is the hero, and the website shows the first eight. Nothing stores an ordering anywhere else.
+
+All four controls are on the DSL detail page (`/dsl/[id]`), which is the horse's page in practice — a horse is created with its DSL, so there is no separate horse screen.
+
+| Control | What it does |
+|---|---|
+| Upload | Writes `{slug}/{NN}`. Leave the number blank to add the next one; give an existing number to replace that image. |
+| Remove | Deletes the object and copies the later ones down, so the folder still runs `01..NN`. A gap is refused by `imageCountFromKeys`. |
+| Recount | Reads the bucket and writes `horses.image_count` from what is actually there. |
+| (automatic) | Upload and remove both recount. The stored figure is never incremented or decremented by hand. |
+
+`image_count` used to be a typed field on the DSL form. It is gone: the form no longer reads it, so an edit preserves the stored value and only the bucket can change it.
+
+Checkout rechecks the bucket (`createR2HorseImageSource` in `engine/src/lib/purchase.ts`) and refuses when the listing has fewer than `max(MIN_IMAGES_FOR_AVAILABLE, horses.image_count)`. `MIN_IMAGES_FOR_AVAILABLE` stays **3** — the founder ruled on 2026-11-07 that three is the minimum to sell, even though the site will render one.
+
+Private material (KYC, proof of address, legal documents) never comes through this path: `assertPublicImageKey` refuses a reserved prefix, and `uploadPublicImage` refuses a non-image content type.
+
+### Recorded probe, 2026-11-07 — the real bucket
+
+Read-only `ListObjectsV2` against the configured bucket, from `engine/.env.local`:
+
+| Slug | Objects | `horses.image_count` |
+|---|---|---|
+| `mulan-the-brave` | `01`, `02`, `03` | 3 — agrees |
+| `hottathanafantasy` | `01`, `02` | 0 — **drift**, fixed by Recount |
+
+That drift is the reason Recount exists: the operator uploaded outside the app, and nothing else would have noticed.
+
 ### Recorded probe, 2026-11-07 — migration 00017 (reservation and backstop)
 
 Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422` inside one transaction that was rolled back. The fixture was one `auth.users` row (which produced one `accounts` row) and the existing `available` DSL: 5.00% listed, 5.00% remaining. Each state read is its own statement, so it reflects the write.

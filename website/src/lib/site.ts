@@ -142,6 +142,35 @@ export function heroImageUrl(slug: string, imageCount: number, publicUrlBase?: s
 }
 
 /**
+ * How many images the public site shows. The engine may hold more; the cap is a
+ * website decision, so a horse with twelve photos does not turn the page into a
+ * contact sheet. Locked by the founder on 2026-11-07: first eight, in order.
+ */
+export const WEBSITE_IMAGE_CAP = 8
+
+/**
+ * The gallery: images two onward, in key order, capped.
+ *
+ * Image `01` is the hero and is rendered separately, so it is excluded here.
+ * Order is the key number — there is no stored ordering anywhere else.
+ */
+export function galleryImageUrls(
+  slug: string,
+  imageCount: number,
+  publicUrlBase?: string,
+): string[] {
+  if (!Number.isInteger(imageCount) || imageCount < 2) return []
+
+  const base = (publicUrlBase ?? '').trim()
+  if (base === '') return []
+
+  const shown = Math.min(imageCount, WEBSITE_IMAGE_CAP)
+  return Array.from({ length: Math.max(0, shown - 1) }, (_, index) =>
+    publicImageUrl(imageKey(slug, index + 2), base),
+  )
+}
+
+/**
  * The sitemap's URL set, from the horse slugs that carry a published DSL.
  *
  * `PLAN.md:88` and `:297` rule the set — the landing page, the marketplace, and

@@ -38,7 +38,7 @@ import {
 } from '@/lib/dsl'
 import type { HorseRow } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
-import { uploadPublicImage } from '@/lib/storage'
+import { deletePublicImage, listPublicImages, uploadPublicImage } from '@/lib/storage'
 
 import { loadDslView } from './data'
 
@@ -105,7 +105,6 @@ function toInput(form: FormData): Result<SaveDslInput> {
     aboutHorse: optional(form, 'aboutHorse'),
     racingOutlookAndPedigree: optional(form, 'racingOutlookAndPedigree'),
     raceExpectation: optional(form, 'raceExpectation'),
-    imageCount: Number(value(form, 'imageCount') || '0'),
     raceRecord: record.value,
   }
 
@@ -228,7 +227,9 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
     if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
 
     const { horse } = view
-    const imageNumber = horse.imageCount + 1
+    const requested = Number(value(form, 'imageNumber'))
+    const imageNumber =
+      Number.isInteger(requested) && requested >= 1 ? requested : horse.imageCount + 1
 
     await uploadPublicImage({
       slug: horse.slug,
@@ -237,10 +238,74 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
       contentType: file.type,
     })
 
-    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: imageNumber }) }
+    // B7: the bucket is the fact, the stored count is a claim. Recount from the
+    // listing rather than incrementing, so a replaced image and a stray object
+    // both land on the number that is actually there.
+    const images = await listPublicImages({ slug: horse.slug })
+    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
   })
 
   if (!uploaded.ok) redirect(`${back}?error=${encodeURIComponent(uploaded.reason)}`)
+
+  revalidatePath(back)
+  redirect(back)
+}
+
+/**
+ * Remove one horse image and close the gap it leaves.
+ *
+ * `deletePublicImage` renumbers the later images so the folder still runs
+ * `01..NN`, then the stored count is read back from the bucket rather than
+ * decremented.
+ */
+export async function deleteHorseImageAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+  const imageNumber = Number(value(form, 'imageNumber'))
+
+  if (!Number.isInteger(imageNumber) || imageNumber < 1) {
+    redirect(`${back}?error=${encodeURIComponent('that is not an image number')}`)
+  }
+
+  const deleted = await attempt<HorseRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const { horse } = view
+    await deletePublicImage({ slug: horse.slug, imageNumber })
+    const images = await listPublicImages({ slug: horse.slug })
+    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
+  })
+
+  if (!deleted.ok) redirect(`${back}?error=${encodeURIComponent(deleted.reason)}`)
+
+  revalidatePath(back)
+  redirect(back)
+}
+
+/**
+ * Recount a horse's images from the bucket and store the result.
+ *
+ * `image_count` can drift from the bucket only by being written outside this
+ * app — a manual R2 upload, or a row that predates the recount-on-upload. The
+ * operator needs a control for that which is not "upload something and hope".
+ */
+export async function recountHorseImagesAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const recounted = await attempt<HorseRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const { horse } = view
+    const images = await listPublicImages({ slug: horse.slug })
+    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
+  })
+
+  if (!recounted.ok) redirect(`${back}?error=${encodeURIComponent(recounted.reason)}`)
 
   revalidatePath(back)
   redirect(back)

@@ -13,9 +13,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { MIN_IMAGES_FOR_AVAILABLE } from '@/lib/storage'
+import { imageKeys, MIN_IMAGES_FOR_AVAILABLE, publicImageUrl } from '@/lib/storage'
 
-import { uploadHorseImageAction } from '../actions'
+import { deleteHorseImageAction, recountHorseImagesAction, uploadHorseImageAction } from '../actions'
 import { loadDslView } from '../data'
 
 function Field({ label, value }: { label: string; value: string | number | null }) {
@@ -54,6 +54,18 @@ export default async function Page({
 
   const { dsl, horse, trainer, owner } = view
 
+  // The count is the source of truth for what to show; the keys are derived
+  // from it, so this page never calls the bucket. `image_count` is written from
+  // the bucket by the upload and delete actions.
+  const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
+  const images = publicUrlBase.startsWith('https://')
+    ? imageKeys(horse.slug, horse.imageCount).map((key, index) => ({
+        key,
+        imageNumber: index + 1,
+        url: publicImageUrl(key, publicUrlBase),
+      }))
+    : []
+
   return (
     <main>
       <h1>{horse.legalName}</h1>
@@ -68,15 +80,50 @@ export default async function Page({
 
       <h2>Images</h2>
       <p>
-        {horse.imageCount} in the bucket, numbered {horse.slug}/01 upward. Available needs{' '}
-        {MIN_IMAGES_FOR_AVAILABLE}. Images are public: KYC and proof of address never come through
-        here.
+        {horse.imageCount} in the bucket, numbered {horse.slug}/01 upward. Image 01 is the hero,
+        and the public site shows the first eight. Available needs {MIN_IMAGES_FOR_AVAILABLE}.
+        Images are public: KYC and proof of address never come through here.
       </p>
+      {images.length > 0 && (
+        <ol>
+          {images.map((image) => (
+            <li key={image.key}>
+              {/* The bucket serves the object; Next's image optimiser has no
+                  origin configured for it, so a plain img is correct here. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.url}
+                alt={`${horse.legalName} image ${String(image.imageNumber)}`}
+                width={160}
+              />
+              <form action={deleteHorseImageAction}>
+                <input type="hidden" name="dslId" value={dsl.id} />
+                <input type="hidden" name="imageNumber" value={image.imageNumber} />
+                <button type="submit">Remove image {image.imageNumber}</button>
+              </form>
+            </li>
+          ))}
+        </ol>
+      )}
       <form action={uploadHorseImageAction}>
         <input type="hidden" name="dslId" value={dsl.id} />
-        <label htmlFor="image">Add image number {horse.imageCount + 1}</label>
+        <label htmlFor="imageNumber">
+          Image number (leave blank to add {horse.imageCount + 1}; an existing number replaces it)
+        </label>
+        <input
+          id="imageNumber"
+          name="imageNumber"
+          type="number"
+          min="1"
+          placeholder={String(horse.imageCount + 1)}
+        />
+        <label htmlFor="image">Image</label>
         <input id="image" name="image" type="file" accept="image/*" required />
         <button type="submit">Upload to {horse.slug}</button>
+      </form>
+      <form action={recountHorseImagesAction}>
+        <input type="hidden" name="dslId" value={dsl.id} />
+        <button type="submit">Recount from the bucket</button>
       </form>
 
       <h2>Horse</h2>

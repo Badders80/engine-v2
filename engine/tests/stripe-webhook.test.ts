@@ -25,6 +25,11 @@ function signPayload(payload: string, timestamp: number, secret: string = SECRET
   return `t=${timestamp},v1=${digest}`
 }
 
+/** Hermetic stand-in for R2: CI has no bucket. */
+function fakeImages(count = 3) {
+  return { countImages: async () => count }
+}
+
 describe('Step 8a — verifyStripeSignature', () => {
   const now = 1_792_540_000
   const payload = JSON.stringify({
@@ -167,6 +172,8 @@ describe('Step 8a — recordWebhookEvent', () => {
       },
       store,
       fakeGateway(),
+      undefined,
+      fakeImages(),
     )
     if (!opened.ok) throw new Error(opened.reason)
     const row = await store.findCheckoutSessionByStripeSessionId(opened.value.checkoutSessionId)

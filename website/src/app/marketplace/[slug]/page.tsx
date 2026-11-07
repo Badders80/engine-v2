@@ -17,7 +17,13 @@ import {
 } from '../../../lib/engineClient'
 import { getListingsBySlug, type Listing } from '../../../lib/listings'
 import { readMyStable, type AccountProfile } from '../../../lib/mystable'
-import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../../lib/site'
+import {
+  galleryImageUrls,
+  heroImageUrl,
+  OG_IMAGE,
+  R2_PUBLIC_URL_ENV,
+  SITE_URL,
+} from '../../../lib/site'
 import { viewForStatus } from '../../../lib/status'
 
 /**
@@ -212,6 +218,7 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
 
   const { horse } = first
   const hero = heroImageUrl(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
+  const gallery = galleryImageUrls(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
 
   /**
    * The horse, at its real page (`PLAN.md:85` — the current site points structured
@@ -260,6 +267,28 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
               className="object-cover"
             />
           </div>
+        ) : null}
+
+        {gallery.length > 0 ? (
+          <ul
+            aria-label={`${horse.legalName} gallery`}
+            className="mt-4 flex gap-3 overflow-x-auto pb-2"
+          >
+            {gallery.map((src, index) => (
+              <li
+                key={src}
+                className="relative h-32 w-48 shrink-0 overflow-hidden rounded-lg bg-raised"
+              >
+                <Image
+                  src={src}
+                  alt={`${horse.legalName} image ${String(index + 2)}`}
+                  fill
+                  sizes="192px"
+                  className="object-cover"
+                />
+              </li>
+            ))}
+          </ul>
         ) : null}
       </section>
 

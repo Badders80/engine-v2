@@ -129,17 +129,6 @@ export function DslForm({
         </label>
 
         <label>
-          Images already in the bucket
-          <input
-            type="number"
-            min="0"
-            step="1"
-            name="imageCount"
-            defaultValue={horse.imageCount ?? 0}
-          />
-        </label>
-
-        <label>
           Race record, one json object
           <textarea
             name="raceRecord"

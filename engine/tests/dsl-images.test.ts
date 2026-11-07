@@ -45,13 +45,13 @@ describe('the upload action exists and goes through the storage module', () => {
   })
 
   it('persists the advanced count on the horse', () => {
-    expect(actions).toMatch(/updateHorse\(horse\.id, \{ imageCount: imageNumber \}\)/)
+    expect(actions).toMatch(/updateHorse\(horse\.id, \{ imageCount: images\.length \}\)/)
   })
 })
 
 describe('the detail page carries the control', () => {
   it('posts the form to the upload action', () => {
-    expect(detail).toMatch(/import \{ uploadHorseImageAction \} from '\.\.\/actions'/)
+    expect(detail).toMatch(/import \{[^}]*deleteHorseImageAction[^}]*recountHorseImagesAction[^}]*uploadHorseImageAction[^}]*\} from '\.\.\/actions'/)
     expect(detail).toMatch(/<form action=\{uploadHorseImageAction\}>/)
   })
 

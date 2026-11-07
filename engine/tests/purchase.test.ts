@@ -127,6 +127,11 @@ async function seedAvailableDsl(
   return saved.value
 }
 
+/** Hermetic stand-in for R2: CI has no bucket. */
+function fakeImages(count = 3) {
+  return { countImages: async () => count }
+}
+
 describe('Step 8a — effectiveMinStake, step validation, and quote calculation', () => {
   it('wires effectiveMinStake so an orphan remainder smaller than min_stake is buyable', async () => {
     const store = createInMemoryPurchaseStore()
@@ -366,6 +371,7 @@ describe('Step 8a — Identity and Checkout gates', () => {
       store,
       stripe,
       emailSender,
+      fakeImages(),
     )
     expect(blocked.ok).toBe(false)
     expect(stripe.checkoutCalls).toBe(0)
@@ -384,11 +390,85 @@ describe('Step 8a — Identity and Checkout gates', () => {
       store,
       stripe,
       emailSender,
+      fakeImages(),
     )
     expect(opened.ok).toBe(true)
     expect(stripe.checkoutCalls).toBe(1)
     expect(store.dump().sales).toHaveLength(0)
     expect(emailSender.sent).toHaveLength(0)
+  })
+})
+
+describe('B7 — the bucket, not the form, decides whether a listing has images', () => {
+  it('refuses Checkout when the bucket holds fewer images than the listing claims', async () => {
+    const store = createInMemoryPurchaseStore()
+    const { dsl } = await seedAvailableDsl(store)
+
+    const account = await store.insertAccount({
+      id: 'acc-b7',
+      fullName: 'Mere Ngata',
+      email: 'mere@example.co.nz',
+      kycStatus: 'verified',
+    })
+
+    const refused = await openCheckoutSession(
+      {
+        dslId: dsl.id,
+        accountId: account.id,
+        stake: 5,
+        acceptance: {
+          pdsAccepted: true,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+        },
+        successUrl: 'https://example.test/ok',
+        cancelUrl: 'https://example.test/cancel',
+      },
+      store,
+      fakeStripe(),
+      undefined,
+      { countImages: async () => 2 },
+    )
+
+    expect(refused.ok).toBe(false)
+    if (refused.ok) return
+    expect(refused.reason).toContain('2 image(s) in the bucket')
+    expect(refused.reason).toContain('3 are needed')
+    expect(store.dump().checkoutSessions).toHaveLength(0)
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(50)
+  })
+
+  it('proceeds when the bucket holds what the listing claims', async () => {
+    const store = createInMemoryPurchaseStore()
+    const { dsl } = await seedAvailableDsl(store)
+
+    const account = await store.insertAccount({
+      id: 'acc-b7-ok',
+      fullName: 'Mere Ngata',
+      email: 'mere.ok@example.co.nz',
+      kycStatus: 'verified',
+    })
+
+    const opened = await openCheckoutSession(
+      {
+        dslId: dsl.id,
+        accountId: account.id,
+        stake: 5,
+        acceptance: {
+          pdsAccepted: true,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+        },
+        successUrl: 'https://example.test/ok',
+        cancelUrl: 'https://example.test/cancel',
+      },
+      store,
+      fakeStripe(),
+      undefined,
+      { countImages: async () => 3 },
+    )
+
+    expect(opened.ok).toBe(true)
   })
 })
 
@@ -425,6 +505,8 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
       },
       store,
       stripe,
+      undefined,
+      fakeImages(),
     )
     if (!opened.ok) throw new Error(opened.reason)
     const checkout = await store.findCheckoutSessionByStripeSessionId(
@@ -531,6 +613,8 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
       },
       store,
       fakeStripe(),
+      undefined,
+      fakeImages(),
     )
     if (!opened.ok) throw new Error(opened.reason)
     const checkout = await store.findCheckoutSessionByStripeSessionId(

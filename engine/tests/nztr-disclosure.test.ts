@@ -55,8 +55,17 @@ function input(overrides: Partial<LegalPackInput['dsl']> = {}): LegalPackInput {
   }
 }
 
-const pack = compileLegalPack(input())
-const pds = pack.pds.markdown
+/**
+ * Both payment models render different cost blocks and a different section 4.
+ * The checklist must hold for each: a disclosure clause that lives inside the
+ * conditional half would pass on one model and ship broken on the other.
+ */
+const PACKS = {
+  subscription_float: compileLegalPack(input({ paymentModel: 'subscription_float' })),
+  upfront: compileLegalPack(input({ paymentModel: 'upfront' })),
+} as const
+
+const pack = PACKS.subscription_float
 const sa = pack.sa.markdown
 
 /**
@@ -115,17 +124,21 @@ const CHECKLIST: ReadonlyArray<{ item: string; patterns: RegExp[] }> = [
 ]
 
 describe('B9 — the NZTR disclosure checklist, against the rendered PDS', () => {
-  for (const entry of CHECKLIST) {
-    it(entry.item, () => {
-      const missing = entry.patterns.filter((pattern) => !pattern.test(pds)).map(String)
-      expect(missing, `missing from the rendered PDS: ${missing.join(', ')}`).toEqual([])
+  for (const [model, rendered] of Object.entries(PACKS)) {
+    for (const entry of CHECKLIST) {
+      it(`${entry.item} [${model}]`, () => {
+        const missing = entry.patterns
+          .filter((pattern) => !pattern.test(rendered.pds.markdown))
+          .map(String)
+        expect(missing, `missing from the rendered PDS: ${missing.join(', ')}`).toEqual([])
+      })
+    }
+
+    it(`leaves no token, block or dangling brace in the rendered document [${model}]`, () => {
+      expect(rendered.pds.markdown).not.toContain('{{')
+      expect(rendered.pds.markdown).not.toContain('}}')
     })
   }
-
-  it('leaves no token, block or dangling brace in the rendered document', () => {
-    expect(pds).not.toContain('{{')
-    expect(pds).not.toContain('}}')
-  })
 })
 
 describe('B9 — the Syndicate Agreement the buyer executes', () => {

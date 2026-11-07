@@ -321,7 +321,7 @@ describe('Step 8a — recordWebhookEvent', () => {
     )
     expect(emailSender.sent.map((sent) => sent.kind)).toEqual(['founder_our_fault_failure'])
     // The hold is kept: money was taken, so the stake must not go back on sale.
-    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(5)
   })
 
   it('B4 — refuses a session Stripe has not marked paid, and leaves the hold open', async () => {

@@ -72,27 +72,67 @@ export type NewHorse = {
 
 export type HorseRow = NewHorse & { id: string }
 
+/**
+ * A DSL row. The commercial and term fields are nullable on purpose: a DSL
+ * exists from the moment the horse does, and its deal may not be done yet.
+ * Anything that reads a price must narrow through `isPricedDsl` first.
+ */
 export type NewDsl = {
   horseId: string
   ownerId: string | null
-  endDate: string
-  termStart: string
-  paymentModel: PaymentModel
-  closeStyle: CloseStyle
+  endDate: string | null
+  termStart: string | null
+  paymentModel: PaymentModel | null
+  closeStyle: CloseStyle | null
   status: DslStatus
   published: boolean
-  wholesaleMonthlyPerPercent: number
-  retailMonthlyPerPercent: number
-  wholesaleMonthlyTotal: number
+  wholesaleMonthlyPerPercent: number | null
+  retailMonthlyPerPercent: number | null
+  wholesaleMonthlyTotal: number | null
   investorSplit: number | null
-  listedStake: number
-  minStake: number
-  step: number
-  stakeRemaining: number
+  listedStake: number | null
+  minStake: number | null
+  step: number | null
+  stakeRemaining: number | null
   distributionSchedule: string | null
 }
 
 export type DslRow = NewDsl & { id: string }
+
+/** A DSL whose deal is done: every field the quote and the pack need is set. */
+export type PricedDsl = DslRow & {
+  ownerId: string
+  endDate: string
+  termStart: string
+  paymentModel: PaymentModel
+  closeStyle: CloseStyle
+  wholesaleMonthlyPerPercent: number
+  retailMonthlyPerPercent: number
+  wholesaleMonthlyTotal: number
+  investorSplit: number
+  listedStake: number
+  minStake: number
+  step: number
+  stakeRemaining: number
+}
+
+export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
+  return (
+    dsl.ownerId !== null &&
+    dsl.endDate !== null &&
+    dsl.termStart !== null &&
+    dsl.paymentModel !== null &&
+    dsl.closeStyle !== null &&
+    dsl.wholesaleMonthlyPerPercent !== null &&
+    dsl.retailMonthlyPerPercent !== null &&
+    dsl.wholesaleMonthlyTotal !== null &&
+    dsl.investorSplit !== null &&
+    dsl.listedStake !== null &&
+    dsl.minStake !== null &&
+    dsl.step !== null &&
+    dsl.stakeRemaining !== null
+  )
+}
 
 export interface DslStore {
   findTrainer(match: { name: string; stable: string }): Promise<TrainerRow | null>

@@ -29,7 +29,11 @@ export type DslFormDefaults = {
     website?: string | null
     profile?: string | null
   }
-  dsl?: Partial<DslDraft>
+  /**
+   * A DSL row is nullable on every commercial field: the listing can exist
+   * before the deal is done. The form renders an absent field as blank.
+   */
+  dsl?: { [K in keyof DslDraft]?: DslDraft[K] | null }
 }
 
 type Props = {

@@ -29,6 +29,7 @@ import {
   type TrainerRow,
 } from './dslStore'
 import { isInvestorReturnPctInRange, retailPerPercentFromWholesale, validateStake } from './pricing'
+import { checkDslReadiness, readinessReason, type ReadinessResult } from './readiness'
 import { paymentModelAllowed, termMonthsBetween } from './term'
 
 export const DSL_STATUSES = DSL_STATUS_VALUES
@@ -146,6 +147,77 @@ function text(value: string | null | undefined): string | null {
 }
 
 /**
+ * The draft as the readiness gate sees it. An unset number arrives from the
+ * form as `NaN`, and an unset text field as `''`, so both become null here.
+ */
+function draftReadiness(args: {
+  horse: {
+    registered: boolean
+    imageCount?: number
+    aboutHorse?: string | null
+    racingOutlookAndPedigree?: string | null
+    raceExpectation?: string | null
+  }
+  trainerBio: string | null | undefined
+  ownerEntity: string | null | undefined
+  dsl: DslDraft
+  stakeRemaining: number | null
+}): ReadinessResult {
+  return checkDslReadiness({
+    dsl: {
+      ownerId: text(args.ownerEntity) === null ? null : 'draft-owner',
+      endDate: text(args.dsl.endDate),
+      termStart: text(args.dsl.termStart),
+      paymentModel: text(args.dsl.paymentModel),
+      closeStyle: text(args.dsl.closeStyle),
+      wholesaleMonthlyPerPercent: numberOrNull(args.dsl.wholesaleMonthlyPerPercent),
+      investorSplit: args.dsl.investorSplit,
+      listedStake: numberOrNull(args.dsl.listedStake),
+      minStake: numberOrNull(args.dsl.minStake),
+      step: numberOrNull(args.dsl.step),
+      stakeRemaining: args.stakeRemaining,
+      distributionSchedule: text(args.dsl.distributionSchedule),
+    },
+    horse: {
+      registered: args.horse.registered,
+      imageCount: args.horse.imageCount ?? 0,
+      aboutHorse: text(args.horse.aboutHorse),
+      racingOutlookAndPedigree: text(args.horse.racingOutlookAndPedigree),
+      raceExpectation: text(args.horse.raceExpectation),
+    },
+    trainer: { bio: text(args.trainerBio) },
+  })
+}
+
+function numberOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null
+}
+
+/**
+ * The fields the deal supplies. Absent means "not filled yet", never zero: a
+ * blank form field arrives as `NaN` or `''`, and both become null so Postgres
+ * sees the same absence the operator sees.
+ */
+function dealColumns(dsl: DslDraft) {
+  const wholesale = numberOrNull(dsl.wholesaleMonthlyPerPercent)
+
+  return {
+    endDate: text(dsl.endDate),
+    termStart: text(dsl.termStart),
+    paymentModel: text(dsl.paymentModel) as PaymentModel | null,
+    closeStyle: text(dsl.closeStyle) as CloseStyle | null,
+    wholesaleMonthlyPerPercent: wholesale,
+    retailMonthlyPerPercent: wholesale === null ? null : retailPerPercentFromWholesale(wholesale),
+    wholesaleMonthlyTotal: wholesale === null ? null : wholesale * 100,
+    investorSplit: dsl.investorSplit,
+    listedStake: numberOrNull(dsl.listedStake),
+    minStake: numberOrNull(dsl.minStake),
+    step: numberOrNull(dsl.step),
+    distributionSchedule: text(dsl.distributionSchedule),
+  }
+}
+
+/**
  * Validate everything before a single row is written, so a refusal leaves the
  * store exactly as it was.
  */
@@ -164,12 +236,29 @@ function checkDraft(input: SaveDslInput): CheckResult {
     return { ok: false, reason: 'the horse needs a legal name, which makes the slug' }
   }
 
+  if (input.dsl.status === 'available') {
+    const ready = draftReadiness({
+      horse: input.horse,
+      trainerBio: input.trainer.bio,
+      ownerEntity: input.owner.entity,
+      dsl: input.dsl,
+      stakeRemaining: numberOrNull(input.dsl.listedStake),
+    })
+    if (!ready.ok) {
+      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
+    }
+  }
+
   return { ok: true }
 }
 
 /**
  * The commercial terms, validated before a single row is written so that a
  * refusal leaves the store exactly as it was. Shared by create and edit.
+ *
+ * A DSL exists before its deal does, so an unset field is not an error: it is
+ * simply not filled yet. Each rule applies only when its field is present.
+ * `checkDslReadiness` is what refuses `available` until every field is set.
  */
 function checkCommercialTerms(dsl: DslDraft): CheckResult {
   const { investorSplit, listedStake, minStake, step, wholesaleMonthlyPerPercent } = dsl
@@ -178,31 +267,42 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
     return { ok: false, reason: `investor split ${investorSplit} sits outside the 50 to 85 range` }
   }
 
-  if (!(wholesaleMonthlyPerPercent > 0)) {
+  if (Number.isFinite(wholesaleMonthlyPerPercent) && wholesaleMonthlyPerPercent <= 0) {
     return { ok: false, reason: 'wholesale cost per 1% must be above zero' }
   }
 
-  if (!(minStake > 0)) return { ok: false, reason: 'minimum stake must be above zero' }
-  if (!(step > 0)) return { ok: false, reason: 'step must be above zero' }
-  if (minStake > listedStake) {
+  if (Number.isFinite(minStake) && minStake <= 0) {
+    return { ok: false, reason: 'minimum stake must be above zero' }
+  }
+  if (Number.isFinite(step) && step <= 0) {
+    return { ok: false, reason: 'step must be above zero' }
+  }
+  if (Number.isFinite(minStake) && Number.isFinite(listedStake) && minStake > listedStake) {
     return { ok: false, reason: 'minimum stake cannot exceed the listed stake' }
   }
 
-  try {
-    validateStake(listedStake, step)
-  } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : 'invalid stake shape' }
+  if (Number.isFinite(listedStake) && Number.isFinite(step)) {
+    try {
+      validateStake(listedStake, step)
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : 'invalid stake shape' }
+    }
   }
 
-  const termMonths = termMonthsBetween(dsl.termStart, dsl.endDate)
-  if (termMonths === null || termMonths < 1) {
-    return { ok: false, reason: 'term dates are invalid' }
-  }
+  const hasTermStart = text(dsl.termStart) !== null
+  const hasEndDate = text(dsl.endDate) !== null
 
-  if (!paymentModelAllowed(dsl.paymentModel, termMonths)) {
-    return {
-      ok: false,
-      reason: `a ${termMonths}-month term must use upfront; subscription_float requires 6 months or more`,
+  if (hasTermStart && hasEndDate) {
+    const termMonths = termMonthsBetween(dsl.termStart, dsl.endDate)
+    if (termMonths === null || termMonths < 1) {
+      return { ok: false, reason: 'term dates are invalid' }
+    }
+
+    if (text(dsl.paymentModel) !== null && !paymentModelAllowed(dsl.paymentModel, termMonths)) {
+      return {
+        ok: false,
+        reason: `a ${termMonths}-month term must use upfront; subscription_float requires 6 months or more`,
+      }
     }
   }
 
@@ -297,21 +397,10 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
   const dsl = await store.insertDsl({
     horseId: horse.id,
     ownerId: owner.id,
-    endDate: input.dsl.endDate,
-    termStart: input.dsl.termStart,
-    paymentModel: input.dsl.paymentModel,
-    closeStyle: input.dsl.closeStyle,
+    ...dealColumns(input.dsl),
     status: input.dsl.status,
     published: input.dsl.published,
-    wholesaleMonthlyPerPercent: input.dsl.wholesaleMonthlyPerPercent,
-    retailMonthlyPerPercent: retailPerPercentFromWholesale(input.dsl.wholesaleMonthlyPerPercent),
-    wholesaleMonthlyTotal: input.dsl.wholesaleMonthlyPerPercent * 100,
-    investorSplit: input.dsl.investorSplit,
-    listedStake: input.dsl.listedStake,
-    minStake: input.dsl.minStake,
-    step: input.dsl.step,
-    stakeRemaining: input.dsl.listedStake,
-    distributionSchedule: text(input.dsl.distributionSchedule),
+    stakeRemaining: numberOrNull(input.dsl.listedStake),
   })
 
   return { ok: true, value: { horse, trainer, owner, dsl } }
@@ -362,6 +451,32 @@ export async function updateDsl(
 
   const terms = checkCommercialTerms(input.dsl)
   if (!terms.ok) return terms
+
+  if (input.dsl.status === 'available') {
+    const ready = draftReadiness({
+      horse: {
+        registered,
+        imageCount: input.horse.imageCount ?? currentHorse.imageCount,
+        aboutHorse:
+          input.horse.aboutHorse === undefined ? currentHorse.aboutHorse : input.horse.aboutHorse,
+        racingOutlookAndPedigree:
+          input.horse.racingOutlookAndPedigree === undefined
+            ? currentHorse.racingOutlookAndPedigree
+            : input.horse.racingOutlookAndPedigree,
+        raceExpectation:
+          input.horse.raceExpectation === undefined
+            ? currentHorse.raceExpectation
+            : input.horse.raceExpectation,
+      },
+      trainerBio: input.trainer.bio,
+      ownerEntity: input.owner.entity,
+      dsl: input.dsl,
+      stakeRemaining: currentDsl.stakeRemaining,
+    })
+    if (!ready.ok) {
+      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
+    }
+  }
 
   if (input.dsl.endDate !== currentDsl.endDate) {
     const clash = await store.findDslByHorseAndEndDate(currentHorse.id, input.dsl.endDate)
@@ -421,20 +536,9 @@ export async function updateDsl(
 
   const dsl = await store.updateDsl(currentDsl.id, {
     ownerId: owner.id,
-    endDate: input.dsl.endDate,
-    termStart: input.dsl.termStart,
-    paymentModel: input.dsl.paymentModel,
-    closeStyle: input.dsl.closeStyle,
+    ...dealColumns(input.dsl),
     status: input.dsl.status,
     published: input.dsl.published,
-    wholesaleMonthlyPerPercent: input.dsl.wholesaleMonthlyPerPercent,
-    retailMonthlyPerPercent: retailPerPercentFromWholesale(input.dsl.wholesaleMonthlyPerPercent),
-    wholesaleMonthlyTotal: input.dsl.wholesaleMonthlyPerPercent * 100,
-    investorSplit: input.dsl.investorSplit,
-    listedStake: input.dsl.listedStake,
-    minStake: input.dsl.minStake,
-    step: input.dsl.step,
-    distributionSchedule: text(input.dsl.distributionSchedule),
   })
 
   return { ok: true, value: { horse, trainer, owner, dsl } }

@@ -51,6 +51,10 @@ function input(overrides: Partial<SaveDslInput> = {}): SaveDslInput {
       lifeNumber: 'NZ01234567',
       loveracingId: 'LR-88421',
       registered: true,
+      aboutHorse: 'A paragraph about the horse.',
+      racingOutlookAndPedigree: 'A paragraph about the racing outlook.',
+      raceExpectation: 'A paragraph about what to expect.',
+      imageCount: 3,
     },
     trainer: {
       name: 'T Trainer',

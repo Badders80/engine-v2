@@ -17,7 +17,7 @@
  *   `stakeRemaining` and flipping `status` to `'fully_allocated'` at 0 (`PLAN.md:316`).
  */
 
-import type { DslRow, PaymentModel } from './dslStore'
+import { isPricedDsl, type PaymentModel, type PricedDsl } from './dslStore'
 import {
   createInMemoryEmailSender,
   sendEngineEmail,
@@ -75,7 +75,10 @@ export type PurchaseQuote = {
   refundSentence: string
 }
 
-export function validatePurchaseStake(dsl: DslRow, stake: number): Result<{ effectiveMin: number }> {
+export function validatePurchaseStake(
+  dsl: PricedDsl,
+  stake: number,
+): Result<{ effectiveMin: number }> {
   if (dsl.status !== 'available' || !dsl.published) {
     return { ok: false, reason: 'this listing is not available for purchase' }
   }
@@ -117,6 +120,9 @@ export async function computeQuote(
   const dsl = await store.findDslById(input.dslId)
   if (dsl === null) {
     return { ok: false, reason: `DSL ${input.dslId} does not exist` }
+  }
+  if (!isPricedDsl(dsl)) {
+    return { ok: false, reason: 'this listing does not have its commercial terms yet' }
   }
 
   const horse = await store.findHorseById(dsl.horseId)
@@ -217,6 +223,9 @@ export async function compileBuyerDocuments(
 
   const dsl = await store.findDslById(input.dslId)
   if (dsl === null) return { ok: false, reason: `DSL ${input.dslId} does not exist` }
+  if (!isPricedDsl(dsl)) {
+    return { ok: false, reason: 'this listing does not have its commercial terms yet' }
+  }
 
   const horse = await store.findHorseById(dsl.horseId)
   if (horse === null) return { ok: false, reason: `horse ${dsl.horseId} does not exist` }
@@ -526,6 +535,9 @@ export async function recordWebhookEvent(
   const { account, quote, pack } = compiled.value
   const dsl = await store.findDslById(dslId)
   if (dsl === null) return failWebhook(`DSL ${dslId} does not exist`)
+  if (!isPricedDsl(dsl)) {
+    return failWebhook(`DSL ${dslId} lost its commercial terms before the webhook arrived`)
+  }
 
   let sale: SaleRow | null = null
   try {

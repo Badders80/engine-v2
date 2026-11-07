@@ -54,6 +54,10 @@ function input(overrides: Partial<SaveDslInput> = {}): SaveDslInput {
       lifeNumber: 'NZ01234567',
       loveracingId: 'LR-88421',
       registered: true,
+      aboutHorse: 'A paragraph about the horse.',
+      racingOutlookAndPedigree: 'A paragraph about the racing outlook.',
+      raceExpectation: 'A paragraph about what to expect.',
+      imageCount: 3,
     },
     trainer: {
       name: 'T Trainer',
@@ -354,7 +358,21 @@ describe('the soft slots are the three on the horse', () => {
   })
 
   it('leaves them empty on a first save, so the operator can fill them after loading', async () => {
-    const saved = await ok(await saveDsl(input(), store))
+    const base = input()
+    const saved = await ok(
+      await saveDsl(
+        {
+          ...base,
+          horse: {
+            ...base.horse,
+            aboutHorse: null,
+            racingOutlookAndPedigree: null,
+            raceExpectation: null,
+          },
+        },
+        store,
+      ),
+    )
     expect(saved.horse.aboutHorse).toBeNull()
     expect(saved.horse.racingOutlookAndPedigree).toBeNull()
     expect(saved.horse.raceExpectation).toBeNull()
@@ -491,5 +509,69 @@ describe('the payment-model rule holds on save', () => {
       expect(result.reason).toMatch(/term dates are invalid/)
       expect(scoped.dump().horses).toHaveLength(0)
     }
+  })
+})
+
+describe('a DSL exists before its deal does', () => {
+  it('saves at Coming Soon with every commercial field blank', async () => {
+    const blank = draft({
+      endDate: '',
+      termStart: '',
+      paymentModel: '' as DslDraft['paymentModel'],
+      closeStyle: '' as DslDraft['closeStyle'],
+      wholesaleMonthlyPerPercent: Number.NaN,
+      investorSplit: null,
+      listedStake: Number.NaN,
+      minStake: Number.NaN,
+      step: Number.NaN,
+      distributionSchedule: null,
+    })
+
+    const saved = await ok(await saveDsl(input({ dsl: blank }), store))
+
+    expect(saved.dsl.status).toBe('coming_soon')
+    expect(saved.dsl.endDate).toBeNull()
+    expect(saved.dsl.listedStake).toBeNull()
+  })
+
+  it('refuses available and names what is still missing', async () => {
+    const blank = draft({
+      status: 'available',
+      published: true,
+      endDate: '',
+      termStart: '',
+      paymentModel: '' as DslDraft['paymentModel'],
+      closeStyle: '' as DslDraft['closeStyle'],
+      wholesaleMonthlyPerPercent: Number.NaN,
+      investorSplit: null,
+      listedStake: Number.NaN,
+      minStake: Number.NaN,
+      step: Number.NaN,
+      distributionSchedule: null,
+    })
+
+    const result = await saveDsl(input({ dsl: blank }), store)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected an incomplete listing to be refused')
+    expect(result.reason).toMatch(/cannot go Available yet/)
+    expect(result.reason).toMatch(/the owner on the term sheet|the term start and end date/)
+  })
+
+  it('refuses available when the horse prose is empty', async () => {
+    const base = input()
+    const result = await saveDsl(
+      {
+        ...base,
+        horse: { ...base.horse, aboutHorse: null, imageCount: 0 },
+        dsl: draft({ status: 'available', published: true }),
+      },
+      store,
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected an incomplete horse to be refused')
+    expect(result.reason).toMatch(/the about-the-horse paragraph/)
+    expect(result.reason).toMatch(/at least 3 horse images/)
   })
 })

@@ -201,7 +201,9 @@ describe('Step 8a — effectiveMinStake, step validation, and quote calculation'
     const quote = await computeQuote({ dslId: dsl.id, stake: 2.5 }, store)
     expect(quote.ok).toBe(false)
     if (!quote.ok) {
-      expect(quote.reason).toContain('dsl.investor_split')
+      // A null split now fails the priced-DSL guard before the split is read;
+      // either way the quote is refused and no 75% fallback is invented.
+      expect(quote.reason).toMatch(/commercial terms|investor_split/)
     }
   })
 })

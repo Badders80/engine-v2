@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { compileLegalPack, type LegalPack } from '@/lib/legal/compile'
+import { isPricedDsl } from '@/lib/dslStore'
 import { validateStake } from '@/lib/pricing'
 
 import { loadDslView } from '../../data'
@@ -81,7 +82,9 @@ export default async function Page({
   let pack: LegalPack | null = null
   let error: string | null = null
 
-  if (trainer === null) {
+  if (!isPricedDsl(dsl)) {
+    error = 'this listing does not have its commercial terms yet, so the documents cannot be compiled'
+  } else if (trainer === null) {
     error = 'this horse has no trainer row, so the documents cannot be compiled'
   } else if (owner === null) {
     error = 'this horse has no owner row, so the documents cannot be compiled'

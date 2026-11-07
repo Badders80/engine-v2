@@ -84,15 +84,20 @@ describe('Step 8b — five-screen BuyFlowModal and Buy Now gate', () => {
   })
 
   it('allows Buy Now only on available listings when WEBSITE_BUY_ENABLED is true', () => {
-    expect(canRenderBuyNow('available', 'true')).toBe(true)
-    expect(canRenderBuyNow('available', 'false')).toBe(false)
-    expect(canRenderBuyNow('available', undefined)).toBe(false)
+    expect(canRenderBuyNow('available', 'true', 10)).toBe(true)
+    expect(canRenderBuyNow('available', 'false', 10)).toBe(false)
+    expect(canRenderBuyNow('available', undefined, 10)).toBe(false)
 
     for (const nonBuyable of ['coming_soon', 'fully_allocated', 'completed']) {
-      expect(canRenderBuyNow(nonBuyable, 'true')).toBe(false)
-      expect(canRenderBuyNow(nonBuyable, 'false')).toBe(false)
-      expect(canRenderBuyNow(nonBuyable, undefined)).toBe(false)
+      expect(canRenderBuyNow(nonBuyable, 'true', 10)).toBe(false)
+      expect(canRenderBuyNow(nonBuyable, 'false', 10)).toBe(false)
+      expect(canRenderBuyNow(nonBuyable, undefined, 10)).toBe(false)
     }
+  })
+
+  it('hides Buy Now when open Checkout holds have taken every remaining stake', () => {
+    expect(canRenderBuyNow('available', 'true', 0)).toBe(false)
+    expect(canRenderBuyNow('available', 'true', 0.5)).toBe(true)
   })
 
   it('requires the listing investorSplit and never falls back to 75', () => {

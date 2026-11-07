@@ -242,7 +242,8 @@ The engine serves five JSON routes for the purchase flow and Stripe webhook:
 - `POST /api/purchase/quote` — calls `computeQuote` (`engine/src/lib/purchase.ts`), which wires `effectiveMinStake(dsl.minStake, dsl.stakeRemaining)` (`engine/src/lib/pricing.ts:120`) so a remainder below `min_stake` can be bought whole without leaving orphan inventory, checks `stake % step === 0` in basis points, reads the DSL's stored/generated retail rate (`monthlyRetailPerPercent`) without recomputing `wholesale × 1.05 × 1.03`, and reads the DSL's `investorSplit` (refusing `null` with no `75` fallback).
 - `POST /api/purchase/documents` — calls `compileBuyerDocuments` (`engine/src/lib/purchase.ts`), which validates stake and calls `compileLegalPack` with `account.fullName` mapped from `accounts.full_name`, returning the PDS and SA Markdown and their SHA-256 hashes.
 - `POST /api/purchase/identity` — calls `beginOrConfirmIdentity` (`engine/src/lib/purchase.ts`), requiring PDS + SA acceptance and the four SA declarations verbatim before advancing. Verified accounts (`account.kycStatus === 'verified'`) confirm their name and skip Stripe Identity; unverified accounts start a Stripe Identity `VerificationSession` (`type: 'document'`); `'failed'` and `'pending'` accounts are refused Checkout.
-- `POST /api/purchase/checkout` — calls `openCheckoutSession` (`engine/src/lib/purchase.ts`), requiring `account.kycStatus === 'verified'`, `dsl.status === 'available'`, and `dsl.published === true`, creating a hosted Stripe Checkout session in `payment` mode, and writing no `sales` row at session creation.
+- `POST /api/purchase/checkout` — calls `openCheckoutSession` (`engine/src/lib/purchase.ts`), requiring `account.kycStatus === 'verified'`, `dsl.status === 'available'`, and `dsl.published === true`, creating a hosted Stripe Checkout session in `payment` mode, and writing no `sales` row at session creation. It compiles the PDS and SA first and writes them to `public.checkout_sessions`, then calls `reserve_checkout_stake` — one transaction that decrements `dsls.stake_remaining` and inserts the binding row — so the stake is held before the buyer reaches Stripe.
+- `POST /api/purchase/expire` — calls `expireCheckoutSessions`, returning every `open` hold past its `expires_at` to its listing. Guarded by `ENGINE_EXPIRE_SECRET` in an `Authorization: Bearer` header, compared in constant time; with no secret configured the route refuses. Called every five minutes by `.github/workflows/expire-checkouts.yml`, and lazily at the top of `openCheckoutSession`.
 - `POST /api/stripe/webhook` — reads the raw request body, verifies `Stripe-Signature` with HMAC-SHA256 and a 300-second tolerance (`verifyStripeSignature` in `engine/src/lib/stripe.ts`), and calls `recordWebhookEvent` (`engine/src/lib/purchase.ts`). Idempotent on `sales.stripe_session_id`. On `checkout.session.completed` it reads the `public.checkout_sessions` row named in `metadata.checkout_id` and **never** recompiles: the frozen `pds_markdown`, `sa_markdown`, `pds_hash`, `sa_hash`, stake, amount, and executed date are the ones the buyer was shown at Checkout. An event with no binding row is refused and emails the founder; no sale is written. Before anything is written it reconciles Stripe's own numbers against the bound row: `payment_status` must be `paid`, `amount_total` must equal `amount_nzd × 100`, and `currency` must be `nzd`. A mismatch writes no sale, alerts the founder with both figures, and marks the row `paid_unfulfilled` when money was taken (so a cron never releases stock that has been paid for); a session Stripe has not marked paid is refused and left `open` for expiry. The charged `amount_total` and `currency` are then recorded on `sales.stripe_amount_total` and `sales.stripe_currency`, so the sale says what Stripe did rather than what we expected. It then claims the row (`open` → `completed`, a conditional update, so only one delivery can win), writes the sale, decrements `dsls.stake_remaining`, and flips `dsls.status` to `'fully_allocated'` when `stake_remaining` reaches `0`. Card-decline events (`payment_intent.payment_failed`) write no `sales` row. Later edits or renames via `updateDsl` leave existing `sales` rows untouched.
 
 Required environment variables in `engine/.env.local` for live/test Stripe calls:
@@ -250,13 +251,44 @@ Required environment variables in `engine/.env.local` for live/test Stripe calls
 ```
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
+ENGINE_EXPIRE_SECRET="<random, 32+ bytes>"
 ```
+
+### Checkout holds (B6)
+
+A Checkout attempt holds its stake for `CHECKOUT_HOLD_SECONDS` (300). `reserve_checkout_stake` decrements `dsls.stake_remaining` and inserts the `checkout_sessions` row in one transaction, so a second buyer cannot take the same last percent: the conditional UPDATE matches no row and the reserve raises `23514`.
+
+Three things release a hold, and all three are safe to race:
+
+1. `release_checkout_stake` — Checkout failed before Stripe returned a session. Updates `open` → `released` and returns the stake. A second call returns `0` and credits nothing.
+2. `expire_checkout_stakes` — the cron and the lazy call in `openCheckoutSession`. Updates overdue `open` rows to `expired` and returns their stake, capped at `listed_stake`.
+3. The webhook — the only path that moves stake forward. A live hold is claimed with a conditional `open` → `completed` and nothing is decremented. A lapsed hold falls to `sell_stake_atomically`, which decrements conditionally and refuses an overdraw; when even that fails, the sale is not written, the row is marked `paid_unfulfilled`, and the founder is emailed.
+
+A listing whose remaining stake is fully held stays `available`; the website hides Buy Now when `stakeRemaining` is `0` (`canRenderBuyNow` in `website/src/lib/engineClient.ts`), and Checkout refuses the stake anyway.
+
+**Operator note.** A 5-minute hold is short for a buyer who has to read a PDS, accept the SA, and complete Stripe Identity. Most abandoned holds will expire before a real completion; the backstop makes that correct rather than lossy, but the TTL is worth revisiting before cutover.
 
 ### Website buy flow, signup trigger, and MyStable (step 8b)
 
 - Migration `00012_accounts_signup.sql` defines `public.handle_auth_user_created()` and the `on_auth_user_created` trigger on `auth.users`. Every signup requires `full_name` in `raw_user_meta_data` and populates `public.accounts` (`id`, `full_name`, `email`, `kyc_status = 'unverified'`) so Checkout never creates a second profile.
 - `website/src/components/BuyFlowModal.tsx` renders the five screens (`Terms` → `Documents` → `Identity` → `Pay` → `Return`) on `/marketplace/[slug]`. It renders only on `available` listings and only when `WEBSITE_BUY_ENABLED=true` in `website/.env.local`; `coming_soon`, `fully_allocated`, and `completed` listings never show a Buy Now control.
 - `website/src/lib/mystable.ts` is the sole module in `website/src/` permitted to query `accounts` and `sales` (enforced by `scripts/assert-purchase-fences.sh` and `website/tests/listings.test.ts`). `/mystable` (`force-dynamic`) displays a pending notice when returning from Stripe Checkout (`?session_id=...`) before the webhook writes the matching `sales` row, and displays the stake, amount paid, and frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` once written.
+
+### Recorded probe, 2026-11-07 — migration 00017 (reservation and backstop)
+
+Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422` inside one transaction that was rolled back. The fixture was one `auth.users` row (which produced one `accounts` row) and the existing `available` DSL: 5.00% listed, 5.00% remaining. Each state read is its own statement, so it reflects the write.
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Does a reserve take the stake and write an `open` hold? | `held 2.50`, `status open`, TTL inside 4:50–5:10; remaining `2.50` |
+| 2 | Can a second buyer take the rest? | Yes — `open`, remaining `0.00` |
+| 3 | Is a third reserve refused? | `23514`, `no stake available on dsl …` |
+| 4 | Does release return the stake exactly once? | First call `1`, second `0`; remaining `2.50` |
+| 5 | Does expiry release only overdue holds? | `expired_count 1`; remaining `5.00`; second sweep `0` |
+| 6 | Does the backstop decrement and flip the status? | remaining `0.00`, `status fully_allocated`; a further call is refused `23514` |
+| 7 | Can `anon` execute the functions? | No — `permission denied for function expire_checkout_stakes` |
+
+Rolled back; the two existing DSLs are unchanged.
 
 ### Recorded probe, 2026-11-07 — migration 00016 (checkout binding)
 

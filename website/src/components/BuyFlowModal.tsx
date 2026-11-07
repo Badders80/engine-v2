@@ -78,7 +78,7 @@ export default function BuyFlowModal({
   const [busy, setBusy] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  if (!canRenderBuyNow(status, buyEnabled ? 'true' : 'false')) {
+  if (!canRenderBuyNow(status, buyEnabled ? 'true' : 'false', initialQuote.maxStake)) {
     return null
   }
 

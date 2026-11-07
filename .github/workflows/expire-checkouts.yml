@@ -1,0 +1,33 @@
+name: expire-checkouts
+
+# B6: returns lapsed Checkout holds to their listings.
+#
+# The engine route is idempotent and also runs lazily on the next Checkout, so
+# a missed run costs availability, not correctness. The secrets are set on the
+# repository when the engine has a public URL; until then this job exits 0
+# without calling anything.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the engine expiry route
+        env:
+          ENGINE_EXPIRE_URL: ${{ secrets.ENGINE_EXPIRE_URL }}
+          ENGINE_EXPIRE_TOKEN: ${{ secrets.ENGINE_EXPIRE_TOKEN }}
+        run: |
+          if [ -z "${ENGINE_EXPIRE_URL}" ] || [ -z "${ENGINE_EXPIRE_TOKEN}" ]; then
+            echo "ENGINE_EXPIRE_URL or ENGINE_EXPIRE_TOKEN is not set; nothing to do."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 \
+            --request POST "${ENGINE_EXPIRE_URL}" \
+            --header "Authorization: Bearer ${ENGINE_EXPIRE_TOKEN}"

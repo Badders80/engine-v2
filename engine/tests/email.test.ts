@@ -217,14 +217,14 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     const { store, dslId, accountId } = await seedStore()
     const sender = createInMemoryEmailSender('alex@evolutionstables.nz')
 
-    const checkout = await store.insertCheckoutSession({
+    const checkout = await store.reserveCheckoutSession({
       dslId,
       accountId,
       printedName: 'Aroha Williams',
       email: 'aroha@example.co.nz',
       horseLegalName: 'Lady Ketchikan',
-      stake: 5,
-      amountNzd: 1775,
+      stake: 20,
+      amountNzd: 1420,
       executedDate: '2026-10-21',
       pdsMarkdown: '# PDS',
       saMarkdown: '# SA',
@@ -241,7 +241,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         object: {
           id: 'cs_step9_1',
           payment_status: 'paid',
-          amount_total: 177_500,
+          amount_total: 142_000,
           currency: 'nzd',
           metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_step9_1' },
         },
@@ -253,8 +253,8 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     expect(sender.sent).toHaveLength(2)
     expect(sender.sent[0].kind).toBe('buyer_sale_written')
     expect(sender.sent[0].to).toBe('aroha@example.co.nz')
-    expect(sender.sent[0].text).toContain('5%')
-    expect(sender.sent[0].text).toContain('$1775 NZD')
+    expect(sender.sent[0].text).toContain('20%')
+    expect(sender.sent[0].text).toContain('$1420 NZD')
     expect(sender.sent[0].text).toContain('https://www.evolutionstables.nz/mystable')
 
     expect(sender.sent[1].kind).toBe('founder_sale_succeeded')
@@ -352,14 +352,14 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       },
     }
 
-    const checkout = await store.insertCheckoutSession({
+    const checkout = await store.reserveCheckoutSession({
       dslId,
       accountId,
       printedName: 'Aroha Williams',
       email: 'aroha@example.co.nz',
       horseLegalName: 'Lady Ketchikan',
-      stake: 5,
-      amountNzd: 1775,
+      stake: 20,
+      amountNzd: 1420,
       executedDate: '2026-10-21',
       pdsMarkdown: '# PDS',
       saMarkdown: '# SA',
@@ -377,7 +377,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
           object: {
             id: 'cs_partial_fail_1',
             payment_status: 'paid',
-            amount_total: 177_500,
+            amount_total: 142_000,
             currency: 'nzd',
             metadata: { checkout_id: checkout.id },
           },

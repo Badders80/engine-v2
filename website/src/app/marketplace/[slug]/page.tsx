@@ -126,7 +126,11 @@ async function DslBlock({
   listing: Listing
   account: AccountProfile | null
 }) {
-  const buyEnabled = canRenderBuyNow(listing.status, process.env[WEBSITE_BUY_ENABLED_ENV])
+  const buyEnabled = canRenderBuyNow(
+    listing.status,
+    process.env[WEBSITE_BUY_ENABLED_ENV],
+    listing.stakeRemaining,
+  )
   const initialQuote = buyEnabled ? await fetchEngineQuote({ dslId: listing.id }) : null
   const splitDisplay =
     listing.investorSplit !== null ? `${String(requireInvestorSplit(listing.investorSplit))}%` : null
@@ -190,7 +194,11 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
   if (!first) notFound()
 
   const anyBuyEnabled = listings.some((listing) =>
-    canRenderBuyNow(listing.status, process.env[WEBSITE_BUY_ENABLED_ENV]),
+    canRenderBuyNow(
+    listing.status,
+    process.env[WEBSITE_BUY_ENABLED_ENV],
+    listing.stakeRemaining,
+  ),
   )
   let account: AccountProfile | null = null
   if (anyBuyEnabled) {

@@ -66,12 +66,21 @@ export type EngineCheckoutSession = {
  * Determines whether the Buy Now control may render on a listing (`PLAN.md:226`, `:318`).
  * Only `available` listings may ever show Buy Now, and only when `WEBSITE_BUY_ENABLED === 'true'`.
  * `coming_soon`, `fully_allocated`, and `completed` listings never render Buy Now under any flag.
+ *
+ * A listing whose stake is fully held by open Checkout attempts is still
+ * `available`, but there is nothing to buy. Rendering Buy Now there sends a
+ * buyer through five screens to be refused at Checkout, so the remaining
+ * stake is part of the predicate.
  */
 export function canRenderBuyNow(
   status: string,
   buyEnabledEnv: string | undefined = process.env[WEBSITE_BUY_ENABLED_ENV],
+  stakeRemaining: number,
 ): boolean {
   if (status !== 'available') {
+    return false
+  }
+  if (!(stakeRemaining > 0)) {
     return false
   }
   return buyEnabledEnv === 'true'

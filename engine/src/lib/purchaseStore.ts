@@ -111,7 +111,12 @@ export interface PurchaseStore extends DslStore {
   listSales(): Promise<SaleRow[]>
   insertSale(row: NewSale): Promise<SaleRow>
   deleteSaleById(id: string): Promise<void>
-  insertCheckoutSession(row: NewCheckoutSession): Promise<CheckoutSessionRow>
+  /**
+   * B6: takes `stake` out of the DSL and writes the binding row in one step.
+   * Throws when the DSL is not available or has less than `stake` left, so two
+   * buyers cannot take the same last percent.
+   */
+  reserveCheckoutSession(row: NewCheckoutSession): Promise<CheckoutSessionRow>
   attachStripeSession(
     checkoutId: string,
     stripeSessionId: string,
@@ -120,10 +125,21 @@ export interface PurchaseStore extends DslStore {
   findCheckoutSessionByStripeSessionId(stripeSessionId: string): Promise<CheckoutSessionRow | null>
   /** `open` -> `completed`. Returns null when the row was not open (replay or expiry). */
   completeCheckoutSession(id: string): Promise<CheckoutSessionRow | null>
-  /** `open` -> `released`. Returns null when the row was not open. */
+  /** `open` -> `released`, and the stake goes back. Null when the row was not open. */
   releaseCheckoutSession(id: string): Promise<CheckoutSessionRow | null>
-  /** `open` -> `paid_unfulfilled`: Stripe took money the sale may not record. */
+  /**
+   * -> `paid_unfulfilled`: Stripe took money the sale may not record. Allowed
+   * from `open`, `expired`, or `released`, because the money can arrive after
+   * the hold has already been swept.
+   */
   markCheckoutPaidUnfulfilled(id: string): Promise<CheckoutSessionRow | null>
+  /** Every open hold past `now` becomes `expired` and returns its stake. */
+  expireCheckoutSessions(now?: string): Promise<number>
+  /**
+   * The webhook backstop for a lapsed hold: an atomic conditional decrement.
+   * Returns the new `stake_remaining`; throws when the stake is not there.
+   */
+  sellStake(dslId: string, stake: number): Promise<number>
 }
 
 export type PurchaseStoreSnapshot = StoreSnapshot & {
@@ -161,8 +177,14 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
   const sales: SaleRow[] = []
   const checkoutSessions: CheckoutSessionRow[] = []
 
-  function transition(id: string, next: CheckoutStatus): CheckoutSessionRow | null {
-    const index = checkoutSessions.findIndex((row) => row.id === id && row.status === 'open')
+  function transition(
+    id: string,
+    next: CheckoutStatus,
+    from: readonly CheckoutStatus[] = ['open'],
+  ): CheckoutSessionRow | null {
+    const index = checkoutSessions.findIndex(
+      (row) => row.id === id && from.includes(row.status),
+    )
     if (index === -1) return null
     const updated: CheckoutSessionRow = {
       ...checkoutSessions[index],
@@ -171,6 +193,17 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
     }
     checkoutSessions[index] = updated
     return { ...updated }
+  }
+
+  /** A released hold returns its stake, never above the listing's own total. */
+  async function restoreStake(row: CheckoutSessionRow): Promise<void> {
+    const dsl = await base.findDslById(row.dslId)
+    if (dsl === null) return
+    const cappedCents = Math.min(
+      Math.round((dsl.listedStake ?? 0) * 100),
+      Math.round((dsl.stakeRemaining ?? 0) * 100) + Math.round(row.stake * 100),
+    )
+    await base.updateDsl(dsl.id, { stakeRemaining: cappedCents / 100 })
   }
 
   return {
@@ -242,7 +275,19 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       }
     },
 
-    async insertCheckoutSession(row) {
+    async reserveCheckoutSession(row) {
+      const dsl = await base.findDslById(row.dslId)
+      if (dsl === null) {
+        throw new Error(`checkout reserve: dsl ${row.dslId} does not exist`)
+      }
+      const remainingCents = Math.round((dsl.stakeRemaining ?? 0) * 100)
+      const stakeCents = Math.round(row.stake * 100)
+      if (dsl.status !== 'available' || !dsl.published || remainingCents < stakeCents) {
+        throw new Error(`no stake available on dsl ${row.dslId}`)
+      }
+
+      await base.updateDsl(dsl.id, { stakeRemaining: (remainingCents - stakeCents) / 100 })
+
       const created: CheckoutSessionRow = {
         ...row,
         id: newId(),
@@ -281,11 +326,46 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
     },
 
     async releaseCheckoutSession(id) {
-      return transition(id, 'released')
+      const released = transition(id, 'released')
+      if (released === null) return null
+      await restoreStake(released)
+      return released
     },
 
     async markCheckoutPaidUnfulfilled(id) {
-      return transition(id, 'paid_unfulfilled')
+      return transition(id, 'paid_unfulfilled', ['open', 'expired', 'released'])
+    },
+
+    async expireCheckoutSessions(now = nowIso()) {
+      const due = checkoutSessions.filter(
+        (row) => row.status === 'open' && row.expiresAt <= now,
+      )
+      let expired = 0
+      for (const row of due) {
+        const closed = transition(row.id, 'expired')
+        if (closed === null) continue
+        await restoreStake(closed)
+        expired += 1
+      }
+      return expired
+    },
+
+    async sellStake(dslId, stake) {
+      const dsl = await base.findDslById(dslId)
+      if (dsl === null) {
+        throw new Error(`sell stake: dsl ${dslId} does not exist`)
+      }
+      const remainingCents = Math.round((dsl.stakeRemaining ?? 0) * 100)
+      const stakeCents = Math.round(stake * 100)
+      if (dsl.status !== 'available' || remainingCents < stakeCents) {
+        throw new Error(`no stake available on dsl ${dslId}`)
+      }
+      const nextRemaining = (remainingCents - stakeCents) / 100
+      await base.updateDsl(dslId, {
+        stakeRemaining: nextRemaining,
+        ...(nextRemaining === 0 ? { status: 'fully_allocated' as const } : {}),
+      })
+      return nextRemaining
     },
 
     dump(): PurchaseStoreSnapshot {

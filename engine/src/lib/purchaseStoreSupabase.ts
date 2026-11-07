@@ -16,7 +16,6 @@ import {
   type CheckoutStatus,
   type KycStatus,
   type NewAccount,
-  type NewCheckoutSession,
   type NewSale,
   type PurchaseStore,
   type SaleRow,
@@ -111,24 +110,6 @@ function toCheckoutSession(value: unknown): CheckoutSessionRow {
     expiresAt: str(row.expires_at),
     createdAt: str(row.created_at),
     closedAt: strOrNull(row.closed_at),
-  }
-}
-
-function checkoutColumns(row: NewCheckoutSession) {
-  return {
-    dsl_id: row.dslId,
-    account_id: row.accountId,
-    printed_name: row.printedName,
-    email: row.email,
-    horse_legal_name: row.horseLegalName,
-    stake: row.stake,
-    amount_nzd: row.amountNzd,
-    executed_date: row.executedDate,
-    pds_markdown: row.pdsMarkdown,
-    sa_markdown: row.saMarkdown,
-    pds_hash: row.pdsHash,
-    sa_hash: row.saHash,
-    expires_at: row.expiresAt,
   }
 }
 
@@ -244,13 +225,26 @@ export function createSupabasePurchaseStore(
       if (error) fail('sales', error.message)
     },
 
-    async insertCheckoutSession(row) {
-      const { data, error } = await client
-        .from('checkout_sessions')
-        .insert(checkoutColumns(row))
-        .select('*')
-        .single()
-      if (error) fail('checkout_sessions', error.message)
+    async reserveCheckoutSession(row) {
+      const { data, error } = await client.rpc('reserve_checkout_stake', {
+        p_dsl_id: row.dslId,
+        p_account_id: row.accountId,
+        p_printed_name: row.printedName,
+        p_email: row.email,
+        p_horse_legal_name: row.horseLegalName,
+        p_stake: row.stake,
+        p_amount_nzd: row.amountNzd,
+        p_executed_date: row.executedDate,
+        p_pds_markdown: row.pdsMarkdown,
+        p_sa_markdown: row.saMarkdown,
+        p_pds_hash: row.pdsHash,
+        p_sa_hash: row.saHash,
+        p_ttl_seconds: Math.max(
+          1,
+          Math.round((Date.parse(row.expiresAt) - Date.now()) / 1000),
+        ),
+      })
+      if (error) fail('reserve_checkout_stake', error.message)
       return toCheckoutSession(data)
     },
 
@@ -290,11 +284,38 @@ export function createSupabasePurchaseStore(
     },
 
     async releaseCheckoutSession(id) {
-      return transitionCheckout(client, id, 'released')
+      const { data, error } = await client.rpc('release_checkout_stake', {
+        p_checkout_id: id,
+        p_terminal: 'released',
+      })
+      if (error) fail('release_checkout_stake', error.message)
+      if (!data) return null
+      const { data: row, error: readError } = await client
+        .from('checkout_sessions')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      if (readError) fail('checkout_sessions', readError.message)
+      return row === null ? null : toCheckoutSession(row)
     },
 
     async markCheckoutPaidUnfulfilled(id) {
-      return transitionCheckout(client, id, 'paid_unfulfilled')
+      return transitionCheckout(client, id, 'paid_unfulfilled', ['open', 'expired', 'released'])
+    },
+
+    async expireCheckoutSessions() {
+      const { data, error } = await client.rpc('expire_checkout_stakes')
+      if (error) fail('expire_checkout_stakes', error.message)
+      return Number(data ?? 0)
+    },
+
+    async sellStake(dslId, stake) {
+      const { data, error } = await client.rpc('sell_stake_atomically', {
+        p_dsl_id: dslId,
+        p_stake: stake,
+      })
+      if (error) fail('sell_stake_atomically', error.message)
+      return num(data)
     },
   }
 }
@@ -308,12 +329,13 @@ async function transitionCheckout(
   client: SupabaseClient,
   id: string,
   next: CheckoutStatus,
+  from: readonly CheckoutStatus[] = ['open'],
 ): Promise<CheckoutSessionRow | null> {
   const { data, error } = await client
     .from('checkout_sessions')
     .update({ status: next, closed_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('status', 'open')
+    .in('status', [...from])
     .select('*')
     .maybeSingle()
   if (error) throw new Error(`checkout_sessions: ${error.message}`)

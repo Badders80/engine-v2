@@ -372,6 +372,10 @@ export async function openCheckoutSession(
     }
   }
 
+  // Lazy expiry: a hold that lapsed while nobody called the cron is returned
+  // here, before this buyer is refused for stock that is actually free.
+  await store.expireCheckoutSessions()
+
   const quoteResult = await computeQuote({ dslId: input.dslId, stake: input.stake }, store)
   if (!quoteResult.ok) return quoteResult
 
@@ -387,7 +391,7 @@ export async function openCheckoutSession(
 
   let checkout: CheckoutSessionRow
   try {
-    checkout = await store.insertCheckoutSession({
+    checkout = await store.reserveCheckoutSession({
       dslId: input.dslId,
       accountId: account.id,
       printedName: account.fullName,
@@ -629,16 +633,6 @@ export async function recordWebhookEvent(
 
   let sale: SaleRow | null = null
   try {
-    // The hold is claimed before anything is written, so two deliveries of the
-    // same event cannot both proceed, and a lapsed hold is refused rather than
-    // sold twice.
-    const claimed = await store.completeCheckoutSession(checkout.id)
-    if (claimed === null) {
-      return failWebhook(
-        `checkout ${checkout.id} is no longer open; no sale was written for ${stripeSessionId}`,
-      )
-    }
-
     sale = await store.insertSale({
       dslId: checkout.dslId,
       userId: checkout.accountId,
@@ -657,20 +651,34 @@ export async function recordWebhookEvent(
       saHash: checkout.saHash,
     })
 
-    const dsl = await store.findDslById(checkout.dslId)
-    if (dsl === null) {
-      throw new Error(`DSL ${checkout.dslId} does not exist`)
+    // B6: the stake was taken at Checkout. Claiming the hold is the only
+    // stake-moving step here; if the hold lapsed while the buyer was paying,
+    // the atomic conditional decrement is the backstop.
+    const claimed = await store.completeCheckoutSession(bound.id)
+    if (claimed === null) {
+      try {
+        await store.sellStake(bound.dslId, bound.stake)
+      } catch {
+        // The hold lapsed and the stock went elsewhere while the money was in
+        // flight. No sale, but the payment is real: flag it for the founder,
+        // and do not let Stripe retry a refusal that cannot change.
+        if (sale !== null) {
+          await store.deleteSaleById(sale.id)
+        }
+        return await refuse(
+          'the hold lapsed and no stake remains; the payment is held for the founder',
+          true,
+        )
+      }
     }
 
-    const remainingCents =
-      Math.round((dsl.stakeRemaining ?? 0) * 100) - Math.round(checkout.stake * 100)
-    const nextRemaining = Math.max(0, remainingCents) / 100
-    const nextStatus = nextRemaining === 0 ? 'fully_allocated' : dsl.status
-
-    await store.updateDsl(dsl.id, {
-      stakeRemaining: nextRemaining,
-      status: nextStatus,
-    })
+    const dsl = await store.findDslById(bound.dslId)
+    if (dsl === null) {
+      throw new Error(`DSL ${bound.dslId} does not exist`)
+    }
+    if ((dsl.stakeRemaining ?? 0) === 0 && dsl.status === 'available') {
+      await store.updateDsl(dsl.id, { status: 'fully_allocated' })
+    }
   } catch (error) {
     if (sale !== null) {
       await store.deleteSaleById(sale.id)

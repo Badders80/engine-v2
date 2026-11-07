@@ -41,10 +41,16 @@ import { termMonthsBetween } from './term'
 export type Result<T> = { ok: true; value: T } | { ok: false; reason: string }
 
 /**
- * How long a Checkout attempt holds its stake. Locked in
- * `DSL-ENGINE-BRIEF-2026-11-07.md` §3.
+ * How long a Checkout attempt holds its stake.
+ *
+ * The brief locked a five-minute hold; the founder moved it to ten on
+ * 2026-11-07, because Stripe Identity (document photo plus liveness) is the
+ * slow step and a hold that lapses mid-verification sends the buyer through
+ * the backstop for no reason. Ten minutes covers reading, signing, Identity,
+ * and card entry. An abandoned hold ties up stock for at most this plus one
+ * cron interval.
  */
-export const CHECKOUT_HOLD_SECONDS = 300
+export const CHECKOUT_HOLD_SECONDS = 600
 
 /**
  * The four mandatory SA declarations from `PLAN.md:232`, verbatim.

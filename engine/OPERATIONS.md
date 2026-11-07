@@ -260,7 +260,7 @@ ENGINE_EXPIRE_SECRET="<random, 32+ bytes>"
 
 ### Checkout holds (B6)
 
-A Checkout attempt holds its stake for `CHECKOUT_HOLD_SECONDS` (300). `reserve_checkout_stake` decrements `dsls.stake_remaining` and inserts the `checkout_sessions` row in one transaction, so a second buyer cannot take the same last percent: the conditional UPDATE matches no row and the reserve raises `23514`.
+A Checkout attempt holds its stake for `CHECKOUT_HOLD_SECONDS` (600, ten minutes; founder ruling 2026-11-07 — Stripe Identity is the slow step and five minutes did not cover a real completion). `reserve_checkout_stake` decrements `dsls.stake_remaining` and inserts the `checkout_sessions` row in one transaction, so a second buyer cannot take the same last percent: the conditional UPDATE matches no row and the reserve raises `23514`.
 
 Three things release a hold, and all three are safe to race:
 
@@ -270,7 +270,7 @@ Three things release a hold, and all three are safe to race:
 
 A listing whose remaining stake is fully held stays `available`; the website hides Buy Now when `stakeRemaining` is `0` (`canRenderBuyNow` in `website/src/lib/engineClient.ts`), and Checkout refuses the stake anyway.
 
-**Operator note.** A 5-minute hold is short for a buyer who has to read a PDS, accept the SA, and complete Stripe Identity. Most abandoned holds will expire before a real completion; the backstop makes that correct rather than lossy, but the TTL is worth revisiting before cutover.
+**Operator note.** Ten minutes covers reading, signing, Identity, and card entry. The cost of a longer hold is that an abandoned Checkout ties up stock for up to the TTL plus one cron interval, so about fifteen minutes on a listing with nothing else in flight. That is the intended trade: a buyer who lapses mid-Identity should not be pushed onto the webhook's backstop path.
 
 ### Website buy flow, signup trigger, and MyStable (step 8b)
 

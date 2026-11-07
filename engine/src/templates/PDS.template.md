@@ -101,6 +101,8 @@ Participation operates under one of two payment structures:
   - Ongoing monthly payments of {{pricing.monthly_lease_payment_unit_nzd}} per 1% stake billed on the 1st of each month commencing on the 1st of the month following join (paying for Month 3 in advance), maintaining a 5-month float buffer, drawn down in the final months of the term.
 - **Upfront Model:** 100% of the lease term payment collected at checkout with zero subsequent charges.
 
+All amounts stated in this document are inclusive of GST at 15%. No additional GST is charged at checkout and no GST item is added to a payment.
+
 ---
 
 ## 5. Investor Return & Stakes Allocation
@@ -187,6 +189,7 @@ Transfers require the written approval of Evolution Stables Ltd and NZTR complia
 - **Stake Percentage:** {{sale.stake_pct}}%  
 - **Initial Float Payment:** {{sale.initial_payment_nzd}}  
 - **Monthly Commitment:** {{sale.monthly_payment_nzd}}  
+- **GST:** Included in the amounts above.  
 
 ---
 
@@ -196,7 +199,9 @@ By executing this agreement online, the subscriber confirms on {{sale.executed_d
 2. Agree to be bound by the Syndicate Agreement and NZTR Rules of Racing;
 3. Understand participation is strictly a leasehold interest with no equity ownership in the horse;
 4. Accept the investment risks outlined; and
-5. Consent to identity verification under New Zealand AML/CFT requirements.
+5. Consent to identity verification under New Zealand AML/CFT requirements;
+6. Am 18 years of age or older; and
+7. Am not prohibited under the NZTR Rules of Racing from owning or leasing a racehorse.
 
 **Subscriber:** {{account.full_name}}  
 **Date:** {{sale.executed_date}}  
@@ -205,6 +210,8 @@ By executing this agreement online, the subscriber confirms on {{sale.executed_d
 
 ## 20. Promoter Declaration
 I, Alex Baddeley, declare that the information provided in this Product Disclosure Statement is, to the best of my knowledge, true, correct, and not misleading in any material respect.
+
+Evolution Stables Ltd is an Authorised Syndicator under the NZTR Code of Practice. NZTR does not endorse, guarantee, or take responsibility for this offer.
 
 Alex Baddeley  
 Director, Evolution Stables Ltd

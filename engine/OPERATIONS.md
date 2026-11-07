@@ -243,7 +243,7 @@ The engine serves five JSON routes for the purchase flow and Stripe webhook:
 - `POST /api/purchase/documents` — calls `compileBuyerDocuments` (`engine/src/lib/purchase.ts`), which validates stake and calls `compileLegalPack` with `account.fullName` mapped from `accounts.full_name`, returning the PDS and SA Markdown and their SHA-256 hashes.
 - `POST /api/purchase/identity` — calls `beginOrConfirmIdentity` (`engine/src/lib/purchase.ts`), requiring PDS + SA acceptance and the four SA declarations verbatim before advancing. Verified accounts (`account.kycStatus === 'verified'`) confirm their name and skip Stripe Identity; unverified accounts start a Stripe Identity `VerificationSession` (`type: 'document'`); `'failed'` and `'pending'` accounts are refused Checkout.
 - `POST /api/purchase/checkout` — calls `openCheckoutSession` (`engine/src/lib/purchase.ts`), requiring `account.kycStatus === 'verified'`, `dsl.status === 'available'`, and `dsl.published === true`, creating a hosted Stripe Checkout session in `payment` mode, and writing no `sales` row at session creation.
-- `POST /api/stripe/webhook` — reads the raw request body, verifies `Stripe-Signature` with HMAC-SHA256 and a 300-second tolerance (`verifyStripeSignature` in `engine/src/lib/stripe.ts`), and calls `recordWebhookEvent` (`engine/src/lib/purchase.ts`). Idempotent on `sales.stripe_session_id`. On `checkout.session.completed`, compiles the PDS and SA at execution, writes the frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` to `public.sales`, decrements `dsls.stake_remaining`, and flips `dsls.status` to `'fully_allocated'` when `stake_remaining` reaches `0`. Card-decline events (`payment_intent.payment_failed`) write no `sales` row. Later edits or renames via `updateDsl` leave existing `sales` rows untouched.
+- `POST /api/stripe/webhook` — reads the raw request body, verifies `Stripe-Signature` with HMAC-SHA256 and a 300-second tolerance (`verifyStripeSignature` in `engine/src/lib/stripe.ts`), and calls `recordWebhookEvent` (`engine/src/lib/purchase.ts`). Idempotent on `sales.stripe_session_id`. On `checkout.session.completed` it reads the `public.checkout_sessions` row named in `metadata.checkout_id` and **never** recompiles: the frozen `pds_markdown`, `sa_markdown`, `pds_hash`, `sa_hash`, stake, amount, and executed date are the ones the buyer was shown at Checkout. An event with no binding row is refused and emails the founder; no sale is written. It then claims the row (`open` → `completed`, a conditional update, so only one delivery can win), writes the sale, decrements `dsls.stake_remaining`, and flips `dsls.status` to `'fully_allocated'` when `stake_remaining` reaches `0`. Card-decline events (`payment_intent.payment_failed`) write no `sales` row. Later edits or renames via `updateDsl` leave existing `sales` rows untouched.
 
 Required environment variables in `engine/.env.local` for live/test Stripe calls:
 
@@ -257,6 +257,23 @@ STRIPE_WEBHOOK_SECRET="whsec_..."
 - Migration `00012_accounts_signup.sql` defines `public.handle_auth_user_created()` and the `on_auth_user_created` trigger on `auth.users`. Every signup requires `full_name` in `raw_user_meta_data` and populates `public.accounts` (`id`, `full_name`, `email`, `kyc_status = 'unverified'`) so Checkout never creates a second profile.
 - `website/src/components/BuyFlowModal.tsx` renders the five screens (`Terms` → `Documents` → `Identity` → `Pay` → `Return`) on `/marketplace/[slug]`. It renders only on `available` listings and only when `WEBSITE_BUY_ENABLED=true` in `website/.env.local`; `coming_soon`, `fully_allocated`, and `completed` listings never show a Buy Now control.
 - `website/src/lib/mystable.ts` is the sole module in `website/src/` permitted to query `accounts` and `sales` (enforced by `scripts/assert-purchase-fences.sh` and `website/tests/listings.test.ts`). `/mystable` (`force-dynamic`) displays a pending notice when returning from Stripe Checkout (`?session_id=...`) before the webhook writes the matching `sales` row, and displays the stake, amount paid, and frozen `pds_markdown`, `sa_markdown`, `pds_hash`, and `sa_hash` once written.
+
+### Recorded probe, 2026-11-07 — migration 00016 (checkout binding)
+
+Applied with `supabase migration up --local`, then run with `psql` against `127.0.0.1:54422` inside one transaction that was rolled back. The fixture was one `auth.users` row carrying `full_name` metadata (the `00012` trigger refuses otherwise), which produced one `public.accounts` row, plus the two existing DSLs.
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Does a checkout row insert, and does it default to `open`? | `status = open`, `expires_at > now()` — yes |
+| 2 | May a sale point at it? | `sales.checkout_session_id` accepted; `bound = t` |
+| 3 | Is a duplicate `stripe_session_id` refused? | `23505`, `checkout_sessions_stripe_session_id_key` |
+| 4 | Is a sixth status refused? | `23514`, `checkout_sessions_status_check` |
+| 5 | Can a bound row be deleted under a sale? | No — `23503`, `sales_checkout_session_id_fkey` |
+| 6 | Can `anon` read the table? | No — `permission denied`; no grant, and RLS is on |
+
+Rows left behind: `checkout_sessions` 0, `sales` 0, `accounts` 0, `auth.users` 0.
+
+**Local history drift found while applying this migration.** `00014` and `00015` were absent from `supabase_migrations.schema_migrations`, yet `dsls.owner_id` existed locally: `00015` had been half-applied by hand — the column move and backfill were done, the `assert_dsl_available()` replacement was not. The missing function body was applied from the file, `supabase migration repair --status applied 00015 --local` recorded it, and `00016` then applied cleanly. A fresh database is unaffected; this was local-only state.
 
 ### Recorded probe, 2026-10-21 — migration 00012 and sales
 

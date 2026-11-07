@@ -34,11 +34,17 @@ import {
   upfrontTotal,
   validateStake,
 } from './pricing'
-import type { AccountRow, PurchaseStore, SaleRow } from './purchaseStore'
+import type { AccountRow, CheckoutSessionRow, PurchaseStore, SaleRow } from './purchaseStore'
 import type { StripeGateway, StripeWebhookEvent } from './stripe'
 import { termMonthsBetween } from './term'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; reason: string }
+
+/**
+ * How long a Checkout attempt holds its stake. Locked in
+ * `DSL-ENGINE-BRIEF-2026-11-07.md` §3.
+ */
+export const CHECKOUT_HOLD_SECONDS = 300
 
 /**
  * The four mandatory SA declarations from `PLAN.md:232`, verbatim.
@@ -370,11 +376,48 @@ export async function openCheckoutSession(
   if (!quoteResult.ok) return quoteResult
 
   const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
+
+  // B5: compile and freeze the exact documents the buyer is about to accept,
+  // before Stripe is called. The webhook reads this row, never a fresh compile.
+  const compiled = await compileBuyerDocuments(
+    { dslId: input.dslId, accountId: account.id, stake: quoteResult.value.stake, executedDate },
+    store,
+  )
+  if (!compiled.ok) return compiled
+
+  let checkout: CheckoutSessionRow
+  try {
+    checkout = await store.insertCheckoutSession({
+      dslId: input.dslId,
+      accountId: account.id,
+      printedName: account.fullName,
+      email: account.email,
+      horseLegalName: quoteResult.value.horseLegalName,
+      stake: quoteResult.value.stake,
+      amountNzd: quoteResult.value.initialPaymentNzd,
+      executedDate,
+      pdsMarkdown: compiled.value.pack.pds.markdown,
+      saMarkdown: compiled.value.pack.sa.markdown,
+      pdsHash: compiled.value.pack.pds.hash,
+      saHash: compiled.value.pack.sa.hash,
+      expiresAt: new Date(Date.now() + CHECKOUT_HOLD_SECONDS * 1000).toISOString(),
+    })
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : 'failed to bind the checkout documents'
+    await sendEngineEmail(
+      { kind: 'founder_our_fault_failure', stage: 'checkout', reason },
+      emailSender,
+    )
+    return { ok: false, reason }
+  }
+
   let session: { id: string; url: string }
   try {
     session = await stripe.createCheckoutSession({
       dslId: input.dslId,
       accountId: account.id,
+      checkoutId: checkout.id,
       horseLegalName: quoteResult.value.horseLegalName,
       stake: quoteResult.value.stake,
       amountNzd: quoteResult.value.initialPaymentNzd,
@@ -386,6 +429,7 @@ export async function openCheckoutSession(
   } catch (error) {
     const reason =
       error instanceof Error ? error.message : 'failed to create Stripe Checkout session'
+    await store.releaseCheckoutSession(checkout.id)
     await sendEngineEmail(
       {
         kind: 'founder_our_fault_failure',
@@ -395,6 +439,23 @@ export async function openCheckoutSession(
       emailSender,
     )
     return { ok: false, reason }
+  }
+
+  try {
+    await store.attachStripeSession(checkout.id, session.id)
+  } catch (error) {
+    // Not fatal: the session metadata carries `checkout_id`, so the webhook can
+    // still find the binding. Tell the founder rather than lose the link.
+    await sendEngineEmail(
+      {
+        kind: 'founder_our_fault_failure',
+        stage: 'checkout',
+        reason: `checkout ${checkout.id} could not record stripe session ${session.id}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      },
+      emailSender,
+    )
   }
 
   return {
@@ -420,7 +481,6 @@ function metadataString(metadata: Record<string, unknown>, key: string): string 
 export async function recordWebhookEvent(
   event: StripeWebhookEvent,
   store: PurchaseStore,
-  corpus?: LegalCorpus,
   emailSender: EmailSender = createInMemoryEmailSender(),
 ): Promise<Result<WebhookResult>> {
   async function failWebhook(reason: string): Promise<Result<WebhookResult>> {
@@ -510,53 +570,58 @@ export async function recordWebhookEvent(
     }
   }
 
-  const dslId = metadataString(metadata, 'dsl_id')
-  const accountId = metadataString(metadata, 'account_id')
-  const stake = Number(metadataString(metadata, 'stake'))
-  const executedDateRaw = metadataString(metadata, 'executed_date')
-  const executedDate =
-    executedDateRaw !== '' ? executedDateRaw : new Date().toISOString().slice(0, 10)
-  const stripeIdentityIdRaw = metadataString(metadata, 'stripe_identity_id')
-  const stripeIdentityId = stripeIdentityIdRaw !== '' ? stripeIdentityIdRaw : null
+  const checkoutId = metadataString(metadata, 'checkout_id')
+  const checkout =
+    checkoutId !== ''
+      ? await store.findCheckoutSessionById(checkoutId)
+      : await store.findCheckoutSessionByStripeSessionId(stripeSessionId)
 
-  if (dslId === '' || accountId === '' || !Number.isFinite(stake) || stake <= 0) {
+  if (checkout === null) {
     return failWebhook(
-      'checkout.session.completed is missing required metadata (dsl_id, account_id, stake)',
+      `checkout.session.completed ${stripeSessionId} has no bound checkout session; no sale was written`,
     )
   }
 
-  const compiled = await compileBuyerDocuments(
-    { dslId, accountId, stake, executedDate },
-    store,
-    corpus,
-  )
-  if (!compiled.ok) return failWebhook(compiled.reason)
-
-  const { account, quote, pack } = compiled.value
-  const dsl = await store.findDslById(dslId)
-  if (dsl === null) return failWebhook(`DSL ${dslId} does not exist`)
-  if (!isPricedDsl(dsl)) {
-    return failWebhook(`DSL ${dslId} lost its commercial terms before the webhook arrived`)
-  }
+  const stripeIdentityIdRaw = metadataString(metadata, 'stripe_identity_id')
+  const stripeIdentityId = stripeIdentityIdRaw !== '' ? stripeIdentityIdRaw : null
 
   let sale: SaleRow | null = null
   try {
+    // The hold is claimed before anything is written, so two deliveries of the
+    // same event cannot both proceed, and a lapsed hold is refused rather than
+    // sold twice.
+    const claimed = await store.completeCheckoutSession(checkout.id)
+    if (claimed === null) {
+      return failWebhook(
+        `checkout ${checkout.id} is no longer open; no sale was written for ${stripeSessionId}`,
+      )
+    }
+
     sale = await store.insertSale({
-      dslId: dsl.id,
-      userId: account.id,
-      printedName: account.fullName,
-      email: account.email,
-      stake: quote.stake,
-      amount: quote.initialPaymentNzd,
+      dslId: checkout.dslId,
+      userId: checkout.accountId,
+      printedName: checkout.printedName,
+      email: checkout.email,
+      stake: checkout.stake,
+      amount: checkout.amountNzd,
       stripeSessionId,
       stripeIdentityId,
-      pdsMarkdown: pack.pds.markdown,
-      saMarkdown: pack.sa.markdown,
-      pdsHash: pack.pds.hash,
-      saHash: pack.sa.hash,
+      checkoutSessionId: checkout.id,
+      stripeAmountTotal: null,
+      stripeCurrency: null,
+      pdsMarkdown: checkout.pdsMarkdown,
+      saMarkdown: checkout.saMarkdown,
+      pdsHash: checkout.pdsHash,
+      saHash: checkout.saHash,
     })
 
-    const remainingCents = Math.round(dsl.stakeRemaining * 100) - Math.round(quote.stake * 100)
+    const dsl = await store.findDslById(checkout.dslId)
+    if (dsl === null) {
+      throw new Error(`DSL ${checkout.dslId} does not exist`)
+    }
+
+    const remainingCents =
+      Math.round((dsl.stakeRemaining ?? 0) * 100) - Math.round(checkout.stake * 100)
     const nextRemaining = Math.max(0, remainingCents) / 100
     const nextStatus = nextRemaining === 0 ? 'fully_allocated' : dsl.status
 
@@ -577,7 +642,7 @@ export async function recordWebhookEvent(
     {
       kind: 'buyer_sale_written',
       sale,
-      horseLegalName: quote.horseLegalName,
+      horseLegalName: checkout.horseLegalName,
     },
     emailSender,
   )
@@ -585,7 +650,7 @@ export async function recordWebhookEvent(
     {
       kind: 'founder_sale_succeeded',
       sale,
-      horseLegalName: quote.horseLegalName,
+      horseLegalName: checkout.horseLegalName,
     },
     emailSender,
   )

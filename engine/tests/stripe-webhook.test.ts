@@ -14,9 +14,9 @@ import { describe, expect, it } from 'vitest'
 
 import { saveDsl } from '../src/lib/dsl'
 import { createInMemoryEmailSender } from '../src/lib/email'
-import { recordWebhookEvent } from '../src/lib/purchase'
+import { openCheckoutSession, recordWebhookEvent, SA_DECLARATIONS } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore } from '../src/lib/purchaseStore'
-import { verifyStripeSignature } from '../src/lib/stripe'
+import { verifyStripeSignature, type StripeGateway } from '../src/lib/stripe'
 
 const SECRET = 'whsec_test_secret_for_v2_engine'
 
@@ -124,26 +124,73 @@ describe('Step 8a — recordWebhookEvent', () => {
     return { store, dsl: saved.value.dsl, account }
   }
 
-  it('writes the sale row, decrements stake_remaining, flips to fully_allocated at 0, and is idempotent on replay', async () => {
-    const { store, dsl, account } = await setupStore()
-
-    // First 5% purchase
-    const event1 = {
-      id: 'evt_sale_a',
-      type: 'checkout.session.completed',
-      data: {
-        object: {
-          id: 'cs_test_session_a',
-          metadata: {
-            dsl_id: dsl.id,
-            account_id: account.id,
-            stake: '5',
-            executed_date: '2026-10-21',
-            stripe_identity_id: 'vs_identity_a',
-          },
-        },
+  const gateway = (() => {
+    let n = 0
+    return {
+      async createIdentitySession() {
+        throw new Error('identity is not used in these tests')
+      },
+      async retrieveIdentitySession() {
+        throw new Error('identity is not used in these tests')
+      },
+      async createCheckoutSession() {
+        n += 1
+        return { id: `cs_test_${n}`, url: `https://checkout.stripe.com/c/pay/cs_test_${n}` }
       },
     }
+  })()
+
+  function fakeGateway(): StripeGateway {
+    return gateway
+  }
+
+  /** Drives the real Checkout path, so the webhook has a bound row to read. */
+  async function openCheckout(
+    store: ReturnType<typeof createInMemoryPurchaseStore>,
+    dslId: string,
+    accountId: string,
+    stake: number,
+  ) {
+    const opened = await openCheckoutSession(
+      {
+        dslId,
+        accountId,
+        stake,
+        acceptance: {
+          pdsAccepted: true,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+        },
+        executedDate: '2026-10-21',
+        successUrl: 'https://example.test/ok',
+        cancelUrl: 'https://example.test/cancel',
+      },
+      store,
+      fakeGateway(),
+    )
+    if (!opened.ok) throw new Error(opened.reason)
+    const row = await store.findCheckoutSessionByStripeSessionId(opened.value.checkoutSessionId)
+    if (row === null) throw new Error('checkout binding row was not written')
+    return {
+      stripeSessionId: opened.value.checkoutSessionId,
+      checkoutId: row.id,
+      quote: opened.value.quote,
+    }
+  }
+
+  function completedEvent(stripeSessionId: string, checkoutId: string) {
+    return {
+      id: `evt_${stripeSessionId}`,
+      type: 'checkout.session.completed',
+      data: { object: { id: stripeSessionId, metadata: { checkout_id: checkoutId } } },
+    }
+  }
+
+  it('writes the sale row from the bound checkout, decrements stake_remaining, flips to fully_allocated at 0, and is idempotent on replay', async () => {
+    const { store, dsl, account } = await setupStore()
+
+    const firstCheckout = await openCheckout(store, dsl.id, account.id, 5)
+    const event1 = completedEvent(firstCheckout.stripeSessionId, firstCheckout.checkoutId)
 
     const first = await recordWebhookEvent(event1, store)
     expect(first.ok).toBe(true)
@@ -156,8 +203,8 @@ describe('Step 8a — recordWebhookEvent', () => {
     expect(first.value.sale.email).toBe('nikau@example.co.nz')
     expect(first.value.sale.stake).toBe(5)
     expect(first.value.sale.amount).toBe(1900) // 5% * $380
-    expect(first.value.sale.stripeSessionId).toBe('cs_test_session_a')
-    expect(first.value.sale.stripeIdentityId).toBe('vs_identity_a')
+    expect(first.value.sale.stripeSessionId).toBe(firstCheckout.stripeSessionId)
+    expect(first.value.sale.checkoutSessionId).toBe(firstCheckout.checkoutId)
     expect(first.value.sale.pdsMarkdown).toContain('Mulan The Brave')
     expect(first.value.sale.saMarkdown).toContain('Mulan The Brave')
     expect(first.value.sale.pdsHash).toMatch(/^[a-f0-9]{64}$/)
@@ -178,27 +225,40 @@ describe('Step 8a — recordWebhookEvent', () => {
     expect(store.dump().sales).toHaveLength(1)
 
     // Second 5% purchase exhausts remaining stake -> status flips to fully_allocated
-    const event2 = {
-      id: 'evt_sale_b',
-      type: 'checkout.session.completed',
-      data: {
-        object: {
-          id: 'cs_test_session_b',
-          metadata: {
-            dsl_id: dsl.id,
-            account_id: account.id,
-            stake: '5',
-            executed_date: '2026-10-21',
-          },
-        },
-      },
-    }
-    const second = await recordWebhookEvent(event2, store)
+    const secondCheckout = await openCheckout(store, dsl.id, account.id, 5)
+    const second = await recordWebhookEvent(
+      completedEvent(secondCheckout.stripeSessionId, secondCheckout.checkoutId),
+      store,
+    )
     expect(second.ok).toBe(true)
     const afterSecondDsl = await store.findDslById(dsl.id)
     expect(afterSecondDsl?.stakeRemaining).toBe(0)
     expect(afterSecondDsl?.status).toBe('fully_allocated')
     expect(store.dump().sales).toHaveLength(2)
+  })
+
+  it('refuses a webhook with no bound checkout row and writes no sale', async () => {
+    const { store, dsl } = await setupStore()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
+
+    const refused = await recordWebhookEvent(
+      {
+        id: 'evt_unbound',
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_test_unbound',
+            metadata: { dsl_id: dsl.id, account_id: 'acc-webhook-1', stake: '5' },
+          },
+        },
+      },
+      store,
+      emailSender,
+    )
+    expect(refused.ok).toBe(false)
+    expect(store.dump().sales).toHaveLength(0)
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
+    expect(emailSender.sent.map((sent) => sent.kind)).toContain('founder_our_fault_failure')
   })
 
   it('writes no sale row on payment_intent.payment_failed or checkout.session.expired', async () => {
@@ -212,7 +272,6 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'pi_failed_1' } },
       },
       store,
-      undefined,
       emailSender,
     )
     expect(declined.ok).toBe(true)
@@ -233,7 +292,6 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'vs_1', metadata: { account_id: account.id } } },
       },
       store,
-      undefined,
       emailSender,
     )
     expect(failed.ok).toBe(true)
@@ -248,7 +306,6 @@ describe('Step 8a — recordWebhookEvent', () => {
         data: { object: { id: 'vs_1', metadata: { account_id: account.id } } },
       },
       store,
-      undefined,
       emailSender,
     )
     expect(verified.ok).toBe(true)

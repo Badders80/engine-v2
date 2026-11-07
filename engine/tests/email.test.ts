@@ -141,6 +141,9 @@ describe('Step 9 — EMAIL_KINDS and pure builders', () => {
       amount: 1775,
       stripeSessionId: 'cs_live_abc123',
       stripeIdentityId: 'vs_live_xyz',
+      checkoutSessionId: 'checkout-1',
+      stripeAmountTotal: 1775,
+      stripeCurrency: 'nzd',
       pdsMarkdown: '# PDS',
       saMarkdown: '# SA',
       pdsHash: 'a'.repeat(64),
@@ -214,24 +217,35 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     const { store, dslId, accountId } = await seedStore()
     const sender = createInMemoryEmailSender('alex@evolutionstables.nz')
 
+    const checkout = await store.insertCheckoutSession({
+      dslId,
+      accountId,
+      printedName: 'Aroha Williams',
+      email: 'aroha@example.co.nz',
+      horseLegalName: 'Lady Ketchikan',
+      stake: 5,
+      amountNzd: 1775,
+      executedDate: '2026-10-21',
+      pdsMarkdown: '# PDS',
+      saMarkdown: '# SA',
+      pdsHash: 'a'.repeat(64),
+      saHash: 'b'.repeat(64),
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })
+    await store.attachStripeSession(checkout.id, 'cs_step9_1')
+
     const event = {
       id: 'evt_step9_sale',
       type: 'checkout.session.completed',
       data: {
         object: {
           id: 'cs_step9_1',
-          metadata: {
-            dsl_id: dslId,
-            account_id: accountId,
-            stake: '5',
-            executed_date: '2026-10-21',
-            stripe_identity_id: 'vs_step9_1',
-          },
+          metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_step9_1' },
         },
       },
     }
 
-    const first = await recordWebhookEvent(event, store, undefined, sender)
+    const first = await recordWebhookEvent(event, store, sender)
     expect(first.ok).toBe(true)
     expect(sender.sent).toHaveLength(2)
     expect(sender.sent[0].kind).toBe('buyer_sale_written')
@@ -248,7 +262,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     expect(sender.sent[1].text).toContain('cs_step9_1')
 
     // Replay of the same session sends zero additional emails
-    const replay = await recordWebhookEvent(event, store, undefined, sender)
+    const replay = await recordWebhookEvent(event, store, sender)
     expect(replay.ok).toBe(true)
     if (replay.ok && replay.value.action === 'sale_written') {
       expect(replay.value.idempotentReplay).toBe(true)
@@ -268,7 +282,6 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: { object: { id: 'vs_kyc_1', metadata: { account_id: accountId } } },
       },
       store,
-      undefined,
       sender,
     )
     expect(requiresInput.ok).toBe(true)
@@ -285,7 +298,6 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: { object: { id: 'vs_kyc_2', metadata: { account_id: accountId } } },
       },
       store,
-      undefined,
       sender,
     )
     expect(canceled.ok).toBe(true)
@@ -306,7 +318,6 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: { object: { id: 'pi_decline_1' } },
       },
       store,
-      undefined,
       sender,
     )
     expect(declined.ok).toBe(true)
@@ -320,7 +331,6 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: { object: { id: 'cs_expired_1' } },
       },
       store,
-      undefined,
       sender,
     )
     expect(expired.ok).toBe(true)
@@ -339,6 +349,23 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       },
     }
 
+    const checkout = await store.insertCheckoutSession({
+      dslId,
+      accountId,
+      printedName: 'Aroha Williams',
+      email: 'aroha@example.co.nz',
+      horseLegalName: 'Lady Ketchikan',
+      stake: 5,
+      amountNzd: 1775,
+      executedDate: '2026-10-21',
+      pdsMarkdown: '# PDS',
+      saMarkdown: '# SA',
+      pdsHash: 'a'.repeat(64),
+      saHash: 'b'.repeat(64),
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    })
+    await store.attachStripeSession(checkout.id, 'cs_partial_fail_1')
+
     const res = await recordWebhookEvent(
       {
         id: 'evt_partial_fail',
@@ -346,17 +373,11 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: {
           object: {
             id: 'cs_partial_fail_1',
-            metadata: {
-              dsl_id: dslId,
-              account_id: accountId,
-              stake: '5',
-              executed_date: '2026-10-21',
-            },
+            metadata: { checkout_id: checkout.id },
           },
         },
       },
       failingStore,
-      undefined,
       sender,
     )
 
@@ -386,7 +407,6 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         },
       },
       store,
-      undefined,
       sender,
     )
 

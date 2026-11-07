@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const store = createSupabasePurchaseStore()
     const emailSender = createEmailSenderFromEnv()
-    const result = await recordWebhookEvent(event, store, undefined, emailSender)
+    const result = await recordWebhookEvent(event, store, emailSender)
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 })
     }

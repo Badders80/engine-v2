@@ -28,6 +28,8 @@ export type StripeIdentitySession = {
 export type StripeCheckoutSessionInput = {
   dslId: string
   accountId: string
+  /** The frozen `checkout_sessions` row. The webhook reads it, not the live DSL. */
+  checkoutId: string
   horseLegalName: string
   stake: number
   amountNzd: number
@@ -225,6 +227,7 @@ export function createStripeGatewayFromEnv(
           'line_items[0][price_data][product_data][name]',
           `${input.horseLegalName} — ${input.stake}% Leasehold Stake`,
         ],
+        ['metadata[checkout_id]', input.checkoutId],
         ['metadata[dsl_id]', input.dslId],
         ['metadata[account_id]', input.accountId],
         ['metadata[stake]', String(input.stake)],

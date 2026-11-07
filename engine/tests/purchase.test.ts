@@ -408,26 +408,46 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
       kycStatus: 'verified',
     })
 
+    const stripe = fakeStripe()
+    const opened = await openCheckoutSession(
+      {
+        dslId: dsl.id,
+        accountId: account.id,
+        stake: 5,
+        acceptance: {
+          pdsAccepted: true,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+        },
+        executedDate: '2026-10-21',
+        successUrl: 'https://example.test/ok',
+        cancelUrl: 'https://example.test/cancel',
+      },
+      store,
+      stripe,
+    )
+    if (!opened.ok) throw new Error(opened.reason)
+    const checkout = await store.findCheckoutSessionByStripeSessionId(
+      opened.value.checkoutSessionId,
+    )
+    if (checkout === null) throw new Error('checkout binding row was not written')
+
     const webhookRes = await recordWebhookEvent(
       {
         id: 'evt_sale_1',
         type: 'checkout.session.completed',
         data: {
           object: {
-            id: 'cs_live_freeze_1',
-            metadata: {
-              dsl_id: dsl.id,
-              account_id: account.id,
-              stake: '5',
-              executed_date: '2026-10-21',
-              stripe_identity_id: 'vs_123',
-            },
+            id: opened.value.checkoutSessionId,
+            metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_123' },
           },
         },
       },
       store,
     )
     expect(webhookRes.ok).toBe(true)
+    if (!webhookRes.ok || webhookRes.value.action !== 'sale_written') return
+    expect(webhookRes.value.sale.checkoutSessionId).toBe(checkout.id)
 
     const salesBefore = await store.listSalesByUserId(account.id)
     expect(salesBefore).toHaveLength(1)
@@ -475,5 +495,93 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
     expect(salesAfter[0].saHash).toBe(frozen.saHash)
     expect(salesAfter[0].pdsMarkdown).toContain('Lady Ketchikan')
     expect(salesAfter[0].pdsMarkdown).not.toContain('Renamed Star')
+  })
+
+  it('B5 — writes the checkout-time quote and documents even when the DSL is re-priced and renamed in between', async () => {
+    const store = createInMemoryPurchaseStore()
+    const { dsl, trainer, owner } = await seedAvailableDsl(store, {
+      listedStake: 10,
+      minStake: 2.5,
+      step: 2.5,
+    })
+
+    const account = await store.insertAccount({
+      id: 'acc-b5',
+      fullName: 'Rowan Ellis',
+      email: 'rowan@example.co.nz',
+      kycStatus: 'verified',
+    })
+
+    const opened = await openCheckoutSession(
+      {
+        dslId: dsl.id,
+        accountId: account.id,
+        stake: 5,
+        acceptance: {
+          pdsAccepted: true,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+        },
+        executedDate: '2026-10-21',
+        successUrl: 'https://example.test/ok',
+        cancelUrl: 'https://example.test/cancel',
+      },
+      store,
+      fakeStripe(),
+    )
+    if (!opened.ok) throw new Error(opened.reason)
+    const checkout = await store.findCheckoutSessionByStripeSessionId(
+      opened.value.checkoutSessionId,
+    )
+    if (checkout === null) throw new Error('checkout binding row was not written')
+
+    // The buyer is on Stripe's page while the operator re-prices the DSL and
+    // renames the horse. Neither may reach the document the buyer accepted.
+    const base = baseSaveInput()
+    const edited = await updateDsl(
+      {
+        dslId: dsl.id,
+        horse: { ...base.horse, legalName: 'Renamed Star' },
+        trainer: {
+          name: trainer.name,
+          stable: trainer.stable,
+          location: trainer.location,
+          website: trainer.website,
+          bio: trainer.bio,
+        },
+        owner: {
+          entity: owner.entity,
+          contact: owner.contact,
+          website: owner.website,
+          profile: owner.profile,
+        },
+        dsl: { ...base.dsl, wholesaleMonthlyPerPercent: 95 },
+      },
+      store,
+    )
+    expect(edited.ok).toBe(true)
+
+    const res = await recordWebhookEvent(
+      {
+        id: 'evt_b5',
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: opened.value.checkoutSessionId,
+            metadata: { checkout_id: checkout.id },
+          },
+        },
+      },
+      store,
+    )
+    expect(res.ok).toBe(true)
+    if (!res.ok || res.value.action !== 'sale_written') return
+
+    expect(res.value.sale.amount).toBe(checkout.amountNzd)
+    expect(res.value.sale.stake).toBe(5)
+    expect(res.value.sale.pdsHash).toBe(checkout.pdsHash)
+    expect(res.value.sale.saHash).toBe(checkout.saHash)
+    expect(res.value.sale.pdsMarkdown).toContain('Lady Ketchikan')
+    expect(res.value.sale.pdsMarkdown).not.toContain('Renamed Star')
   })
 })

@@ -12,6 +12,9 @@ import { notFound } from 'next/navigation'
 import { DslForm } from '../../DslForm'
 import { updateDslAction } from '../../actions'
 import { loadDslView } from '../../data'
+import { recordStore } from '../../../records/store'
+
+export const dynamic = 'force-dynamic'
 
 export default async function Page({
   params,
@@ -41,6 +44,10 @@ export default async function Page({
 
   const { dsl, horse, trainer, owner } = view
 
+  const store = recordStore()
+  const trainers = await store.listTrainers()
+  const owners = await store.listOwners()
+
   return (
     <main>
       <h1>Edit {horse.legalName}</h1>
@@ -59,6 +66,10 @@ export default async function Page({
         dslId={dsl.id}
         error={error ?? null}
         defaults={{ horse, trainer: trainer ?? {}, owner: owner ?? {}, dsl }}
+        trainerOptions={trainers.map((t) => ({ id: t.id, name: t.name, stable: t.stable }))}
+        ownerOptions={owners.map((o) => ({ id: o.id, entity: o.entity }))}
+        currentTrainerId={horse.trainerId}
+        currentOwnerId={dsl.ownerId}
       />
     </main>
   )

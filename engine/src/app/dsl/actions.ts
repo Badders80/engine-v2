@@ -139,7 +139,17 @@ function toInput(form: FormData): Result<SaveDslInput> {
     distributionSchedule: optional(form, 'distributionSchedule'),
   }
 
-  return { ok: true, value: { horse, trainer, owner, dsl } }
+  return {
+    ok: true,
+    value: {
+      horse,
+      trainerId: optional(form, 'trainerId'),
+      trainer,
+      ownerId: optional(form, 'ownerId'),
+      owner,
+      dsl,
+    },
+  }
 }
 
 /**
@@ -179,7 +189,9 @@ export async function updateDslAction(form: FormData): Promise<void> {
       {
         dslId,
         horse: input.value.horse,
+        trainerId: input.value.trainerId,
         trainer: input.value.trainer,
+        ownerId: input.value.ownerId,
         owner: input.value.owner,
         dsl: input.value.dsl,
       },

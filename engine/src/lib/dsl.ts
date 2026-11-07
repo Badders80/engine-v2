@@ -116,7 +116,16 @@ export type DslDraft = {
 
 export type SaveDslInput = {
   horse: HorseDraft
+  /**
+   * An existing trainer to attach. When set, the trainer draft is ignored and
+   * that row is used untouched; its bio is edited on its own page. When null,
+   * the draft is resolved by name and stable, which updates an existing row or
+   * inserts a new one.
+   */
+  trainerId?: string | null
   trainer: TrainerDraft
+  /** The same rule for the owner, matched by entity when no id is given. */
+  ownerId?: string | null
   owner: OwnerDraft
   dsl: DslDraft
 }
@@ -159,13 +168,13 @@ function draftReadiness(args: {
     raceExpectation?: string | null
   }
   trainerBio: string | null | undefined
-  ownerEntity: string | null | undefined
+  ownerId: string | null
   dsl: DslDraft
   stakeRemaining: number | null
 }): ReadinessResult {
   return checkDslReadiness({
     dsl: {
-      ownerId: text(args.ownerEntity) === null ? null : 'draft-owner',
+      ownerId: args.ownerId,
       endDate: text(args.dsl.endDate),
       termStart: text(args.dsl.termStart),
       paymentModel: text(args.dsl.paymentModel),
@@ -236,19 +245,6 @@ function checkDraft(input: SaveDslInput): CheckResult {
     return { ok: false, reason: 'the horse needs a legal name, which makes the slug' }
   }
 
-  if (input.dsl.status === 'available') {
-    const ready = draftReadiness({
-      horse: input.horse,
-      trainerBio: input.trainer.bio,
-      ownerEntity: input.owner.entity,
-      dsl: input.dsl,
-      stakeRemaining: numberOrNull(input.dsl.listedStake),
-    })
-    if (!ready.ok) {
-      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
-    }
-  }
-
   return { ok: true }
 }
 
@@ -309,8 +305,33 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
   return { ok: true }
 }
 
-/** An existing trainer with the same name and stable is updated, never doubled. */
-async function resolveTrainer(draft: TrainerDraft, store: DslStore): Promise<TrainerRow> {
+/**
+ * The trainer this save attaches.
+ *
+ * An id means "use that row". No id means the draft names one: a matching
+ * name and stable is updated in place, and anything else is inserted. Picking
+ * by id is what stops a renamed stable from creating a second row.
+ */
+async function resolveTrainer(
+  input: Pick<SaveDslInput, 'trainerId' | 'trainer'>,
+  store: DslStore,
+): Promise<Result<TrainerRow>> {
+  if (input.trainerId) {
+    const found = await store.findTrainerById(input.trainerId)
+    if (found === null) {
+      return { ok: false, reason: `trainer ${input.trainerId} does not exist` }
+    }
+    return { ok: true, value: found }
+  }
+
+  const draft = input.trainer
+  if (text(draft.name) === null || text(draft.stable) === null) {
+    return {
+      ok: false,
+      reason: 'a new trainer needs a name and a stable, or pick an existing trainer',
+    }
+  }
+
   const fields = {
     name: draft.name,
     stable: draft.stable,
@@ -320,13 +341,34 @@ async function resolveTrainer(draft: TrainerDraft, store: DslStore): Promise<Tra
   }
 
   const existing = await store.findTrainer({ name: draft.name, stable: draft.stable })
-  if (existing !== null) return store.updateTrainer(existing.id, fields)
+  if (existing !== null) {
+    return { ok: true, value: await store.updateTrainer(existing.id, fields) }
+  }
 
-  return store.insertTrainer(fields)
+  return { ok: true, value: await store.insertTrainer(fields) }
 }
 
-/** An existing owner with the same entity is updated, never doubled. */
-async function resolveOwner(draft: OwnerDraft, store: DslStore): Promise<OwnerRow> {
+/** The owner this save attaches. Same rule, matched by entity when no id is given. */
+async function resolveOwner(
+  input: Pick<SaveDslInput, 'ownerId' | 'owner'>,
+  store: DslStore,
+): Promise<Result<OwnerRow>> {
+  if (input.ownerId) {
+    const found = await store.findOwnerById(input.ownerId)
+    if (found === null) {
+      return { ok: false, reason: `owner ${input.ownerId} does not exist` }
+    }
+    return { ok: true, value: found }
+  }
+
+  const draft = input.owner
+  if (text(draft.entity) === null || text(draft.contact) === null) {
+    return {
+      ok: false,
+      reason: 'a new owner needs an entity and a contact, or pick an existing owner',
+    }
+  }
+
   const fields = {
     entity: draft.entity,
     contact: draft.contact,
@@ -335,9 +377,11 @@ async function resolveOwner(draft: OwnerDraft, store: DslStore): Promise<OwnerRo
   }
 
   const existing = await store.findOwner({ entity: draft.entity })
-  if (existing !== null) return store.updateOwner(existing.id, fields)
+  if (existing !== null) {
+    return { ok: true, value: await store.updateOwner(existing.id, fields) }
+  }
 
-  return store.insertOwner(fields)
+  return { ok: true, value: await store.insertOwner(fields) }
 }
 
 /**
@@ -366,8 +410,26 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
     }
   }
 
-  const trainer = await resolveTrainer(input.trainer, store)
-  const owner = await resolveOwner(input.owner, store)
+  const trainerResult = await resolveTrainer(input, store)
+  if (!trainerResult.ok) return trainerResult
+  const ownerResult = await resolveOwner(input, store)
+  if (!ownerResult.ok) return ownerResult
+
+  const trainer = trainerResult.value
+  const owner = ownerResult.value
+
+  if (input.dsl.status === 'available') {
+    const ready = draftReadiness({
+      horse: input.horse,
+      trainerBio: trainer.bio,
+      ownerId: owner.id,
+      dsl: input.dsl,
+      stakeRemaining: numberOrNull(input.dsl.listedStake),
+    })
+    if (!ready.ok) {
+      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
+    }
+  }
 
   const horseFields = {
     slug,
@@ -413,7 +475,9 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
 export type EditDslInput = {
   dslId: string
   horse: Partial<HorseDraft>
+  trainerId?: string | null
   trainer: TrainerDraft
+  ownerId?: string | null
   owner: OwnerDraft
   dsl: DslDraft
 }
@@ -456,32 +520,6 @@ export async function updateDsl(
   const terms = checkCommercialTerms(input.dsl)
   if (!terms.ok) return terms
 
-  if (input.dsl.status === 'available') {
-    const ready = draftReadiness({
-      horse: {
-        registered,
-        imageCount: input.horse.imageCount ?? currentHorse.imageCount,
-        aboutHorse:
-          input.horse.aboutHorse === undefined ? currentHorse.aboutHorse : input.horse.aboutHorse,
-        racingOutlookAndPedigree:
-          input.horse.racingOutlookAndPedigree === undefined
-            ? currentHorse.racingOutlookAndPedigree
-            : input.horse.racingOutlookAndPedigree,
-        raceExpectation:
-          input.horse.raceExpectation === undefined
-            ? currentHorse.raceExpectation
-            : input.horse.raceExpectation,
-      },
-      trainerBio: input.trainer.bio,
-      ownerEntity: input.owner.entity,
-      dsl: input.dsl,
-      stakeRemaining: currentDsl.stakeRemaining,
-    })
-    if (!ready.ok) {
-      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
-    }
-  }
-
   if (input.dsl.endDate !== currentDsl.endDate) {
     const clash = await store.findDslByHorseAndEndDate(currentHorse.id, input.dsl.endDate)
     if (clash !== null) {
@@ -502,8 +540,39 @@ export async function updateDsl(
     }
   }
 
-  const trainer = await resolveTrainer(input.trainer, store)
-  const owner = await resolveOwner(input.owner, store)
+  const trainerResult = await resolveTrainer(input, store)
+  if (!trainerResult.ok) return trainerResult
+  const ownerResult = await resolveOwner(input, store)
+  if (!ownerResult.ok) return ownerResult
+
+  const trainer = trainerResult.value
+  const owner = ownerResult.value
+
+  if (input.dsl.status === 'available') {
+    const ready = draftReadiness({
+      horse: {
+        registered,
+        imageCount: input.horse.imageCount ?? currentHorse.imageCount,
+        aboutHorse:
+          input.horse.aboutHorse === undefined ? currentHorse.aboutHorse : input.horse.aboutHorse,
+        racingOutlookAndPedigree:
+          input.horse.racingOutlookAndPedigree === undefined
+            ? currentHorse.racingOutlookAndPedigree
+            : input.horse.racingOutlookAndPedigree,
+        raceExpectation:
+          input.horse.raceExpectation === undefined
+            ? currentHorse.raceExpectation
+            : input.horse.raceExpectation,
+      },
+      trainerBio: trainer.bio,
+      ownerId: owner.id,
+      dsl: input.dsl,
+      stakeRemaining: currentDsl.stakeRemaining,
+    })
+    if (!ready.ok) {
+      return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
+    }
+  }
 
   const horse = await store.updateHorse(currentHorse.id, {
     slug,

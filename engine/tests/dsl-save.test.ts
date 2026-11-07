@@ -633,3 +633,82 @@ describe('an edit to a trainer or owner persists (B8)', () => {
     expect(second.trainer.website).toBe('https://new.example.test')
   })
 })
+
+describe('attaching an existing trainer or owner by id', () => {
+  it('uses the picked trainer untouched and creates no new row', async () => {
+    const picked = await store.insertTrainer({
+      name: 'Picked Trainer',
+      stable: 'Picked Stables',
+      location: 'Cambridge',
+      website: null,
+      bio: 'The picked bio.',
+    })
+
+    const base = input()
+    const saved = await ok(
+      await saveDsl(
+        {
+          ...base,
+          trainerId: picked.id,
+          trainer: { ...base.trainer, name: 'Ignored', stable: 'Ignored' },
+        },
+        store,
+      ),
+    )
+
+    expect(saved.trainer.id).toBe(picked.id)
+    expect(store.dump().trainers).toHaveLength(1)
+    expect(saved.trainer.name).toBe('Picked Trainer')
+  })
+
+  it('uses the picked owner untouched and creates no new row', async () => {
+    const picked = await store.insertOwner({
+      entity: 'Picked Bloodstock',
+      contact: 'P Contact',
+      website: null,
+      profile: 'The picked profile.',
+    })
+
+    const base = input()
+    const saved = await ok(
+      await saveDsl(
+        { ...base, ownerId: picked.id, owner: { ...base.owner, entity: 'Ignored Entity' } },
+        store,
+      ),
+    )
+
+    expect(saved.owner.id).toBe(picked.id)
+    expect(store.dump().owners).toHaveLength(1)
+  })
+
+  it('refuses an id that does not exist', async () => {
+    const result = await saveDsl(input({ trainerId: 'no-such-trainer' }), store)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a missing trainer to be refused')
+    expect(result.reason).toMatch(/does not exist/)
+    expect(store.dump().horses).toHaveLength(0)
+  })
+
+  it('reads the picked trainer bio for readiness, not the draft', async () => {
+    const picked = await store.insertTrainer({
+      name: 'No Bio',
+      stable: 'Silent Stables',
+      location: 'Cambridge',
+      website: null,
+      bio: null,
+    })
+
+    const result = await saveDsl(
+      input({
+        trainerId: picked.id,
+        dsl: draft({ status: 'available', published: true }),
+      }),
+      store,
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a trainee with no bio to be refused')
+    expect(result.reason).toMatch(/trainer's bio/)
+  })
+})

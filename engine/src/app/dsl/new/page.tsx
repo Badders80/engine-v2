@@ -11,8 +11,11 @@ import Link from 'next/link'
 
 import { loadLoveracingPage } from '@/lib/loveracingFetch'
 
+import { recordStore } from '../../records/store'
 import { DslForm, type DslFormDefaults } from '../DslForm'
 import { createDslAction } from '../actions'
+
+export const dynamic = 'force-dynamic'
 
 export default async function Page({
   searchParams,
@@ -23,6 +26,10 @@ export default async function Page({
   const link = (params.loveracing ?? '').trim()
 
   const loaded = link === '' ? null : await loadLoveracingPage(link)
+
+  const store = recordStore()
+  const trainers = await store.listTrainers()
+  const owners = await store.listOwners()
 
   const defaults: DslFormDefaults =
     loaded !== null && loaded.ok
@@ -78,6 +85,8 @@ export default async function Page({
           submitLabel="Save the DSL"
           defaults={defaults}
           error={params.error ?? null}
+          trainerOptions={trainers.map((t) => ({ id: t.id, name: t.name, stable: t.stable }))}
+          ownerOptions={owners.map((o) => ({ id: o.id, entity: o.entity }))}
         />
       </section>
     </main>

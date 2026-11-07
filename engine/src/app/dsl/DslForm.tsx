@@ -42,9 +42,24 @@ type Props = {
   defaults?: DslFormDefaults
   error?: string | null
   dslId?: string
+  /** Existing rows the operator can attach instead of retyping one. */
+  trainerOptions?: readonly { id: string; name: string; stable: string }[]
+  ownerOptions?: readonly { id: string; entity: string }[]
+  currentTrainerId?: string | null
+  currentOwnerId?: string | null
 }
 
-export function DslForm({ action, submitLabel, defaults = {}, error = null, dslId }: Props) {
+export function DslForm({
+  action,
+  submitLabel,
+  defaults = {},
+  error = null,
+  dslId,
+  trainerOptions = [],
+  ownerOptions = [],
+  currentTrainerId = null,
+  currentOwnerId = null,
+}: Props) {
   const horse = defaults.horse ?? {}
   const trainer = defaults.trainer ?? {}
   const owner = defaults.owner ?? {}
@@ -161,18 +176,37 @@ export function DslForm({ action, submitLabel, defaults = {}, error = null, dslI
         <legend>Trainer</legend>
 
         <label>
+          Attach an existing trainer
+          <select name="trainerId" defaultValue={currentTrainerId ?? ''}>
+            <option value="">— create a new trainer below —</option>
+            {trainerOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name} — {option.stable}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <p>
+          <small>
+            Picking a trainer ignores the fields below. Edit that trainer&apos;s bio on its own
+            page.
+          </small>
+        </p>
+
+        <label>
           Name
-          <input name="trainerName" defaultValue={trainer.name ?? ''} required />
+          <input name="trainerName" defaultValue={trainer.name ?? ''} />
         </label>
 
         <label>
           Stable
-          <input name="trainerStable" defaultValue={trainer.stable ?? ''} required />
+          <input name="trainerStable" defaultValue={trainer.stable ?? ''} />
         </label>
 
         <label>
           Location
-          <input name="trainerLocation" defaultValue={trainer.location ?? ''} required />
+          <input name="trainerLocation" defaultValue={trainer.location ?? ''} />
         </label>
 
         <label>
@@ -190,13 +224,32 @@ export function DslForm({ action, submitLabel, defaults = {}, error = null, dslI
         <legend>Owner</legend>
 
         <label>
+          Attach an existing owner
+          <select name="ownerId" defaultValue={currentOwnerId ?? ''}>
+            <option value="">— create a new owner below —</option>
+            {ownerOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.entity}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <p>
+          <small>
+            Picking an owner ignores the fields below. Edit that owner&apos;s profile on its own
+            page.
+          </small>
+        </p>
+
+        <label>
           Entity
-          <input name="ownerEntity" defaultValue={owner.entity ?? ''} required />
+          <input name="ownerEntity" defaultValue={owner.entity ?? ''} />
         </label>
 
         <label>
           Contact
-          <input name="ownerContact" defaultValue={owner.contact ?? ''} required />
+          <input name="ownerContact" defaultValue={owner.contact ?? ''} />
         </label>
 
         <label>

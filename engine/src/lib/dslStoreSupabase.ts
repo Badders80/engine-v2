@@ -290,6 +290,28 @@ export function createSupabaseDslStore(client: SupabaseClient): DslStore {
       return data === null ? null : toTrainer(data)
     },
 
+    async listTrainers() {
+      const { data, error } = await client
+        .from('trainers')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) fail('trainers', error.message)
+      return (data ?? []).map(toTrainer)
+    },
+
+    async updateTrainer(id, patch) {
+      const { data, error } = await client
+        .from('trainers')
+        .update(trainerColumns(patch))
+        .eq('id', id)
+        .select('*')
+        .single()
+
+      if (error) fail('trainers', error.message)
+      return toTrainer(data)
+    },
+
     async findOwner(match) {
       const { data, error } = await client
         .from('owners')
@@ -318,6 +340,38 @@ export function createSupabaseDslStore(client: SupabaseClient): DslStore {
 
       if (error) fail('owners', error.message)
       return data === null ? null : toOwner(data)
+    },
+
+    async listOwners() {
+      const { data, error } = await client
+        .from('owners')
+        .select('*')
+        .order('entity', { ascending: true })
+
+      if (error) fail('owners', error.message)
+      return (data ?? []).map(toOwner)
+    },
+
+    async updateOwner(id, patch) {
+      const { data, error } = await client
+        .from('owners')
+        .update(ownerColumns(patch))
+        .eq('id', id)
+        .select('*')
+        .single()
+
+      if (error) fail('owners', error.message)
+      return toOwner(data)
+    },
+
+    async listHorses() {
+      const { data, error } = await client
+        .from('horses')
+        .select('*')
+        .order('legal_name', { ascending: true })
+
+      if (error) fail('horses', error.message)
+      return (data ?? []).map(toHorse)
     },
 
     async findHorseBySlug(slug) {

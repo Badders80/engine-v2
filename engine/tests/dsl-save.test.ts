@@ -575,3 +575,61 @@ describe('a DSL exists before its deal does', () => {
     expect(result.reason).toMatch(/at least 3 horse images/)
   })
 })
+
+describe('an edit to a trainer or owner persists (B8)', () => {
+  it('updates an existing trainer in place and never doubles it', async () => {
+    await ok(await saveDsl(input(), store))
+
+    const base = input()
+    const second = await ok(
+      await saveDsl(
+        {
+          ...base,
+          horse: { ...base.horse, legalName: 'Second Horse' },
+          trainer: { ...base.trainer, bio: 'A rewritten bio.' },
+        },
+        store,
+      ),
+    )
+
+    expect(store.dump().trainers).toHaveLength(1)
+    expect(second.trainer.bio).toBe('A rewritten bio.')
+  })
+
+  it('updates an existing owner in place and never doubles it', async () => {
+    await ok(await saveDsl(input(), store))
+
+    const base = input()
+    const second = await ok(
+      await saveDsl(
+        {
+          ...base,
+          horse: { ...base.horse, legalName: 'Third Horse' },
+          owner: { ...base.owner, profile: 'A rewritten profile.' },
+        },
+        store,
+      ),
+    )
+
+    expect(store.dump().owners).toHaveLength(1)
+    expect(second.owner.profile).toBe('A rewritten profile.')
+  })
+
+  it('does not drop a trainer website change', async () => {
+    await ok(await saveDsl(input(), store))
+
+    const base = input()
+    const second = await ok(
+      await saveDsl(
+        {
+          ...base,
+          horse: { ...base.horse, legalName: 'Fourth Horse' },
+          trainer: { ...base.trainer, website: 'https://new.example.test' },
+        },
+        store,
+      ),
+    )
+
+    expect(second.trainer.website).toBe('https://new.example.test')
+  })
+})

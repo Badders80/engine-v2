@@ -138,9 +138,14 @@ export interface DslStore {
   findTrainer(match: { name: string; stable: string }): Promise<TrainerRow | null>
   insertTrainer(row: NewTrainer): Promise<TrainerRow>
   findTrainerById(id: string): Promise<TrainerRow | null>
+  listTrainers(): Promise<TrainerRow[]>
+  updateTrainer(id: string, patch: Partial<NewTrainer>): Promise<TrainerRow>
   findOwner(match: { entity: string }): Promise<OwnerRow | null>
   insertOwner(row: NewOwner): Promise<OwnerRow>
   findOwnerById(id: string): Promise<OwnerRow | null>
+  listOwners(): Promise<OwnerRow[]>
+  updateOwner(id: string, patch: Partial<NewOwner>): Promise<OwnerRow>
+  listHorses(): Promise<HorseRow[]>
   findHorseBySlug(slug: string): Promise<HorseRow | null>
   findHorseById(id: string): Promise<HorseRow | null>
   insertHorse(row: NewHorse): Promise<HorseRow>
@@ -221,6 +226,29 @@ export function createInMemoryDslStore(): InMemoryDslStore {
     },
     async findTrainerById(id) {
       return trainers.find((row) => row.id === id) ?? null
+    },
+    async listTrainers() {
+      return [...trainers]
+    },
+    async updateTrainer(id, patch) {
+      const index = trainers.findIndex((row) => row.id === id)
+      mustFind(trainers[index], 'trainer', id)
+      const updated = { ...trainers[index], ...patch }
+      trainers[index] = updated
+      return updated
+    },
+    async listOwners() {
+      return [...owners]
+    },
+    async updateOwner(id, patch) {
+      const index = owners.findIndex((row) => row.id === id)
+      mustFind(owners[index], 'owner', id)
+      const updated = { ...owners[index], ...patch }
+      owners[index] = updated
+      return updated
+    },
+    async listHorses() {
+      return [...horses]
     },
     async findOwnerById(id) {
       return owners.find((row) => row.id === id) ?? null

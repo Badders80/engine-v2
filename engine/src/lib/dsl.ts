@@ -309,31 +309,35 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
   return { ok: true }
 }
 
-/** An existing trainer with the same name and stable is reused, never doubled. */
+/** An existing trainer with the same name and stable is updated, never doubled. */
 async function resolveTrainer(draft: TrainerDraft, store: DslStore): Promise<TrainerRow> {
-  const existing = await store.findTrainer({ name: draft.name, stable: draft.stable })
-  if (existing !== null) return existing
-
-  return store.insertTrainer({
+  const fields = {
     name: draft.name,
     stable: draft.stable,
     location: draft.location,
     website: text(draft.website),
     bio: text(draft.bio),
-  })
+  }
+
+  const existing = await store.findTrainer({ name: draft.name, stable: draft.stable })
+  if (existing !== null) return store.updateTrainer(existing.id, fields)
+
+  return store.insertTrainer(fields)
 }
 
-/** An existing owner with the same entity is reused, never doubled. */
+/** An existing owner with the same entity is updated, never doubled. */
 async function resolveOwner(draft: OwnerDraft, store: DslStore): Promise<OwnerRow> {
-  const existing = await store.findOwner({ entity: draft.entity })
-  if (existing !== null) return existing
-
-  return store.insertOwner({
+  const fields = {
     entity: draft.entity,
     contact: draft.contact,
     website: text(draft.website),
     profile: text(draft.profile),
-  })
+  }
+
+  const existing = await store.findOwner({ entity: draft.entity })
+  if (existing !== null) return store.updateOwner(existing.id, fields)
+
+  return store.insertOwner(fields)
 }
 
 /**

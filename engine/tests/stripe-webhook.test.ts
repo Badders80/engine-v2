@@ -175,14 +175,27 @@ describe('Step 8a — recordWebhookEvent', () => {
       stripeSessionId: opened.value.checkoutSessionId,
       checkoutId: row.id,
       quote: opened.value.quote,
+      amountTotalCents: Math.round(opened.value.quote.initialPaymentNzd * 100),
     }
   }
 
-  function completedEvent(stripeSessionId: string, checkoutId: string) {
+  function completedEvent(
+    stripeSessionId: string,
+    checkoutId: string,
+    amountTotalCents: number,
+  ) {
     return {
       id: `evt_${stripeSessionId}`,
       type: 'checkout.session.completed',
-      data: { object: { id: stripeSessionId, metadata: { checkout_id: checkoutId } } },
+      data: {
+        object: {
+          id: stripeSessionId,
+          payment_status: 'paid',
+          amount_total: amountTotalCents,
+          currency: 'nzd',
+          metadata: { checkout_id: checkoutId },
+        },
+      },
     }
   }
 
@@ -190,7 +203,11 @@ describe('Step 8a — recordWebhookEvent', () => {
     const { store, dsl, account } = await setupStore()
 
     const firstCheckout = await openCheckout(store, dsl.id, account.id, 5)
-    const event1 = completedEvent(firstCheckout.stripeSessionId, firstCheckout.checkoutId)
+    const event1 = completedEvent(
+      firstCheckout.stripeSessionId,
+      firstCheckout.checkoutId,
+      firstCheckout.amountTotalCents,
+    )
 
     const first = await recordWebhookEvent(event1, store)
     expect(first.ok).toBe(true)
@@ -227,7 +244,11 @@ describe('Step 8a — recordWebhookEvent', () => {
     // Second 5% purchase exhausts remaining stake -> status flips to fully_allocated
     const secondCheckout = await openCheckout(store, dsl.id, account.id, 5)
     const second = await recordWebhookEvent(
-      completedEvent(secondCheckout.stripeSessionId, secondCheckout.checkoutId),
+      completedEvent(
+        secondCheckout.stripeSessionId,
+        secondCheckout.checkoutId,
+        secondCheckout.amountTotalCents,
+      ),
       store,
     )
     expect(second.ok).toBe(true)
@@ -259,6 +280,87 @@ describe('Step 8a — recordWebhookEvent', () => {
     expect(store.dump().sales).toHaveLength(0)
     expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
     expect(emailSender.sent.map((sent) => sent.kind)).toContain('founder_our_fault_failure')
+  })
+
+  it('B4 — records Stripe\'s charged amount and currency on the sale', async () => {
+    const { store, dsl, account } = await setupStore()
+    const checkout = await openCheckout(store, dsl.id, account.id, 5)
+
+    const res = await recordWebhookEvent(
+      completedEvent(checkout.stripeSessionId, checkout.checkoutId, checkout.amountTotalCents),
+      store,
+    )
+    expect(res.ok).toBe(true)
+    if (!res.ok || res.value.action !== 'sale_written') return
+    expect(res.value.sale.amount).toBe(checkout.amountTotalCents / 100)
+    expect(res.value.sale.stripeAmountTotal).toBe(checkout.amountTotalCents / 100)
+    expect(res.value.sale.stripeCurrency).toBe('nzd')
+  })
+
+  it('B4 — refuses a sale when Stripe charged a different amount, keeps the hold, and alerts the founder', async () => {
+    const { store, dsl, account } = await setupStore()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
+    const checkout = await openCheckout(store, dsl.id, account.id, 5)
+
+    const res = await recordWebhookEvent(
+      completedEvent(
+        checkout.stripeSessionId,
+        checkout.checkoutId,
+        checkout.amountTotalCents - 100,
+      ),
+      store,
+      emailSender,
+    )
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.value.action).toBe('refused')
+
+    expect(store.dump().sales).toHaveLength(0)
+    expect((await store.findCheckoutSessionById(checkout.checkoutId))?.status).toBe(
+      'paid_unfulfilled',
+    )
+    expect(emailSender.sent.map((sent) => sent.kind)).toEqual(['founder_our_fault_failure'])
+    // The hold is kept: money was taken, so the stake must not go back on sale.
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
+  })
+
+  it('B4 — refuses a session Stripe has not marked paid, and leaves the hold open', async () => {
+    const { store, dsl, account } = await setupStore()
+    const emailSender = createInMemoryEmailSender('founder@evolutionstables.nz')
+    const checkout = await openCheckout(store, dsl.id, account.id, 5)
+
+    const event = completedEvent(
+      checkout.stripeSessionId,
+      checkout.checkoutId,
+      checkout.amountTotalCents,
+    )
+    event.data.object.payment_status = 'unpaid'
+
+    const res = await recordWebhookEvent(event, store, emailSender)
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.value.action).toBe('refused')
+    expect(store.dump().sales).toHaveLength(0)
+    expect((await store.findCheckoutSessionById(checkout.checkoutId))?.status).toBe('open')
+    expect(emailSender.sent).toHaveLength(1)
+  })
+
+  it('B4 — refuses a sale charged in a currency other than NZD', async () => {
+    const { store, dsl, account } = await setupStore()
+    const checkout = await openCheckout(store, dsl.id, account.id, 5)
+
+    const event = completedEvent(
+      checkout.stripeSessionId,
+      checkout.checkoutId,
+      checkout.amountTotalCents,
+    )
+    event.data.object.currency = 'usd'
+
+    const res = await recordWebhookEvent(event, store)
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(res.value.action).toBe('refused')
+    expect(store.dump().sales).toHaveLength(0)
   })
 
   it('writes no sale row on payment_intent.payment_failed or checkout.session.expired', async () => {

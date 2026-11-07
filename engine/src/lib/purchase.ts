@@ -471,6 +471,7 @@ export async function openCheckoutSession(
 export type WebhookResult =
   | { action: 'sale_written'; sale: SaleRow; idempotentReplay: boolean }
   | { action: 'kyc_updated'; accountId: string; kycStatus: AccountRow['kycStatus'] }
+  | { action: 'refused'; reason: string; eventType: string }
   | { action: 'ignored'; eventType: string }
 
 function metadataString(metadata: Record<string, unknown>, key: string): string {
@@ -581,9 +582,50 @@ export async function recordWebhookEvent(
       `checkout.session.completed ${stripeSessionId} has no bound checkout session; no sale was written`,
     )
   }
+  const bound = checkout
 
   const stripeIdentityIdRaw = metadataString(metadata, 'stripe_identity_id')
   const stripeIdentityId = stripeIdentityIdRaw !== '' ? stripeIdentityIdRaw : null
+
+  // B4: Stripe's numbers are the money record. The bound quote is the contract.
+  // They must agree before anything is written.
+  const paymentStatus = typeof obj.payment_status === 'string' ? obj.payment_status.trim() : ''
+  const currency = typeof obj.currency === 'string' ? obj.currency.trim().toLowerCase() : ''
+  const amountTotal = typeof obj.amount_total === 'number' ? obj.amount_total : Number.NaN
+  const expectedCents = Math.round(bound.amountNzd * 100)
+
+  async function refuse(
+    reason: string,
+    moneyTaken: boolean,
+  ): Promise<Result<WebhookResult>> {
+    if (moneyTaken) {
+      // Keep the hold. Releasing it would put stock back on sale for money that
+      // has already been taken; a human closes this one.
+      await store.markCheckoutPaidUnfulfilled(bound.id)
+    }
+    await sendEngineEmail(
+      {
+        kind: 'founder_our_fault_failure',
+        stage: 'webhook',
+        reason: `checkout ${bound.id} (${stripeSessionId}): ${reason}`,
+      },
+      emailSender,
+    )
+    return { ok: true, value: { action: 'refused', reason, eventType: event.type } }
+  }
+
+  if (paymentStatus !== 'paid') {
+    return refuse(`Stripe reports payment_status '${paymentStatus || 'missing'}'`, false)
+  }
+  if (!Number.isFinite(amountTotal) || amountTotal !== expectedCents) {
+    return refuse(
+      `Stripe charged ${Number.isFinite(amountTotal) ? `${amountTotal}c` : 'no amount'} but the bound quote is ${expectedCents}c`,
+      true,
+    )
+  }
+  if (currency !== 'nzd') {
+    return refuse(`Stripe charged in '${currency || 'missing'}', not nzd`, true)
+  }
 
   let sale: SaleRow | null = null
   try {
@@ -607,8 +649,8 @@ export async function recordWebhookEvent(
       stripeSessionId,
       stripeIdentityId,
       checkoutSessionId: checkout.id,
-      stripeAmountTotal: null,
-      stripeCurrency: null,
+      stripeAmountTotal: amountTotal / 100,
+      stripeCurrency: currency,
       pdsMarkdown: checkout.pdsMarkdown,
       saMarkdown: checkout.saMarkdown,
       pdsHash: checkout.pdsHash,

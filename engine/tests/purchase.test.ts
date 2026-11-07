@@ -439,6 +439,9 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
         data: {
           object: {
             id: opened.value.checkoutSessionId,
+            payment_status: 'paid',
+            amount_total: Math.round(checkout.amountNzd * 100),
+            currency: 'nzd',
             metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_123' },
           },
         },
@@ -568,6 +571,9 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
         data: {
           object: {
             id: opened.value.checkoutSessionId,
+            payment_status: 'paid',
+            amount_total: Math.round(checkout.amountNzd * 100),
+            currency: 'nzd',
             metadata: { checkout_id: checkout.id },
           },
         },

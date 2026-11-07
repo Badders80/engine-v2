@@ -240,6 +240,9 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       data: {
         object: {
           id: 'cs_step9_1',
+          payment_status: 'paid',
+          amount_total: 177_500,
+          currency: 'nzd',
           metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_step9_1' },
         },
       },
@@ -373,6 +376,9 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         data: {
           object: {
             id: 'cs_partial_fail_1',
+            payment_status: 'paid',
+            amount_total: 177_500,
+            currency: 'nzd',
             metadata: { checkout_id: checkout.id },
           },
         },

@@ -66,6 +66,8 @@ Members pay for the duration of their participation under one of two models spec
 
 All billing operates in full calendar-month units.
 
+All amounts are stated inclusive of GST at 15%. No additional GST is charged and no GST item is added to a payment.
+
 ---
 
 ## 10. Investor Returns

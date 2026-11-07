@@ -1,5 +1,5 @@
 87aec93f2ca5314cfd3f0e5de8687a2b5ed70822ed6a0f873517507fb26d119e  engine/src/templates/PDS.template.md
-99d553779ef557d8700211a667e98c65b4fd9e7be9b472a950821b75664cadb8  engine/src/templates/SA.template.md
+ec36c087409157a2d5427d2feccc3e312feafda8073526c05af62be81494deb5  engine/src/templates/SA.template.md
 ac693a7b56e81b1a60deb8b0eec7881f1d1844b5fa9290182a71a1d38e92d05d  engine/src/templates/blocks/pds-costs-summary.float.md
 7f9c562741f6b71295df375cff14772d9ffa385da1affa3a1cb131557f3e7997  engine/src/templates/blocks/pds-costs-summary.upfront.md
 f62e7f97d02250cfe2155634f5d86afd8768100124fcc894b2d32ca6f1747809  engine/src/templates/blocks/pds-close-style.fourteen-day.md

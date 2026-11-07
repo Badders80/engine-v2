@@ -254,6 +254,10 @@ STRIPE_WEBHOOK_SECRET="whsec_..."
 ENGINE_EXPIRE_SECRET="<random, 32+ bytes>"
 ```
 
+**Where the keys live, and how they rotate.** `engine/.env.example` carries the names with no values and is committed; `engine/.env.local` carries the values and is gitignored by `.env.*`. The Stripe test key is copied from the Stripe CLI profile (`stripe config --list`, profile "evolution stables limited", `test_mode_api_key`) — it is never typed into a tracked file. `scripts/assert-purchase-fences.sh` fails the gate if any tracked file contains a `sk_test_`, `sk_live_`, `rk_test_`, or `rk_live_` literal, so a key pasted into source is caught before it is pushed. `STRIPE_WEBHOOK_SECRET` is not a stored credential: `stripe listen` prints a fresh one on every start, so it is pasted into `.env.local` per session. Production reads the same names from the host's environment; the live keys are created there at cutover, never here.
+
+**Verified 2026-11-07:** the test key from the CLI profile answers `GET https://api.stripe.com/v1/balance` with HTTP 200, `livemode: false`, `currency: nzd`.
+
 ### Checkout holds (B6)
 
 A Checkout attempt holds its stake for `CHECKOUT_HOLD_SECONDS` (300). `reserve_checkout_stake` decrements `dsls.stake_remaining` and inserts the `checkout_sessions` row in one transaction, so a second buyer cannot take the same last percent: the conditional UPDATE matches no row and the reserve raises `23514`.

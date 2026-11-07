@@ -112,9 +112,19 @@ else
   no 'website/src/app/mystable/page.tsx missing or not force-dynamic'
 fi
 
+# 7. No Stripe secret literal in any tracked file. `git grep` searches the
+#    index and worktree of tracked files only, so a gitignored `.env.local`
+#    holding the real key is not a finding — but a committed one is.
+SECRET_PATTERN='(sk|rk)_(test|live)_[A-Za-z0-9]{20,}'
+if [ -n "$(git -C "$ROOT" grep -lE "$SECRET_PATTERN" -- . ':(exclude)scripts/assert-purchase-fences.sh' 2>/dev/null)" ]; then
+  no "a Stripe secret literal is committed: $(git -C "$ROOT" grep -lE "$SECRET_PATTERN" -- . ':(exclude)scripts/assert-purchase-fences.sh' | tr '\n' ' ')"
+else
+  ok 'no Stripe secret literal in any tracked file'
+fi
+
 if [ "$fail" -ne 0 ]; then
   printf '%spurchase fences: FAILED%s\n' "$RED" "$OFF"
   exit 1
 fi
 
-printf '%spurchase fences: clean%s %s(6 rule groups)%s\n' "$GREEN" "$OFF" "$DIM" "$OFF"
+printf '%spurchase fences: clean%s %s(7 rule groups)%s\n' "$GREEN" "$OFF" "$DIM" "$OFF"

@@ -160,6 +160,15 @@ export function createSupabasePurchaseStore(
       return (data ?? []).map(toSale)
     },
 
+    async listSales() {
+      const { data, error } = await client
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) fail('sales', error.message)
+      return (data ?? []).map(toSale)
+    },
+
     async insertSale(row) {
       const { data, error } = await client
         .from('sales')

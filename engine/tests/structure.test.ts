@@ -1,9 +1,11 @@
 /**
- * The negative constraints on step 4, asserted against the tree itself.
+ * The negative constraints on the operator surface, asserted against the tree.
  *
- * Step 4 belongs inside `engine/`. Horse, trainer, and owner do not get screens
- * of their own; the DSL page is the only operator surface, and it is the only
- * thing that writes those rows. The website app is not touched by this step.
+ * Amended 2026-11-07. The original rule was "horse, trainer and owner get no
+ * screens of their own; the DSL page is the only operator surface". The model
+ * that replaced it makes those three independent records, so they do have
+ * lists and edit pages. What survives, and is asserted here, is that the
+ * surface stays small, deliberate, and never grows an admin suite.
  */
 
 import { existsSync, readdirSync } from 'node:fs'
@@ -22,15 +24,18 @@ function appRoutes(app: 'engine' | 'website'): string[] {
     .sort()
 }
 
-describe('horse, trainer, and owner get no screens of their own', () => {
-  it('has no horses, trainers, or owners route on the engine', () => {
+describe('the operator surface is three sections', () => {
+  it('has a records section for each static table', () => {
     const routes = appRoutes('engine')
-    expect(routes).not.toContain('horses')
-    expect(routes).not.toContain('trainers')
-    expect(routes).not.toContain('owners')
+    expect(routes).toEqual(expect.arrayContaining(['horses', 'trainers', 'owners']))
   })
 
-  it('has no list, admin, or management route on the engine', () => {
+  it('has a listings section and a sales section', () => {
+    const routes = appRoutes('engine')
+    expect(routes).toEqual(expect.arrayContaining(['dsl', 'sales']))
+  })
+
+  it('has no admin, management or registry route', () => {
     const routes = appRoutes('engine')
     for (const banned of ['admin', 'manage', 'management', 'crud', 'registry']) {
       expect(routes).not.toContain(banned)
@@ -38,7 +43,7 @@ describe('horse, trainer, and owner get no screens of their own', () => {
   })
 })
 
-describe('step 4 stays inside the engine app', () => {
+describe('the engine app owns the operator surface', () => {
   it('leaves the website app without a DSL or operator route', () => {
     const routes = appRoutes('website')
     for (const banned of ['dsl', 'dsls', 'engine', 'operator', 'admin']) {
@@ -67,10 +72,10 @@ describe('the operator guide stays single', () => {
   })
 })
 
-describe('one DSL page, not a suite of them', () => {
-  it('keeps the dsl route and the purchase/stripe api route and nothing beside them', () => {
+describe('the route set stays closed', () => {
+  it('adds no route beyond the three sections, the API and the shared folder', () => {
     const routes = appRoutes('engine')
-    const unexpected = routes.filter((name) => !['dsl', 'api'].includes(name))
-    expect(unexpected).toEqual([])
+    const allowed = ['_components', 'api', 'dsl', 'horses', 'owners', 'records', 'sales', 'trainers']
+    expect(routes.filter((name) => !allowed.includes(name))).toEqual([])
   })
 })

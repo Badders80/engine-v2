@@ -1,31 +1,33 @@
 /**
- * View one DSL. PLAN.md step 4.
+ * One DSL — the term sheet. PLAN.md step 4; founder ruling 2026-11-07.
  *
- * Read only, apart from the image upload. The edit link goes to the same form
- * the create page uses.
+ * This is the page the operator comes back to. Create lands here, the listing
+ * is published from here, and every Sales row points here. It renders the five
+ * sections of the one-page term sheet from the DSL row alone, with a blank
+ * marker for anything not filled in — never a default.
  *
- * The upload lives here rather than on the edit form because it is one file at a
- * time and it writes as it goes: `00008_dsl_availability_trigger.sql` wants three
- * images on the horse before the listing may be available, and this is the only
- * control that can put them there.
+ * It is not a second write surface. Publish, take-down, and the image controls
+ * all go through `actions.ts`; nothing here decides anything.
+ *
+ * The compiled documents are not rendered here. `/dsl/[id]/legal` is the
+ * pre-execution preview, and the real compile happens per buyer at Checkout.
  */
 
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { checkDslReadiness, readinessReason } from '@/lib/readiness'
 import { imageKeys, MIN_IMAGES_FOR_AVAILABLE, publicImageUrl } from '@/lib/storage'
+import { buildTermSheet } from '@/lib/termSheet'
 
-import { deleteHorseImageAction, recountHorseImagesAction, uploadHorseImageAction } from '../actions'
+import {
+  deleteHorseImageAction,
+  publishDslAction,
+  recountHorseImagesAction,
+  unpublishDslAction,
+  uploadHorseImageAction,
+} from '../actions'
 import { loadDslView } from '../data'
-
-function Field({ label, value }: { label: string; value: string | number | null }) {
-  return (
-    <>
-      <dt>{label}</dt>
-      <dd>{value === null || value === '' ? '—' : value}</dd>
-    </>
-  )
-}
 
 export default async function Page({
   params,
@@ -53,10 +55,12 @@ export default async function Page({
   if (!view.found) notFound()
 
   const { dsl, horse, trainer, owner } = view
+  const sections = buildTermSheet({ dsl, horse, trainer, owner })
+  const readiness = checkDslReadiness({ dsl, horse, trainer })
 
   // The count is the source of truth for what to show; the keys are derived
   // from it, so this page never calls the bucket. `image_count` is written from
-  // the bucket by the upload and delete actions.
+  // the bucket by the upload, delete, and recount actions.
   const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
   const images = publicUrlBase.startsWith('https://')
     ? imageKeys(horse.slug, horse.imageCount).map((key, index) => ({
@@ -70,13 +74,56 @@ export default async function Page({
     <main>
       <h1>{horse.legalName}</h1>
       <p>
-        {dsl.status}, {dsl.published ? 'published' : 'unpublished'} ·{' '}
-        <Link href={`/dsl/${dsl.id}/edit`}>Edit</Link> ·{' '}
-        <Link href={`/dsl/${dsl.id}/legal`}>Legal preview</Link> ·{' '}
-        <Link href="/dsl/new">New DSL</Link>
+        Term sheet · <Link href={`/dsl/${dsl.id}/edit`}>Edit</Link> ·{' '}
+        <Link href={`/dsl/${dsl.id}/legal`}>PDS / SA preview</Link> ·{' '}
+        <Link href="/dsl">All listings</Link>
       </p>
 
+      <h2>Publication</h2>
       {error !== undefined && <p role="alert">{error}</p>}
+
+      {dsl.published && dsl.status === 'available' ? (
+        <>
+          <p>
+            Live. Listed at <Link href={`/marketplace/${horse.slug}`}>{horse.slug}</Link>,{' '}
+            {dsl.stakeRemaining ?? 0}% of {dsl.listedStake ?? 0}% remaining.
+          </p>
+          <form action={unpublishDslAction}>
+            <input type="hidden" name="dslId" value={dsl.id} />
+            <button type="submit">Take down</button>
+          </form>
+        </>
+      ) : (
+        <>
+          <p>{readiness.ok ? 'Ready to publish.' : readinessReason(readiness)}</p>
+          <form action={publishDslAction}>
+            <input type="hidden" name="dslId" value={dsl.id} />
+            <button type="submit" disabled={!readiness.ok}>
+              Publish
+            </button>
+          </form>
+          {dsl.published && (
+            <p>
+              Published with status {dsl.status}. Only an <code>available</code> listing is
+              buyable; take it down and publish again once the terms are fixed.
+            </p>
+          )}
+        </>
+      )}
+
+      {sections.map((section) => (
+        <section key={section.title}>
+          <h2>{section.title}</h2>
+          <dl>
+            {section.rows.map((row) => (
+              <div key={row.label}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
 
       <h2>Images</h2>
       <p>
@@ -125,61 +172,6 @@ export default async function Page({
         <input type="hidden" name="dslId" value={dsl.id} />
         <button type="submit">Recount from the bucket</button>
       </form>
-
-      <h2>Horse</h2>
-      <dl>
-        <Field label="Slug" value={horse.slug} />
-        <Field label="Foaling date" value={horse.foalingDate} />
-        <Field label="Sex" value={horse.sex} />
-        <Field label="Colour" value={horse.colour} />
-        <Field label="Breeder" value={horse.breeder} />
-        <Field label="Sire" value={horse.sireName} />
-        <Field label="Dam" value={horse.damName} />
-        <Field label="Microchip" value={horse.microchip} />
-        <Field label="Life number" value={horse.lifeNumber} />
-        <Field label="Loveracing id" value={horse.loveracingId} />
-        <Field label="Registered" value={horse.registered ? 'yes' : 'no'} />
-      </dl>
-
-      <h2>Soft slots</h2>
-      <dl>
-        <Field label="About the horse" value={horse.aboutHorse} />
-        <Field label="Racing outlook and pedigree" value={horse.racingOutlookAndPedigree} />
-        <Field label="Race expectation" value={horse.raceExpectation} />
-      </dl>
-      <pre>{JSON.stringify(horse.raceRecord, null, 2)}</pre>
-
-      <h2>Trainer</h2>
-      <dl>
-        <Field label="Name" value={trainer === null ? null : trainer.name} />
-        <Field label="Stable" value={trainer === null ? null : trainer.stable} />
-        <Field label="Location" value={trainer === null ? null : trainer.location} />
-        <Field label="Website" value={trainer === null ? null : trainer.website} />
-      </dl>
-
-      <h2>Owner</h2>
-      <dl>
-        <Field label="Entity" value={owner === null ? null : owner.entity} />
-        <Field label="Contact" value={owner === null ? null : owner.contact} />
-        <Field label="Website" value={owner === null ? null : owner.website} />
-      </dl>
-
-      <h2>Terms</h2>
-      <dl>
-        <Field label="Wholesale per 1% per month" value={dsl.wholesaleMonthlyPerPercent} />
-        <Field label="Listed price per 1% per month" value={dsl.retailMonthlyPerPercent} />
-        <Field label="Wholesale total at 100%" value={dsl.wholesaleMonthlyTotal} />
-        <Field label="Investor split" value={dsl.investorSplit} />
-        <Field label="Payment style" value={dsl.paymentModel} />
-        <Field label="Close style" value={dsl.closeStyle} />
-        <Field label="Listed stake" value={dsl.listedStake} />
-        <Field label="Stake remaining" value={dsl.stakeRemaining} />
-        <Field label="Minimum stake" value={dsl.minStake} />
-        <Field label="Step" value={dsl.step} />
-        <Field label="Term start" value={dsl.termStart} />
-        <Field label="End date" value={dsl.endDate} />
-        <Field label="Distribution schedule" value={dsl.distributionSchedule} />
-      </dl>
     </main>
   )
 }

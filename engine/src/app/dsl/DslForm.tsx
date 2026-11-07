@@ -298,20 +298,8 @@ export function DslForm({
           </select>
         </label>
 
-        <label>
-          Status
-          <select name="status" defaultValue={dsl.status ?? 'coming_soon'}>
-            <option value="coming_soon">coming_soon</option>
-            <option value="available">available</option>
-            <option value="fully_allocated">fully_allocated</option>
-            <option value="completed">completed</option>
-          </select>
-        </label>
-
-        <label>
-          <input type="checkbox" name="published" defaultChecked={dsl.published ?? false} />
-          Published
-        </label>
+        {/* Status and published are not form fields. A new DSL is a draft, and
+            it goes live from the term sheet with Publish, after a look. */}
 
         <label>
           Listed stake

@@ -36,8 +36,9 @@ import {
   type SaveDslInput,
   type TrainerDraft,
 } from '@/lib/dsl'
-import type { HorseRow } from '@/lib/dslStore'
+import type { DslRow, HorseRow } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
+import { checkDslReadiness, readinessReason } from '@/lib/readiness'
 import { deletePublicImage, listPublicImages, uploadPublicImage } from '@/lib/storage'
 
 import { loadDslView } from './data'
@@ -81,13 +82,17 @@ function raceRecord(form: FormData): Result<Record<string, unknown>> {
   }
 }
 
-function toInput(form: FormData): Result<SaveDslInput> {
+function toInput(
+  form: FormData,
+  fallback: { status: DslStatus; published: boolean },
+): Result<SaveDslInput> {
   const record = raceRecord(form)
   if (!record.ok) return record
 
   const status = value(form, 'status')
-  if (!(DSL_STATUSES as readonly string[]).includes(status)) {
-    return { ok: false, reason: `'${status}' is not one of the four DSL statuses` }
+  const nextStatus = status === '' ? fallback.status : status
+  if (!(DSL_STATUSES as readonly string[]).includes(nextStatus)) {
+    return { ok: false, reason: `'${nextStatus}' is not one of the four DSL statuses` }
   }
 
   const horse: HorseDraft = {
@@ -128,8 +133,8 @@ function toInput(form: FormData): Result<SaveDslInput> {
     termStart: value(form, 'termStart'),
     paymentModel: value(form, 'paymentModel') as DslDraft['paymentModel'],
     closeStyle: value(form, 'closeStyle') as DslDraft['closeStyle'],
-    status: status as DslStatus,
-    published: checked(form, 'published'),
+    status: nextStatus as DslStatus,
+    published: form.has('published') ? checked(form, 'published') : fallback.published,
     wholesaleMonthlyPerPercent: decimal(form, 'wholesaleMonthlyPerPercent'),
     investorSplit: value(form, 'investorSplit') === '' ? null : decimal(form, 'investorSplit'),
     listedStake: decimal(form, 'listedStake'),
@@ -166,7 +171,9 @@ async function attempt<T>(run: () => Promise<Result<T>>): Promise<Result<T>> {
 }
 
 export async function createDslAction(form: FormData): Promise<void> {
-  const input = toInput(form)
+  // A new DSL is always a draft. Going live is a deliberate act, on the term
+  // sheet, after the operator has looked at it.
+  const input = toInput(form, { status: 'coming_soon', published: false })
   if (!input.ok) redirect(`/dsl/new?error=${encodeURIComponent(input.reason)}`)
 
   const saved = await attempt(() => saveDsl(input.value, store()))
@@ -180,7 +187,15 @@ export async function updateDslAction(form: FormData): Promise<void> {
   const dslId = value(form, 'dslId')
   const back = `/dsl/${dslId}/edit`
 
-  const input = toInput(form)
+  const current = await loadDslView(dslId)
+  if (!current.ok || !current.found) {
+    redirect(`${back}?error=${encodeURIComponent('the DSL could not be loaded')}`)
+  }
+
+  const input = toInput(form, {
+    status: current.dsl.status,
+    published: current.dsl.published,
+  })
   if (!input.ok) redirect(`${back}?error=${encodeURIComponent(input.reason)}`)
 
   const saved = await attempt(() =>
@@ -308,5 +323,60 @@ export async function recountHorseImagesAction(form: FormData): Promise<void> {
   if (!recounted.ok) redirect(`${back}?error=${encodeURIComponent(recounted.reason)}`)
 
   revalidatePath(back)
+  redirect(back)
+}
+
+/**
+ * Publish. The one act that makes a listing live.
+ *
+ * Readiness is recomputed here rather than trusted from the form, so a DSL
+ * that lost a field since the last save cannot go live on a stale tick. The
+ * Postgres trigger is the backstop; this is the message the operator reads.
+ */
+export async function publishDslAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const published = await attempt<DslRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const readiness = checkDslReadiness({
+      dsl: view.dsl,
+      horse: view.horse,
+      trainer: view.trainer,
+    })
+    if (!readiness.ok) {
+      return { ok: false, reason: readinessReason(readiness) ?? 'this DSL is not ready' }
+    }
+
+    return {
+      ok: true,
+      value: await store().updateDsl(dslId, { published: true, status: 'available' }),
+    }
+  })
+
+  if (!published.ok) redirect(`${back}?error=${encodeURIComponent(published.reason)}`)
+
+  revalidatePath(back)
+  revalidatePath('/dsl')
+  redirect(back)
+}
+
+/** Take a listing off the market. It keeps its terms; it stops being buyable. */
+export async function unpublishDslAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const taken = await attempt<DslRow>(async () => ({
+    ok: true,
+    value: await store().updateDsl(dslId, { published: false, status: 'coming_soon' }),
+  }))
+
+  if (!taken.ok) redirect(`${back}?error=${encodeURIComponent(taken.reason)}`)
+
+  revalidatePath(back)
+  revalidatePath('/dsl')
   redirect(back)
 }

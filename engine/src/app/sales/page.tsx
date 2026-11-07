@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +29,11 @@ export default async function Page() {
         <tbody>
           {sales.map((sale) => (
             <tr key={sale.id} className="border-b border-black/10">
-              <td className="py-2 font-mono text-xs">{sale.dslId}</td>
+              <td className="py-2 font-mono text-xs">
+                <Link href={`/dsl/${sale.dslId}`} className="underline">
+                  {sale.dslId}
+                </Link>
+              </td>
               <td className="py-2">{sale.stake}%</td>
               <td className="py-2">{sale.amount}</td>
               <td className="py-2">{sale.createdAt}</td>

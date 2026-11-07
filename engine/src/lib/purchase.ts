@@ -224,8 +224,9 @@ export async function compileBuyerDocuments(
   const trainer = await store.findTrainerById(horse.trainerId)
   if (trainer === null) return { ok: false, reason: 'horse has no trainer row' }
 
-  const owner = await store.findOwnerById(horse.ownerId)
-  if (owner === null) return { ok: false, reason: 'horse has no owner row' }
+  if (dsl.ownerId === null) return { ok: false, reason: 'dsl has no owner row' }
+  const owner = await store.findOwnerById(dsl.ownerId)
+  if (owner === null) return { ok: false, reason: 'dsl has no owner row' }
 
   const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
 

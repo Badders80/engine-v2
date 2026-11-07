@@ -68,13 +68,13 @@ export type NewHorse = {
   imageCount: number
   raceRecord: Record<string, unknown>
   trainerId: string
-  ownerId: string
 }
 
 export type HorseRow = NewHorse & { id: string }
 
 export type NewDsl = {
   horseId: string
+  ownerId: string | null
   endDate: string
   termStart: string
   paymentModel: PaymentModel

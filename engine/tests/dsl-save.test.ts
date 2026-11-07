@@ -113,10 +113,10 @@ describe('one save writes and links horse, trainer, and owner', () => {
     expect(rows.dsls).toHaveLength(1)
   })
 
-  it('links the DSL to the horse and the horse to its trainer and owner', async () => {
+  it('links the DSL to the horse, and the DSL to its owner', async () => {
     const saved = await ok(await saveDsl(input(), store))
     expect(saved.horse.trainerId).toBe(saved.trainer.id)
-    expect(saved.horse.ownerId).toBe(saved.owner.id)
+    expect(saved.dsl.ownerId).toBe(saved.owner.id)
     expect(saved.dsl.horseId).toBe(saved.horse.id)
   })
 

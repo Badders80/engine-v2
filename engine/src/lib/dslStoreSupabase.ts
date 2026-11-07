@@ -145,7 +145,6 @@ function toHorse(value: unknown): HorseRow {
     imageCount: num(row.image_count),
     raceRecord: blob(row.race_record),
     trainerId: str(row.trainer_id),
-    ownerId: str(row.owner_id),
   }
 }
 
@@ -154,6 +153,7 @@ function toDsl(value: unknown): DslRow {
   return {
     id: str(row.id),
     horseId: str(row.horse_id),
+    ownerId: strOrNull(row.owner_id),
     endDate: str(row.end_date),
     termStart: str(row.term_start),
     paymentModel: str(row.payment_model) as DslRow['paymentModel'],
@@ -218,7 +218,6 @@ function horseColumns(row: Partial<NewHorse>) {
     image_count: row.imageCount,
     race_record: row.raceRecord,
     trainer_id: row.trainerId,
-    owner_id: row.ownerId,
   })
 }
 
@@ -229,6 +228,7 @@ function horseColumns(row: Partial<NewHorse>) {
 function dslColumns(row: Partial<NewDsl>) {
   return defined({
     horse_id: row.horseId,
+    owner_id: row.ownerId,
     end_date: row.endDate,
     term_start: row.termStart,
     payment_model: row.paymentModel,

@@ -287,7 +287,6 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
     imageCount: input.horse.imageCount ?? existing?.imageCount ?? 0,
     raceRecord: input.horse.raceRecord ?? {},
     trainerId: trainer.id,
-    ownerId: owner.id,
   }
 
   const horse =
@@ -297,6 +296,7 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
 
   const dsl = await store.insertDsl({
     horseId: horse.id,
+    ownerId: owner.id,
     endDate: input.dsl.endDate,
     termStart: input.dsl.termStart,
     paymentModel: input.dsl.paymentModel,
@@ -417,10 +417,10 @@ export async function updateDsl(
     imageCount: input.horse.imageCount ?? currentHorse.imageCount,
     raceRecord: input.horse.raceRecord ?? currentHorse.raceRecord,
     trainerId: trainer.id,
-    ownerId: owner.id,
   })
 
   const dsl = await store.updateDsl(currentDsl.id, {
+    ownerId: owner.id,
     endDate: input.dsl.endDate,
     termStart: input.dsl.termStart,
     paymentModel: input.dsl.paymentModel,

@@ -356,3 +356,38 @@ The trigger fires on `dsls` writes only. Clearing a horse's `registered`, or dro
 ## Not operated yet
 
 These attach to the same rows later. They are not part of the first sale: a fuller investor profile, reservations, a race-by-race table, a payout engine, and automated monthly charges. Payment default, prize freeze, and forfeiture are printed procedures. A system that runs them is not part of this outcome.
+
+## Email sender — Resend (set up 2026-11-07)
+
+The engine sends the four transactional emails through Resend's HTTP API. No
+SDK: `engine/src/lib/email.ts` posts `{ from, to, subject, text, kind }` to
+`ENGINE_EMAIL_API_URL`. Resend ignores the extra `kind` field, so the payload
+needs no adapter.
+
+**Domain.** `evolutionstables.nz` is verified in Resend. DNS is hosted at
+Metaname (not Route 53 — Resend's provider detection is stale). Three records
+live on the `send` subdomain and on `resend._domainkey`:
+
+- `resend._domainkey` TXT — the DKIM public key
+- `send` MX 10 — `feedback-smtp.ap-northeast-1.amazonses.com.`
+- `send` TXT — `v=spf1 include:amazonses.com ~all`
+
+The apex SPF (`include:_spf.google.com`) and the apex MX records are Google
+Workspace. Do not change them.
+
+**Metaname's DNS form rejects underscores in new record names**, so the DKIM
+record cannot be added through the UI. Use `create_dns_record` on
+`https://metaname.net/api/1.1` (JSON-RPC; params are
+`account_reference, api_key, domain_name, {name,type,aux,ttl,data}`). An MX
+target needs a trailing dot, or Metaname appends the zone name.
+
+**Required env** (in `engine/.env.local`, gitignored):
+
+```
+ENGINE_EMAIL_API_URL=https://api.resend.com/emails
+ENGINE_EMAIL_API_KEY=...
+ENGINE_EMAIL_FROM="Evolution Stables <stable@evolutionstables.nz>"
+ENGINE_FOUNDER_EMAIL=alex@evolutionstables.nz
+```
+
+**Verified 2026-11-07:** a real send returned HTTP 200 with a message id.

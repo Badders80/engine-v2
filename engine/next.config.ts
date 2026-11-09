@@ -2,6 +2,11 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // A running dev server and `next build` must not share `.next`: the build
+  // rewrites the dev chunks, so the open page 404s its CSS and Server Actions
+  // fail with MODULE_NOT_FOUND. Give a dev server its own cache with
+  // `NEXT_DIST_DIR=.next-<port> next dev`.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   // The operator uploads one horse image per Server Action. Next's default
   // request body limit is 1 MB, and a camera-resolution hero is routinely
   // larger: the first Mulan hero is 1.1 MB, so the upload failed with

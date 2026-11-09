@@ -9,41 +9,44 @@ export default async function Page() {
 
   return (
     <main>
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="text-2xl">DSLs</h1>
-        <Link href="/dsl/new" className="border border-black/40 px-4 py-2 text-sm">
+      <div className="mb-6 flex items-baseline justify-between gap-3">
+        <h1>DSLs</h1>
+        <Link
+          href="/dsl/new"
+          className="rounded-sm border border-line-strong px-4 py-2 text-caption uppercase tracking-caption hover:border-accent"
+        >
           + New DSL
         </Link>
       </div>
 
-      <table className="w-full max-w-4xl border-collapse text-left text-sm">
+      <table className="w-full max-w-4xl text-left text-body">
         <thead>
-          <tr className="border-b border-black/20">
-            <th className="py-2">Status</th>
-            <th className="py-2">Listed</th>
-            <th className="py-2">Terms</th>
-            <th className="py-2">End date</th>
-            <th className="py-2" />
+          <tr className="border-b border-line">
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Listed</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Terms</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">End date</th>
+            <th className="py-3" />
           </tr>
         </thead>
         <tbody>
           {dsls.map((dsl) => (
-            <tr key={dsl.id} className="border-b border-black/10">
-              <td className="py-2">{dsl.status}</td>
-              <td className="py-2">{dsl.published ? 'yes' : 'no'}</td>
-              <td className="py-2">{dsl.listedStake === null ? 'not set' : `${dsl.listedStake}%`}</td>
-              <td className="py-2">{dsl.endDate ?? '—'}</td>
-              <td className="py-2">
-                <Link href={`/dsl/${dsl.id}`} className="underline">
-                  Open
-                </Link>
+            <tr key={dsl.id} className="border-b border-line">
+              <td className="py-3">{dsl.status}</td>
+              <td className="py-3">{dsl.published ? 'yes' : 'no'}</td>
+              <td className="py-3 font-figure">
+                {dsl.listedStake === null ? 'not set' : `${dsl.listedStake}%`}
+              </td>
+              <td className="py-3 font-figure">{dsl.endDate ?? '—'}</td>
+              <td className="py-3">
+                <Link href={`/dsl/${dsl.id}`}>Open</Link>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {dsls.length === 0 ? <p className="mt-6 opacity-70">No DSLs yet.</p> : null}
+      {dsls.length === 0 ? <p className="mt-6 text-body text-muted">No DSLs yet.</p> : null}
     </main>
   )
 }

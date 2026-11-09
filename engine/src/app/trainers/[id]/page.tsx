@@ -1,92 +1,186 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import {
+  Button,
+  ErrorSlot,
+  Field,
+  FieldGroup,
+  FormShell,
+  SummaryRow,
+  TextInput,
+} from '../../_components/forms'
+import { ProfileFields } from '../../_components/ProfileFields'
 import { updateTrainerAction } from '../../records/actions'
 import { recordStore } from '../../records/store'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+function TextBlock({ value }: { value: string | null }) {
+  return value === null ? (
+    <p className="text-body text-low">—</p>
+  ) : (
+    <p className="whitespace-pre-wrap text-body">{value}</p>
+  )
+}
+
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
   const { id } = await params
+  const { error } = await searchParams
   const trainer = await recordStore().findTrainerById(id)
 
   if (trainer === null) notFound()
 
   return (
-    <main>
-      <p className="mb-2 text-sm">
-        <Link href="/trainers" className="underline">
-          Trainers
-        </Link>
-      </p>
-      <h1 className="mb-6 text-2xl">{trainer.name}</h1>
+    <main className="grid gap-8">
+      <header>
+        <p className="text-caption uppercase tracking-caption text-low">
+          <Link href="/trainers">Trainers</Link> / Profile
+        </p>
+        <h1 className="mt-1">{trainer.name}</h1>
+      </header>
 
-      <dl className="grid max-w-xl grid-cols-[8rem_1fr] gap-y-2">
-        <dt className="opacity-60">Stable</dt>
-        <dd>{trainer.stable}</dd>
-        <dt className="opacity-60">Location</dt>
-        <dd>{trainer.location}</dd>
-        <dt className="opacity-60">Website</dt>
-        <dd>{trainer.website ?? '—'}</dd>
-        <dt className="opacity-60">Bio</dt>
-        <dd className="whitespace-pre-wrap">{trainer.bio ?? '—'}</dd>
-      </dl>
-
-      <details className="mt-8 max-w-xl">
-        <summary className="cursor-pointer underline">Edit</summary>
-
-        <form action={updateTrainerAction} className="mt-4 grid gap-4">
-          <input type="hidden" name="id" value={trainer.id} />
-
-          <label className="grid gap-1">
-            <span className="text-sm">Name</span>
-            <input name="name" defaultValue={trainer.name} required className="border border-black/20 p-2" />
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-sm">Stable</span>
-            <input
-              name="stable"
-              defaultValue={trainer.stable}
-              required
-              className="border border-black/20 p-2"
+      <div className="grid gap-6 md:grid-cols-2">
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h3 className="mb-3">Identity</h3>
+          <dl className="grid gap-0">
+            <SummaryRow label="Stable" value={trainer.stable} />
+            <SummaryRow label="Location" value={trainer.location} />
+            <SummaryRow
+              label="Website"
+              value={
+                trainer.website === null ? (
+                  '—'
+                ) : (
+                  <a href={trainer.website} rel="noreferrer">
+                    {trainer.website}
+                  </a>
+                )
+              }
             />
-          </label>
+          </dl>
+        </section>
 
-          <label className="grid gap-1">
-            <span className="text-sm">Location</span>
-            <input
-              name="location"
-              defaultValue={trainer.location}
-              required
-              className="border border-black/20 p-2"
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h3 className="mb-3">Social</h3>
+          <dl className="grid gap-0">
+            <SummaryRow
+              label="X / Twitter"
+              value={trainer.xUrl === null ? '—' : <a href={trainer.xUrl}>{trainer.xUrl}</a>}
             />
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-sm">Website</span>
-            <input
-              name="website"
-              type="url"
-              defaultValue={trainer.website ?? ''}
-              className="border border-black/20 p-2"
+            <SummaryRow
+              label="Facebook"
+              value={
+                trainer.facebookUrl === null ? (
+                  '—'
+                ) : (
+                  <a href={trainer.facebookUrl}>{trainer.facebookUrl}</a>
+                )
+              }
             />
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-sm">Bio</span>
-            <textarea
-              name="bio"
-              rows={6}
-              defaultValue={trainer.bio ?? ''}
-              className="border border-black/20 p-2"
+            <SummaryRow
+              label="Instagram"
+              value={
+                trainer.instagramUrl === null ? (
+                  '—'
+                ) : (
+                  <a href={trainer.instagramUrl}>{trainer.instagramUrl}</a>
+                )
+              }
             />
-          </label>
+          </dl>
+        </section>
+      </div>
 
-          <button type="submit" className="justify-self-start border border-black/40 px-4 py-2">
-            Save changes
-          </button>
-        </form>
+      <section className="rounded-md border border-line bg-panel p-5">
+        <h3 className="mb-3">Profile</h3>
+        <TextBlock value={trainer.bio} />
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h3 className="mb-3">Achievements</h3>
+          <TextBlock value={trainer.achievements} />
+        </section>
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h3 className="mb-3">Other</h3>
+          <TextBlock value={trainer.other} />
+        </section>
+      </div>
+
+      <section className="rounded-md border border-line bg-panel p-5">
+        <h3 className="mb-3">Links</h3>
+        {trainer.links.length === 0 ? (
+          <p className="text-body text-low">—</p>
+        ) : (
+          <ul className="grid gap-2">
+            {trainer.links.map((link) => (
+              <li key={`${link.label}-${link.url}`} className="flex flex-wrap gap-3 text-body">
+                <span className="text-muted">{link.label}</span>
+                <a href={link.url}>{link.url}</a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <details className="rounded-md border border-line bg-panel p-5">
+        <summary className="cursor-pointer text-caption uppercase tracking-caption text-muted">
+          Edit trainer
+        </summary>
+
+        <FormShell className="mt-5">
+          <ErrorSlot message={error ?? null} />
+
+          <form action={updateTrainerAction} className="grid gap-8">
+            <input type="hidden" name="id" value={trainer.id} />
+
+            <FieldGroup legend="Identity">
+              <Field label="Name" htmlFor="name">
+                <TextInput id="name" name="name" defaultValue={trainer.name} required />
+              </Field>
+              <Field label="Stable" htmlFor="stable">
+                <TextInput id="stable" name="stable" defaultValue={trainer.stable} required />
+              </Field>
+              <Field label="Location" htmlFor="location">
+                <TextInput
+                  id="location"
+                  name="location"
+                  defaultValue={trainer.location}
+                  required
+                />
+              </Field>
+              <Field label="Website" htmlFor="website">
+                <TextInput
+                  id="website"
+                  name="website"
+                  type="url"
+                  defaultValue={trainer.website ?? ''}
+                />
+              </Field>
+            </FieldGroup>
+
+            <ProfileFields
+              profileName="bio"
+              profileLabel="Profile"
+              profileHelp="The bio the PDS reads. Blank a bio only while no Available DSL depends on it."
+              profileValue={trainer.bio}
+              defaults={trainer}
+            />
+
+            <div>
+              <Button type="submit" variant="primary">
+                Save changes
+              </Button>
+            </div>
+          </form>
+        </FormShell>
       </details>
     </main>
   )

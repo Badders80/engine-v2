@@ -634,14 +634,73 @@ describe('an edit to a trainer or owner persists (B8)', () => {
   })
 })
 
-describe('attaching an existing trainer or owner by id', () => {
-  it('uses the picked trainer untouched and creates no new row', async () => {
+describe('the Records profile fields survive a DSL save', () => {
+  it('leaves a matched trainer and owner profile untouched', async () => {
+    const trainer = await store.insertTrainer({
+      name: 'T Trainer',
+      stable: 'Wexford Stables',
+      location: 'Cambridge',
+      website: 'https://example.test',
+      bio: 'One bio.',
+      achievements: 'Group 1 winner.',
+      other: 'Other notes.',
+      xUrl: 'https://x.com/t',
+      facebookUrl: 'https://facebook.com/t',
+      instagramUrl: 'https://instagram.com/t',
+      links: [{ label: 'Stable', url: 'https://example.test/stable' }],
+    })
+
+    const owner = await store.insertOwner({
+      entity: 'Ketchikan Bloodstock Ltd',
+      contact: 'C Contact',
+      website: null,
+      profile: 'One profile paragraph.',
+      achievements: 'Owner achievements.',
+      other: 'Owner other.',
+      xUrl: 'https://x.com/o',
+      facebookUrl: 'https://facebook.com/o',
+      instagramUrl: 'https://instagram.com/o',
+      links: [{ label: 'News', url: 'https://example.test/news' }],
+    })
+
+    // No ids: the save matches by name + stable and by entity, the path that
+    // updates an existing row rather than inserting one.
+    await ok(await saveDsl(input(), store))
+
+    const savedTrainer = await store.findTrainerById(trainer.id)
+    const savedOwner = await store.findOwnerById(owner.id)
+
+    expect(savedTrainer?.achievements).toBe('Group 1 winner.')
+    expect(savedTrainer?.other).toBe('Other notes.')
+    expect(savedTrainer?.xUrl).toBe('https://x.com/t')
+    expect(savedTrainer?.facebookUrl).toBe('https://facebook.com/t')
+    expect(savedTrainer?.instagramUrl).toBe('https://instagram.com/t')
+    expect(savedTrainer?.links).toEqual([
+      { label: 'Stable', url: 'https://example.test/stable' },
+    ])
+
+    expect(savedOwner?.achievements).toBe('Owner achievements.')
+    expect(savedOwner?.other).toBe('Owner other.')
+    expect(savedOwner?.xUrl).toBe('https://x.com/o')
+    expect(savedOwner?.facebookUrl).toBe('https://facebook.com/o')
+    expect(savedOwner?.instagramUrl).toBe('https://instagram.com/o')
+    expect(savedOwner?.links).toEqual([{ label: 'News', url: 'https://example.test/news' }])
+  })
+})
+
+describe('attaching an existing trainer or owner by id', () => {  it('uses the picked trainer untouched and creates no new row', async () => {
     const picked = await store.insertTrainer({
       name: 'Picked Trainer',
       stable: 'Picked Stables',
       location: 'Cambridge',
       website: null,
       bio: 'The picked bio.',
+      achievements: null,
+      other: null,
+      xUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      links: [],
     })
 
     const base = input()
@@ -667,6 +726,12 @@ describe('attaching an existing trainer or owner by id', () => {
       contact: 'P Contact',
       website: null,
       profile: 'The picked profile.',
+      achievements: null,
+      other: null,
+      xUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      links: [],
     })
 
     const base = input()
@@ -697,6 +762,12 @@ describe('attaching an existing trainer or owner by id', () => {
       location: 'Cambridge',
       website: null,
       bio: null,
+      achievements: null,
+      other: null,
+      xUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      links: [],
     })
 
     const result = await saveDsl(

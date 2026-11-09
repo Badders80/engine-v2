@@ -84,6 +84,29 @@ while IFS= read -r f; do
   fi
 done < <(find "$SRC" -type f \( -name '*.tsx' -o -name '*.ts' -o -name '*.css' \) | sort)
 
+# The engine app's own console theme (DSL side quest U13, 2026-11-09).
+#
+# One narrow rule, because the engine is a different app with a different
+# palette: `border-black` / `border-white` may never appear. The legal sheet is
+# white on purpose, so `bg-white` and `text-white` stay legal and are not
+# touched. Scan the whole engine/src tree, never a hardcoded file list.
+#
+# Proven RED against the pre-sweep tree (10 files, 36 hits) and GREEN after.
+# A guard that cannot fail is decorative.
+ENGINE_SRC="$ROOT/engine/src"
+if [ -d "$ENGINE_SRC" ]; then
+  while IFS= read -r f; do
+    scanned=$((scanned + 1))
+    rel="${f#"$ROOT"/}"
+
+    if grep -nE '\bborder-(black|white)(/[0-9]+)?\b' "$f" >/dev/null; then
+      printf '%sFAIL%s border-black/white in %s — use the line token\n' "$RED" "$OFF" "$rel"
+      grep -nE '\bborder-(black|white)(/[0-9]+)?\b' "$f" | head -3
+      fail=1
+    fi
+  done < <(find "$ENGINE_SRC" -type f \( -name '*.tsx' -o -name '*.ts' -o -name '*.css' \) | sort)
+fi
+
 if [ "$fail" -ne 0 ]; then
   printf '%sdesign enforcement: FAILED%s (%d files scanned)\n' "$RED" "$OFF" "$scanned"
   exit 1

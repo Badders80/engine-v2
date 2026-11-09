@@ -342,10 +342,23 @@ async function resolveTrainer(
 
   const existing = await store.findTrainer({ name: draft.name, stable: draft.stable })
   if (existing !== null) {
+    // The six profile fields are authored in Records (U3); a DSL save must not
+    // blank a value the operator entered there.
     return { ok: true, value: await store.updateTrainer(existing.id, fields) }
   }
 
-  return { ok: true, value: await store.insertTrainer(fields) }
+  return {
+    ok: true,
+    value: await store.insertTrainer({
+      ...fields,
+      achievements: null,
+      other: null,
+      xUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      links: [],
+    }),
+  }
 }
 
 /** The owner this save attaches. Same rule, matched by entity when no id is given. */
@@ -378,10 +391,22 @@ async function resolveOwner(
 
   const existing = await store.findOwner({ entity: draft.entity })
   if (existing !== null) {
+    // Same rule as the trainer: a DSL save never blanks a Records profile field.
     return { ok: true, value: await store.updateOwner(existing.id, fields) }
   }
 
-  return { ok: true, value: await store.insertOwner(fields) }
+  return {
+    ok: true,
+    value: await store.insertOwner({
+      ...fields,
+      achievements: null,
+      other: null,
+      xUrl: null,
+      facebookUrl: null,
+      instagramUrl: null,
+      links: [],
+    }),
+  }
 }
 
 /**

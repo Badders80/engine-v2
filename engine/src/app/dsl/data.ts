@@ -34,7 +34,8 @@ export async function loadDslView(id: string): Promise<DslView> {
       return { ok: false, reason: `the horse ${dsl.horseId} for this DSL does not exist` }
     }
 
-    const trainer = await store.findTrainerById(horse.trainerId)
+    const trainer =
+      horse.trainerId === null ? null : await store.findTrainerById(horse.trainerId)
     const owner = dsl.ownerId === null ? null : await store.findOwnerById(dsl.ownerId)
 
     return { ok: true, found: true, dsl, horse, trainer, owner }

@@ -30,12 +30,21 @@ export const DSL_STATUS_VALUES = [
 
 export type DslStatus = (typeof DSL_STATUS_VALUES)[number]
 
+/** One extra link on a trainer or owner. Stored as a jsonb array. */
+export type LinkEntry = { label: string; url: string }
+
 export type NewTrainer = {
   name: string
   stable: string
   location: string
   website: string | null
   bio: string | null
+  achievements: string | null
+  other: string | null
+  xUrl: string | null
+  facebookUrl: string | null
+  instagramUrl: string | null
+  links: LinkEntry[]
 }
 
 export type TrainerRow = NewTrainer & { id: string }
@@ -45,6 +54,12 @@ export type NewOwner = {
   contact: string
   website: string | null
   profile: string | null
+  achievements: string | null
+  other: string | null
+  xUrl: string | null
+  facebookUrl: string | null
+  instagramUrl: string | null
+  links: LinkEntry[]
 }
 
 export type OwnerRow = NewOwner & { id: string }
@@ -67,7 +82,11 @@ export type NewHorse = {
   raceExpectation: string | null
   imageCount: number
   raceRecord: Record<string, unknown>
-  trainerId: string
+  /**
+   * A horse has 0..1 current trainer (`horses.trainer_id`, nullable). The
+   * trainer is authored on the horse; the DSL reads it read-only.
+   */
+  trainerId: string | null
 }
 
 export type HorseRow = NewHorse & { id: string }

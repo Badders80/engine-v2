@@ -27,6 +27,7 @@ import {
   type DslStatus,
   type DslStore,
   type HorseRow,
+  type LinkEntry,
   type NewDsl,
   type NewHorse,
   type NewOwner,
@@ -88,6 +89,19 @@ function blob(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
+/** `links` is a jsonb array of { label, url }; anything else reads as empty. */
+function linkEntries(value: unknown): LinkEntry[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((entry) => {
+    const row = record(entry)
+    const label = str(row.label)
+    const url = str(row.url)
+    if (label === '' || url === '') return []
+    return [{ label, url }]
+  })
+}
+
 /**
  * The status column is an enum in the database, so a value outside the four is a
  * fault worth naming rather than a value to quietly round to Coming Soon.
@@ -109,6 +123,12 @@ function toTrainer(value: unknown): TrainerRow {
     location: str(row.location),
     website: strOrNull(row.website),
     bio: strOrNull(row.bio),
+    achievements: strOrNull(row.achievements),
+    other: strOrNull(row.other),
+    xUrl: strOrNull(row.x_url),
+    facebookUrl: strOrNull(row.facebook_url),
+    instagramUrl: strOrNull(row.instagram_url),
+    links: linkEntries(row.links),
   }
 }
 
@@ -120,6 +140,12 @@ function toOwner(value: unknown): OwnerRow {
     contact: str(row.contact),
     website: strOrNull(row.website),
     profile: strOrNull(row.profile),
+    achievements: strOrNull(row.achievements),
+    other: strOrNull(row.other),
+    xUrl: strOrNull(row.x_url),
+    facebookUrl: strOrNull(row.facebook_url),
+    instagramUrl: strOrNull(row.instagram_url),
+    links: linkEntries(row.links),
   }
 }
 
@@ -144,7 +170,7 @@ function toHorse(value: unknown): HorseRow {
     raceExpectation: strOrNull(row.race_expectation),
     imageCount: num(row.image_count),
     raceRecord: blob(row.race_record),
-    trainerId: str(row.trainer_id),
+    trainerId: strOrNull(row.trainer_id),
   }
 }
 
@@ -186,6 +212,12 @@ function trainerColumns(row: NewTrainer | Partial<NewTrainer>) {
     location: row.location,
     website: row.website,
     bio: row.bio,
+    achievements: row.achievements,
+    other: row.other,
+    x_url: row.xUrl,
+    facebook_url: row.facebookUrl,
+    instagram_url: row.instagramUrl,
+    links: row.links,
   })
 }
 
@@ -195,6 +227,12 @@ function ownerColumns(row: NewOwner | Partial<NewOwner>) {
     contact: row.contact,
     website: row.website,
     profile: row.profile,
+    achievements: row.achievements,
+    other: row.other,
+    x_url: row.xUrl,
+    facebook_url: row.facebookUrl,
+    instagram_url: row.instagramUrl,
+    links: row.links,
   })
 }
 

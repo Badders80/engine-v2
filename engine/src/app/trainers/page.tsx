@@ -8,13 +8,19 @@ export default async function Page() {
   const rows = await recordStore().listTrainers()
 
   return (
-    <main>
-      <h1 className="mb-6 text-2xl">Trainers</h1>
+    <main className="grid gap-6">
+      <header className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <p className="text-caption uppercase tracking-caption text-low">Records</p>
+          <h1 className="mt-1">Trainers</h1>
+        </div>
+        <p className="font-figure text-caption text-muted">{rows.length} records</p>
+      </header>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
         <Link
           href="/trainers/new"
-          className="flex min-h-24 items-center justify-center border border-dashed border-black/30 p-4 text-center"
+          className="flex min-h-32 items-center justify-center rounded-md border border-dashed border-line-strong p-5 text-center text-body text-muted hover:border-accent hover:text-ink"
         >
           + New trainer
         </Link>
@@ -23,16 +29,16 @@ export default async function Page() {
           <Link
             key={row.id}
             href={`/trainers/${row.id}`}
-            className="min-h-24 border border-black/10 p-4 hover:border-black/40"
+            className="grid min-h-32 gap-2 rounded-md border border-line bg-panel p-5 hover:border-line-strong"
           >
-            <p className="font-medium">{row.name}</p>
-            <p className="text-sm opacity-70">{row.stable}</p>
-            <p className="text-sm opacity-70">{row.location}</p>
+            <p className="text-body text-ink">{row.name}</p>
+            <p className="text-caption text-muted">{row.stable}</p>
+            <p className="text-caption text-low">{row.location}</p>
           </Link>
         ))}
       </div>
 
-      {rows.length === 0 ? <p className="mt-6 opacity-70">No trainers yet.</p> : null}
+      {rows.length === 0 ? <p className="text-body text-muted">No trainers yet.</p> : null}
     </main>
   )
 }

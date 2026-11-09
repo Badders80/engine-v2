@@ -261,7 +261,8 @@ export async function compileBuyerDocuments(
   const horse = await store.findHorseById(dsl.horseId)
   if (horse === null) return { ok: false, reason: `horse ${dsl.horseId} does not exist` }
 
-  const trainer = await store.findTrainerById(horse.trainerId)
+  const trainer =
+    horse.trainerId === null ? null : await store.findTrainerById(horse.trainerId)
   if (trainer === null) return { ok: false, reason: 'horse has no trainer row' }
 
   if (dsl.ownerId === null) return { ok: false, reason: 'dsl has no owner row' }

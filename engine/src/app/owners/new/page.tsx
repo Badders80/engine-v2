@@ -1,42 +1,69 @@
 import Link from 'next/link'
 
+import {
+  Button,
+  ErrorSlot,
+  Field,
+  FieldGroup,
+  FormShell,
+  TextInput,
+} from '../../_components/forms'
+import { ProfileFields } from '../../_components/ProfileFields'
 import { createOwnerAction } from '../../records/actions'
 
-export default function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
+
   return (
-    <main>
-      <p className="mb-2 text-sm">
-        <Link href="/owners" className="underline">
-          Owners
-        </Link>
-      </p>
-      <h1 className="mb-6 text-2xl">New owner</h1>
+    <main className="grid gap-8">
+      <header>
+        <p className="text-caption uppercase tracking-caption text-low">
+          <Link href="/owners">Owners</Link> / New
+        </p>
+        <h1 className="mt-1">New owner</h1>
+      </header>
 
-      <form action={createOwnerAction} className="grid max-w-xl gap-4">
-        <label className="grid gap-1">
-          <span className="text-sm">Entity</span>
-          <input name="entity" required className="border border-black/20 p-2" />
-        </label>
+      <FormShell>
+        <ErrorSlot message={error ?? null} />
 
-        <label className="grid gap-1">
-          <span className="text-sm">Contact person</span>
-          <input name="contact" required className="border border-black/20 p-2" />
-        </label>
+        <form action={createOwnerAction} className="grid gap-8">
+          <FieldGroup legend="Identity">
+            <Field label="Entity" htmlFor="entity">
+              <TextInput id="entity" name="entity" required />
+            </Field>
+            <Field label="Contact person" htmlFor="contact">
+              <TextInput id="contact" name="contact" required />
+            </Field>
+            <Field label="Website" htmlFor="website">
+              <TextInput id="website" name="website" type="url" />
+            </Field>
+          </FieldGroup>
 
-        <label className="grid gap-1">
-          <span className="text-sm">Website</span>
-          <input name="website" type="url" className="border border-black/20 p-2" />
-        </label>
+          <ProfileFields
+            profileName="profile"
+            profileLabel="Profile"
+            profileValue={null}
+            defaults={{
+              achievements: null,
+              other: null,
+              xUrl: null,
+              facebookUrl: null,
+              instagramUrl: null,
+              links: [],
+            }}
+          />
 
-        <label className="grid gap-1">
-          <span className="text-sm">Profile</span>
-          <textarea name="profile" rows={6} className="border border-black/20 p-2" />
-        </label>
-
-        <button type="submit" className="justify-self-start border border-black/40 px-4 py-2">
-          Save owner
-        </button>
-      </form>
+          <div>
+            <Button type="submit" variant="primary">
+              Save owner
+            </Button>
+          </div>
+        </form>
+      </FormShell>
     </main>
   )
 }

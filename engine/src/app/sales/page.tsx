@@ -15,34 +15,32 @@ export default async function Page() {
 
   return (
     <main>
-      <h1 className="mb-6 text-2xl">Sales</h1>
+      <h1 className="mb-6">Sales</h1>
 
-      <table className="w-full max-w-4xl border-collapse text-left text-sm">
+      <table className="w-full max-w-4xl text-left text-body">
         <thead>
-          <tr className="border-b border-black/20">
-            <th className="py-2">DSL</th>
-            <th className="py-2">Stake</th>
-            <th className="py-2">Amount</th>
-            <th className="py-2">Written</th>
+          <tr className="border-b border-line">
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">DSL</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Stake</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Amount</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Written</th>
           </tr>
         </thead>
         <tbody>
           {sales.map((sale) => (
-            <tr key={sale.id} className="border-b border-black/10">
-              <td className="py-2 font-mono text-xs">
-                <Link href={`/dsl/${sale.dslId}`} className="underline">
-                  {sale.dslId}
-                </Link>
+            <tr key={sale.id} className="border-b border-line">
+              <td className="py-3 font-figure text-caption">
+                <Link href={`/dsl/${sale.dslId}`}>{sale.dslId}</Link>
               </td>
-              <td className="py-2">{sale.stake}%</td>
-              <td className="py-2">{sale.amount}</td>
-              <td className="py-2">{sale.createdAt}</td>
+              <td className="py-3 font-figure">{sale.stake}%</td>
+              <td className="py-3 font-figure">{sale.amount}</td>
+              <td className="py-3 font-figure">{sale.createdAt}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {sales.length === 0 ? <p className="mt-6 opacity-70">No sales yet.</p> : null}
+      {sales.length === 0 ? <p className="mt-6 text-body text-muted">No sales yet.</p> : null}
     </main>
   )
 }

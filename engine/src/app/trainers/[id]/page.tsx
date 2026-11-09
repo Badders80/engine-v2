@@ -5,16 +5,21 @@ import {
   Button,
   ErrorSlot,
   Field,
-  FieldGroup,
   FormShell,
   SummaryRow,
   TextInput,
 } from '../../_components/forms'
 import { ProfileFields } from '../../_components/ProfileFields'
+import { TrainerNames } from '../../_components/TrainerNames'
 import { updateTrainerAction } from '../../records/actions'
 import { recordStore } from '../../records/store'
 
 export const dynamic = 'force-dynamic'
+
+/** A stored `A & B` name is edited as two boxes, which is how it was entered. */
+function trainerNames(name: string): string[] {
+  return name.split(/\s+&\s+/).filter((part) => part !== '')
+}
 
 function TextBlock({ value }: { value: string | null }) {
   return value === null ? (
@@ -141,13 +146,22 @@ export default async function Page({
           <form action={updateTrainerAction} className="grid gap-8">
             <input type="hidden" name="id" value={trainer.id} />
 
-            <FieldGroup legend="Identity">
-              <Field label="Name" htmlFor="name">
-                <TextInput id="name" name="name" defaultValue={trainer.name} required />
+            <div className="grid gap-4">
+              <Field
+                label="Company name"
+                htmlFor="stable"
+                help="The stable or business, for example Wexford Stables."
+              >
+                <TextInput
+                  id="stable"
+                  name="stable"
+                  defaultValue={trainer.stable}
+                  required
+                />
               </Field>
-              <Field label="Stable" htmlFor="stable">
-                <TextInput id="stable" name="stable" defaultValue={trainer.stable} required />
-              </Field>
+
+              <TrainerNames defaultNames={trainerNames(trainer.name)} />
+
               <Field label="Location" htmlFor="location">
                 <TextInput
                   id="location"
@@ -164,7 +178,7 @@ export default async function Page({
                   defaultValue={trainer.website ?? ''}
                 />
               </Field>
-            </FieldGroup>
+            </div>
 
             <ProfileFields
               profileName="bio"

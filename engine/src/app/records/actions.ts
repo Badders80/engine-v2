@@ -114,12 +114,31 @@ function fail(back: string, reason: string): never {
   redirect(`${back}?error=${encodeURIComponent(reason)}`)
 }
 
+/**
+ * A company/stable can run more than one trainer. The form submits one
+ * `trainerNames` field per name; the row keeps a single name string joined
+ * with ` & `, because a horse attaches to one trainer and the PDS prints
+ * `trainer.name`.
+ */
+function trainerName(form: FormData): Result<string> {
+  const names = form
+    .getAll('trainerNames')
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter((entry) => entry !== '')
+
+  if (names.length === 0) return { ok: false, reason: 'a trainer needs at least one name' }
+  return { ok: true, value: names.join(' & ') }
+}
+
 export async function createTrainerAction(form: FormData): Promise<void> {
   const profile = profileFields(form)
   if (!profile.ok) fail('/trainers/new', profile.reason)
 
+  const name = trainerName(form)
+  if (!name.ok) fail('/trainers/new', name.reason)
+
   const created = await recordStore().insertTrainer({
-    name: value(form, 'name'),
+    name: name.value,
     stable: value(form, 'stable'),
     location: value(form, 'location'),
     website: optional(form, 'website'),
@@ -136,8 +155,11 @@ export async function updateTrainerAction(form: FormData): Promise<void> {
   const profile = profileFields(form)
   if (!profile.ok) fail(`/trainers/${id}`, profile.reason)
 
+  const name = trainerName(form)
+  if (!name.ok) fail(`/trainers/${id}`, name.reason)
+
   await recordStore().updateTrainer(id, {
-    name: value(form, 'name'),
+    name: name.value,
     stable: value(form, 'stable'),
     location: value(form, 'location'),
     website: optional(form, 'website'),

@@ -2,15 +2,14 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** say **`go chunk 2`** — open `/home/evo/sandbox/v2/dsl-sidequest/EXECUTION-DOD-2026-11-09.md`
-§ Chunk contracts and start **H2 (status is a machine)** at `engine/src/lib/dsl.ts:57-66`:
-`checkStatusTransition` ignores `from`, so encode the edges plus the no-op and
-initial rows, in TS and in the trigger (`00021`).
+**Next action:** say **`go chunk 3`** — open `/home/evo/sandbox/v2/dsl-sidequest/STATE.md`
+§ Chunk 3 and start at **U4 (the term sheet)**, then U7, U11, U14 and U10. No
+migration: the sign-off columns landed in `00021`.
 
 ## State — 2026-11-10
 
 **The DSL side quest is running on its own branch.** `dsl-sidequest` off `main`
-@ `0095106`; `main` is untouched; nothing pushed, nothing merged.
+@ `0095106`; `main` is untouched; nothing pushed.
 
 - **Chunk 1 — Records, Home, forms** (`8b6baf4`, audit PASS): console theme tokens,
   shared form primitives, `/` index, `/horses` tile grid, horse profile, horse-only
@@ -31,17 +30,23 @@ initial rows, in TS and in the trigger (`00021`).
   registry with add/remove (title fetching removed); social URLs render as
   handles; `/trainers/[id]/edit` and `/owners/[id]/edit` use the horse Edit
   pattern; `NEXT_DIST_DIR` isolates a dev server from a build.
-- **Gate:** typecheck + lint + test green 2026-11-10 — **346 engine / 54
-  website**; full `pnpm verify` last green at `0844487`.
+- **Chunk 2 — one profile, roles + hardening** (`e1f12f9`, audit PASS):
+  `parties` + `party_roles` replace `trainers`/`owners`; DSL FKs point at
+  parties; the status matrix lives in TS and the `00021` trigger; one `dsls`
+  write; four readiness guards; narrative sign-off columns; horse authoring
+  loses the trainer; admin stops quoting the wholesale total.
+- **Gate:** `pnpm verify` green 2026-11-10 at `e1f12f9` — **345 engine / 54
+  website**, both builds.
 - **Target database:** new hosted Supabase `evolution-engine`
-  (`rkcptsghxovoeaycabah`, Sydney). 20 migrations replayed, zero-rows gate,
-  schema parity 171/171, migration history recorded —
+  (`rkcptsghxovoeaycabah`, Sydney). 21 migrations replayed (`00001`–`00021`),
+  schema parity **326/326** manifest lines identical local ↔ hosted, migration
+  history recorded —
   `supabase db push --dry-run` says *up to date*. `engine/.env.local` points at it.
   The old project `ejdenhlpvtldiljxawtd` stays untouched with the public site.
-- **Data:** Mulan The Brave (NZ), slug `mulan-the-brave`, registered; 0 trainers,
-  0 owners, 0 DSLs. The local 54422 stack is scratch only.
-- **Chunks 2–4 are LOCKED** (2026-11-10): harden (`00021`), deal assembly, ledger
-  (`00022`). Contents are in `STATE.md` and change only by ruling.
+- **Data:** 1 party (trainer role), 1 horse — Mulan The Brave (NZ), registered —
+  0 DSLs, 0 sales. The local 54422 stack is scratch only.
+- **Chunks 3–4 are LOCKED** (2026-11-10): deal assembly, ledger (`00022`).
+  Contents are in `STATE.md` and change only by ruling.
 - **Plan of record:** `/home/evo/sandbox/v2/dsl-sidequest/` — `STATE.md` (position),
   `PLAN.md` (what), `EXECUTION-DOD-2026-11-09.md` (how we run: gate, decision
   policy, tools, audits), `PUBLIC-WRAP.md` (deferred public work).
@@ -50,6 +55,7 @@ initial rows, in TS and in the trigger (`00021`).
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-10 | DSL 2 — profiles/roles + hardening | engine_v2/website | `e1f12f9` | done |
 | 2026-11-10 | DSL 1d — profile polish (names, links, handles, edit routes, dev cache) | engine_v2/website | `d387225` | done |
 | 2026-11-09 | DSL 1c — horse edit + trainer | engine_v2/website | `82a702d` | done |
 | 2026-11-09 | DSL 1b — loveracing, barn name, slug law | engine_v2/website | `e30e50c` | done |
@@ -59,7 +65,7 @@ initial rows, in TS and in the trigger (`00021`).
 
 ## Blocked
 
-- **Chunk 2** — waits on the founder's `go`.
+- **Chunk 3** — waits on the founder's `go`.
 - **Backups** — the free tier has none and this is now the target authority:
   Pro plan or a scheduled `pg_dump`. Founder's call.
 - **Sale fixture** — `sales` is empty and chunk 4's proof walks one. Create it

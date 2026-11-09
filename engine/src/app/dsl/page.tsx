@@ -5,7 +5,9 @@ import { recordStore } from '../records/store'
 export const dynamic = 'force-dynamic'
 
 export default async function Page() {
-  const dsls = await recordStore().listDsls()
+  const store = recordStore()
+  const [dsls, horses] = await Promise.all([store.listDsls(), store.listHorses()])
+  const horseName = new Map(horses.map((horse) => [horse.id, horse.legalName]))
 
   return (
     <main>
@@ -22,16 +24,18 @@ export default async function Page() {
       <table className="w-full max-w-4xl text-left text-body">
         <thead>
           <tr className="border-b border-line">
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Horse</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Listed</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Terms</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">End date</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Expiry</th>
             <th className="py-3" />
           </tr>
         </thead>
         <tbody>
           {dsls.map((dsl) => (
             <tr key={dsl.id} className="border-b border-line">
+              <td className="py-3">{horseName.get(dsl.horseId) ?? '—'}</td>
               <td className="py-3">{dsl.status}</td>
               <td className="py-3">{dsl.published ? 'yes' : 'no'}</td>
               <td className="py-3 font-figure">

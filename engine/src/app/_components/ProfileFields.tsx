@@ -32,33 +32,27 @@ export function ProfileFields({
 }) {
   return (
     <>
-      <FieldGroup legend="Profile">
-        <Field label={profileLabel} htmlFor={profileName} help={profileHelp}>
-          <TextArea
-            id={profileName}
-            name={profileName}
-            rows={6}
-            defaultValue={profileValue ?? ''}
-          />
-        </Field>
-      </FieldGroup>
+      <Field label={profileLabel} htmlFor={profileName} help={profileHelp}>
+        <TextArea
+          id={profileName}
+          name={profileName}
+          rows={6}
+          defaultValue={profileValue ?? ''}
+        />
+      </Field>
 
-      <FieldGroup legend="Achievements">
-        <Field label="Achievements" htmlFor="achievements">
-          <TextArea
-            id="achievements"
-            name="achievements"
-            rows={4}
-            defaultValue={defaults.achievements ?? ''}
-          />
-        </Field>
-      </FieldGroup>
+      <Field label="Achievements" htmlFor="achievements">
+        <TextArea
+          id="achievements"
+          name="achievements"
+          rows={4}
+          defaultValue={defaults.achievements ?? ''}
+        />
+      </Field>
 
-      <FieldGroup legend="Other">
-        <Field label="Other" htmlFor="other">
-          <TextArea id="other" name="other" rows={4} defaultValue={defaults.other ?? ''} />
-        </Field>
-      </FieldGroup>
+      <Field label="Other" htmlFor="other">
+        <TextArea id="other" name="other" rows={4} defaultValue={defaults.other ?? ''} />
+      </Field>
 
       <FieldGroup legend="Social">
         <Field label="X / Twitter" htmlFor="xUrl">
@@ -82,21 +76,19 @@ export function ProfileFields({
         </Field>
       </FieldGroup>
 
-      <FieldGroup legend="Links">
-        <Field
-          label="Extra links"
-          htmlFor="links"
-          help="One per line: Label | https://…"
-        >
-          <TextArea
-            id="links"
-            name="links"
-            rows={4}
-            className="font-figure"
-            defaultValue={defaults.links.map((link) => `${link.label} | ${link.url}`).join('\n')}
-          />
-        </Field>
-      </FieldGroup>
+      <Field
+        label="Links"
+        htmlFor="links"
+        help="One per line: Label | https://…"
+      >
+        <TextArea
+          id="links"
+          name="links"
+          rows={4}
+          className="font-figure"
+          defaultValue={defaults.links.map((link) => `${link.label} | ${link.url}`).join('\n')}
+        />
+      </Field>
     </>
   )
 }

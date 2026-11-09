@@ -212,6 +212,15 @@ export async function createHorseAction(form: FormData): Promise<void> {
   const slug = slugFromLegalName(legalName)
   if (slug === '') fail(back, 'that legal name does not make a slug')
 
+  // The barn name is a nickname, never a duplicate of the official name
+  // (HORSE-IDENTITY-NAMING-LAW.md §4). Typing the same thing twice means
+  // "there isn't one", so it is stored as null rather than refused.
+  const typedBarnName = optional(form, 'barnName')
+  const barnName =
+    typedBarnName !== null && typedBarnName.toLowerCase() === legalName.toLowerCase()
+      ? null
+      : typedBarnName
+
   const trainerId = optional(form, 'trainerId')
   const store = recordStore()
 
@@ -227,6 +236,7 @@ export async function createHorseAction(form: FormData): Promise<void> {
   const created = await store.insertHorse({
     slug,
     legalName,
+    barnName,
     foalingDate,
     sex,
     colour,

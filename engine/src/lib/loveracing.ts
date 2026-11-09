@@ -13,10 +13,24 @@
  * - It reads the source as text, with no DOM. The test environment is Node, and
  *   a parser that needed `document` would need a browser to test.
  *
- * It returns hard facts and the race record only. The soft slots
- * (`about_horse`, `racing_outlook_and_pedigree`, `race_expectation`) are the
- * operator's to write afterwards, so they are not filled here. The race record
- * comes back as one object, to be stored as a single jsonb blob.
+ * The markup it reads was checked against the live Stud Book page on 2026-11-09
+ * (`/Breeding/{id}/{slug}.aspx` and `/stud-book/{id}/{slug}.aspx` return the
+ * same bytes):
+ *
+ *   <h2 class="horse-name">Mulan The Brave (NZ) 2023</h2>
+ *   <ul class="no-bullets horse-attr">
+ *     <li><strong>Born:</strong> 17/08/2023</li>
+ *     <li>Bay Filly</li>
+ *     <li><strong>Sire:</strong> <a …>TURN ME LOOSE (NZ) 2011</a></li>
+ *   </ul>
+ *   <div class="col-xs-3"><strong>Foaling date:</strong> 17/08/2023</div>
+ *   <div class="col-xs-3"><strong>Microchip:</strong> 985125000128426</div>
+ *   <div class="col-xs-3"><strong>Life no:</strong> NZ00460867</div>
+ *   <div class="col-xs-3"><strong>Breeder:</strong> C W Kwok</div>
+ *
+ * It returns hard facts only. The race record lives on the Performance Profile
+ * (`EntryDetail.aspx?HorseID=…`), which is a later item — the identity page has
+ * no race table, so `raceRecord` comes back empty rather than guessed.
  */
 
 import type { NewHorse } from './dslStore'
@@ -56,22 +70,6 @@ export type LoveracingParseResult =
   | { ok: true; value: { horse: LoveracingHorse; raceRecord: RaceRecord } }
   | { ok: false; reason: string }
 
-const FACT_LABELS = {
-  registration: 'registered',
-  'foaling date': 'foalingDate',
-  sex: 'sex',
-  colour: 'colour',
-  color: 'colour',
-  breeder: 'breeder',
-  sire: 'sireName',
-  dam: 'damName',
-  microchip: 'microchip',
-  'life number': 'lifeNumber',
-  'horse id': 'loveracingId',
-} as const
-
-type FactKey = (typeof FACT_LABELS)[keyof typeof FACT_LABELS]
-
 function stripTags(fragment: string): string {
   return fragment
     .replace(/<[^>]*>/g, '')
@@ -83,26 +81,52 @@ function stripTags(fragment: string): string {
 }
 
 /**
- * Read the `dt`/`dd` pairs, not the whole page. A page that lists a horse's
- * facts in another shape is refused rather than guessed at.
+ * The value that follows `<strong>Label:</strong>`, up to the next label or the
+ * end of its container. The page writes every fact this way, and the label text
+ * is the only stable hook in it.
  */
-function readFacts(source: string): Map<FactKey, string> {
-  const facts = new Map<FactKey, string>()
-  const pair = /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi
+function fact(source: string, label: string): string | null {
+  const pattern = new RegExp(
+    `<strong>\\s*${label}\\s*:\\s*</strong>([\\s\\S]{0,300}?)(?=<strong>|<\\/div>|<\\/li>|$)`,
+    'i',
+  )
+  const match = pattern.exec(source)
+  if (match === null) return null
 
-  for (const match of source.matchAll(pair)) {
-    const label = stripTags(match[1]).toLowerCase()
-    const key = (FACT_LABELS as Record<string, FactKey>)[label]
-    if (key === undefined) continue
-    facts.set(key, stripTags(match[2]))
+  const value = stripTags(match[1])
+  return value === '' || value === '-' ? null : value
+}
+
+/** `<li>Bay Filly</li>` — the only unlabelled line in the identity list. */
+function readColourAndSex(source: string): { colour: string; sex: string } {
+  const list = /<ul[^>]*class="[^"]*horse-attr[^"]*"[^>]*>([\s\S]*?)<\/ul>/i.exec(source)
+  if (list === null) return { colour: '', sex: '' }
+
+  for (const item of list[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
+    if (/<strong>/i.test(item[1])) continue
+
+    const said = stripTags(item[1])
+    if (said === '') continue
+
+    const words = said.split(/\s+/)
+    const tail = words[words.length - 1].toLowerCase()
+    const sexes = ['filly', 'colt', 'gelding', 'mare', 'stallion', 'rig']
+    if (sexes.includes(tail)) {
+      return {
+        colour: words.slice(0, -1).join(' '),
+        sex: words[words.length - 1],
+      }
+    }
+
+    return { colour: said, sex: '' }
   }
 
-  return facts
+  return { colour: '', sex: '' }
 }
 
 /** `14/09/2021` becomes `2021-09-14`, the form the date column takes. */
-function toIsoDate(value: string | undefined): string | null {
-  if (value === undefined) return null
+function toIsoDate(value: string | null): string | null {
+  if (value === null) return null
 
   const dayFirst = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value)
   if (dayFirst) {
@@ -116,77 +140,54 @@ function toIsoDate(value: string | undefined): string | null {
   return null
 }
 
-function readRaceRecord(source: string): RaceRecord {
-  const table = /<table[^>]*class="[^"]*race-record[^"]*"[^>]*>([\s\S]*?)<\/table>/i.exec(source)
-  if (!table) return { starts: 0, wins: 0, places: 0, resultLines: [] }
-
-  const resultLines: RaceResultLine[] = []
-
-  for (const row of table[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    if (/<th[\s>]/i.test(row[1])) continue
-
-    const cells = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((cell) =>
-      stripTags(cell[1]),
-    )
-    if (cells.length < 5) continue
-
-    const [date, venue, race, distance, result] = cells
-    resultLines.push({
-      date: toIsoDate(date),
-      venue: venue === '' ? null : venue,
-      race: race === '' ? null : race,
-      distance: distance === '' ? null : Number(distance),
-      result: result === '' ? null : Number(result),
-    })
-  }
-
-  const results = resultLines.map((line) => line.result)
-
-  return {
-    starts: resultLines.length,
-    wins: results.filter((result) => result === 1).length,
-    places: results.filter((result) => result === 2 || result === 3).length,
-    resultLines,
-  }
+/** The heading carries the foaling year after the name; the name does not. */
+function nameWithoutYear(said: string): string {
+  return said.replace(/\s+(19|20)\d{2}\s*$/, '').trim()
 }
 
-export function parseLoveracingPage(source: string): LoveracingParseResult {
-  const named = /<h1[^>]*class="[^"]*horse-name[^"]*"[^>]*>([\s\S]*?)<\/h1>/i.exec(source)
+export function parseLoveracingPage(
+  source: string,
+  loveracingId: string | null = null,
+): LoveracingParseResult {
+  const named = /<h2[^>]*class="[^"]*horse-name[^"]*"[^>]*>([\s\S]*?)<\/h2>/i.exec(source)
 
-  if (!named) {
-    const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(source)
+  if (named === null) {
+    const heading = /<h2[^>]*>([\s\S]*?)<\/h2>/i.exec(source)
     const said = heading ? stripTags(heading[1]) : ''
     return {
       ok: false,
-      reason: said === '' ? 'No horse found on that page.' : said,
+      reason:
+        said === ''
+          ? 'No horse found on that page.'
+          : `That page does not look like a Stud Book page (first heading: ${said}).`,
     }
   }
 
-  const legalName = stripTags(named[1])
-  const facts = readFacts(source)
+  const legalName = nameWithoutYear(stripTags(named[1]))
+  if (legalName === '') {
+    return { ok: false, reason: 'the page has a horse-name heading but it is empty' }
+  }
 
-  const missing = (['foalingDate', 'sireName', 'damName'] as FactKey[]).filter(
-    (key) => facts.get(key) === undefined,
-  )
+  const foalingDate = toIsoDate(fact(source, 'Foaling date') ?? fact(source, 'Born'))
+  if (foalingDate === null) {
+    return { ok: false, reason: `the foaling date for ${legalName} is missing or not a date` }
+  }
+
+  const { colour, sex } = readColourAndSex(source)
+  const sireName = fact(source, 'Sire')
+  const damName = fact(source, 'Dam')
+
+  const missing: string[] = []
+  if (sireName === null) missing.push('sire')
+  if (damName === null) missing.push('dam')
   if (missing.length > 0) {
     return {
       ok: false,
-      reason: `the page names ${legalName} but is missing ${missing.join(', ')}`,
+      reason: `the page names ${legalName} but is missing ${missing.join(' and ')}`,
     }
   }
 
-  const foalingDate = toIsoDate(facts.get('foalingDate'))
-  if (foalingDate === null) {
-    return { ok: false, reason: `the foaling date for ${legalName} is not a date` }
-  }
-
-  const registration = facts.get('registered') ?? ''
-  if (/unregistered/i.test(registration)) {
-    return {
-      ok: false,
-      reason: `${legalName} is not registered; an unregistered horse is typed by hand instead`,
-    }
-  }
+  const lifeNumber = fact(source, 'Life no') ?? fact(source, 'Life number')
 
   return {
     ok: true,
@@ -194,17 +195,19 @@ export function parseLoveracingPage(source: string): LoveracingParseResult {
       horse: {
         legalName,
         foalingDate,
-        sex: facts.get('sex') ?? '',
-        colour: facts.get('colour') ?? '',
-        breeder: facts.get('breeder') ?? null,
-        sireName: facts.get('sireName') ?? '',
-        damName: facts.get('damName') ?? '',
-        microchip: facts.get('microchip') ?? null,
-        lifeNumber: facts.get('lifeNumber') ?? null,
-        loveracingId: facts.get('loveracingId') ?? null,
-        registered: /registered/i.test(registration),
+        sex,
+        colour,
+        breeder: fact(source, 'Breeder'),
+        sireName: sireName ?? '',
+        damName: damName ?? '',
+        microchip: fact(source, 'Microchip'),
+        lifeNumber,
+        loveracingId,
+        // A horse with a Stud Book page and a life number is registered; the
+        // operator can still untick the box before saving.
+        registered: lifeNumber !== null,
       },
-      raceRecord: readRaceRecord(source),
+      raceRecord: { starts: 0, wins: 0, places: 0, resultLines: [] },
     },
   }
 }

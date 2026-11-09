@@ -155,6 +155,7 @@ function toHorse(value: unknown): HorseRow {
     id: str(row.id),
     slug: str(row.slug),
     legalName: str(row.legal_name),
+    barnName: strOrNull(row.barn_name),
     foalingDate: str(row.foaling_date),
     sex: str(row.sex),
     colour: str(row.colour),
@@ -240,6 +241,7 @@ function horseColumns(row: Partial<NewHorse>) {
   return defined({
     slug: row.slug,
     legal_name: row.legalName,
+    barn_name: row.barnName,
     foaling_date: row.foalingDate,
     sex: row.sex,
     colour: row.colour,

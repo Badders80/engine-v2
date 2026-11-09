@@ -67,6 +67,13 @@ export type OwnerRow = NewOwner & { id: string }
 export type NewHorse = {
   slug: string
   legalName: string
+  /**
+   * The unofficial stable nickname (Nellie, Mulan, Coco). Optional and
+   * display-only — never a slug, folder or key. Null when there is no real
+   * nickname, and never set equal to `legalName`
+   * (`engine/SSOT/doc/HORSE-IDENTITY-NAMING-LAW.md` §1–§4).
+   */
+  barnName?: string | null
   foalingDate: string
   sex: string
   colour: string

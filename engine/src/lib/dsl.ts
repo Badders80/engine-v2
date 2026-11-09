@@ -142,11 +142,30 @@ export type SavedDsl = {
  * the horse is saved, a second horse with the same slug is refused, and there
  * is no redirect table.
  */
+/**
+ * The slug is the official NZTR name, kebab-cased, with the parenthetical
+ * country suffix dropped (`HORSE-IDENTITY-NAMING-LAW.md` §2):
+ * `Mulan The Brave (NZ)` → `mulan-the-brave`,
+ * `Hottathanafantasy` → `hottathanafantasy` (one word stays one word).
+ */
 export function slugFromLegalName(legalName: string): string {
   return legalName
+    .replace(/\s*\([A-Za-z]{2,3}\)\s*$/, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+/**
+ * The slug for a horse with no official name yet: `sire-x-dam-yr`, the year
+ * required (`HORSE-IDENTITY-NAMING-LAW.md` §2). The sire is never abbreviated.
+ */
+export function slugFromUnnamed(sireName: string, damName: string, year: string): string {
+  const sire = slugFromLegalName(sireName)
+  const dam = slugFromLegalName(damName)
+  const born = year.trim()
+  if (sire === '' || dam === '' || !/^(19|20)\d{2}$/.test(born)) return ''
+  return `${sire}-x-${dam}-${born}`
 }
 
 function text(value: string | null | undefined): string | null {

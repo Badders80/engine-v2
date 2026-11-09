@@ -20,7 +20,7 @@ function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 }
 
-const REGISTERED = fixture('loveracing-registered.html')
+const REGISTERED = fixture('loveracing-mulan.html')
 
 function stub(status: number, body: string): ReturnType<typeof vi.fn<FetchLike>> {
   return vi.fn<FetchLike>(async () => new Response(body, { status }))
@@ -88,8 +88,19 @@ describe('the load makes one request to the guarded url', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.reason)
-    expect(result.value.horse.legalName).toBe('LADY KETCHIKAN')
-    expect(result.value.raceRecord.starts).toBe(2)
+    expect(result.value.horse.legalName).toBe('Mulan The Brave (NZ)')
+    expect(result.value.raceRecord.starts).toBe(0)
+  })
+
+  it('reads the loveracing id out of either URL shape', async () => {
+    for (const raw of [
+      'https://loveracing.nz/Breeding/460867/Mulan-The-Brave-NZ-2023.aspx',
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+    ]) {
+      const result = await loadLoveracingPage(raw, stub(200, REGISTERED))
+      if (!result.ok) throw new Error(result.reason)
+      expect(result.value.horse.loveracingId).toBe('460867')
+    }
   })
 
   it('requests the guarded url itself, and refuses to follow a redirect', async () => {

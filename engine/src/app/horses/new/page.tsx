@@ -95,6 +95,18 @@ export default async function Page({
               />
             </Field>
 
+            <Field
+              label="Barn name"
+              htmlFor="barnName"
+              help="Optional. The nickname the yard actually uses (Coco, Nellie). Leave blank if there isn't one — never repeat the official name."
+            >
+              <TextInput
+                id="barnName"
+                name="barnName"
+                defaultValue=""
+              />
+            </Field>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Foaling date" htmlFor="foalingDate">
                 <TextInput

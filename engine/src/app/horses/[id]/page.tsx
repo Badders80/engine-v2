@@ -53,9 +53,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
           <h1>{horse.legalName}</h1>
-          <span className="rounded-sm border border-line px-2 py-1 text-caption uppercase tracking-caption text-muted">
-            {horse.registered ? 'Registered' : 'Unregistered'}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-sm border border-line px-2 py-1 text-caption uppercase tracking-caption text-muted">
+              {horse.registered ? 'Registered' : 'Unregistered'}
+            </span>
+            <Link
+              href={`/horses/${horse.id}/edit`}
+              className="rounded-sm border border-line px-3 py-1 text-caption uppercase tracking-caption text-body"
+            >
+              Edit
+            </Link>
+          </div>
         </div>
         <p className="mt-1 font-figure text-caption text-low">{horse.slug}</p>
       </header>

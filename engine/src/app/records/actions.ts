@@ -258,3 +258,69 @@ export async function createHorseAction(form: FormData): Promise<void> {
   revalidatePath('/horses')
   redirect(`/horses/${created.id}`)
 }
+
+/**
+ * Edit a horse (1c). The slug is deliberately absent: it is the official name,
+ * and a rename is a migration, not an edit (`HORSE-IDENTITY-NAMING-LAW.md` §7).
+ * The trainer is authored here, per ruling 15 — the DSL reads it read-only.
+ */
+export async function updateHorseAction(form: FormData): Promise<void> {
+  const id = value(form, 'id')
+  if (id === '') fail('/horses', 'no horse was named')
+
+  const back = `/horses/${id}/edit`
+  const store = recordStore()
+
+  const horse = await store.findHorseById(id)
+  if (horse === null) fail('/horses', 'that horse no longer exists')
+
+  const legalName = value(form, 'legalName')
+  if (legalName === '') fail(back, 'a horse needs a legal name')
+
+  const foalingDate = value(form, 'foalingDate')
+  if (foalingDate === '') fail(back, 'a horse needs a foaling date')
+
+  const sex = value(form, 'sex')
+  const colour = value(form, 'colour')
+  const sireName = value(form, 'sireName')
+  const damName = value(form, 'damName')
+  if (sex === '' || colour === '' || sireName === '' || damName === '') {
+    fail(back, 'sex, colour, sire and dam are required')
+  }
+
+  const record = raceRecord(form)
+  if (!record.ok) fail(back, record.reason)
+
+  // A barn name equal to the official name is "there isn't one" (§4).
+  const typedBarnName = optional(form, 'barnName')
+  const barnName =
+    typedBarnName !== null && typedBarnName.toLowerCase() === legalName.toLowerCase()
+      ? null
+      : typedBarnName
+
+  const trainerId = optional(form, 'trainerId')
+  if (trainerId !== null && (await store.findTrainerById(trainerId)) === null) {
+    fail(back, `trainer ${trainerId} does not exist`)
+  }
+
+  await store.updateHorse(id, {
+    legalName,
+    barnName,
+    foalingDate,
+    sex,
+    colour,
+    breeder: optional(form, 'breeder'),
+    sireName,
+    damName,
+    microchip: optional(form, 'microchip'),
+    lifeNumber: optional(form, 'lifeNumber'),
+    loveracingId: optional(form, 'loveracingId'),
+    registered: checked(form, 'registered'),
+    raceRecord: record.value,
+    trainerId,
+  })
+
+  revalidatePath('/horses')
+  revalidatePath(`/horses/${id}`)
+  redirect(`/horses/${id}`)
+}

@@ -1,6 +1,7 @@
 import type { LinkEntry } from '@/lib/dslStore'
 
 import { Field, FieldGroup, TextArea, TextInput } from './forms'
+import { LinkRows } from './LinkRows'
 
 /**
  * The six profile fields on trainers and owners (U3): achievements, other,
@@ -76,19 +77,7 @@ export function ProfileFields({
         </Field>
       </FieldGroup>
 
-      <Field
-        label="Links"
-        htmlFor="links"
-        help="One per line: Label | https://…"
-      >
-        <TextArea
-          id="links"
-          name="links"
-          rows={4}
-          className="font-figure"
-          defaultValue={defaults.links.map((link) => `${link.label} | ${link.url}`).join('\n')}
-        />
-      </Field>
+      <LinkRows defaultLinks={defaults.links} />
     </>
   )
 }

@@ -38,31 +38,32 @@ function checked(form: FormData, key: string): boolean {
 }
 
 /**
- * Extra links are one per line as `Label | https://…`, stored as a jsonb
- * array. Text that does not fit that shape is refused with a reason rather
- * than quietly dropped.
+ * Links are a plain registry: one `linkUrl` per row, stored as given. The
+ * jsonb shape still carries a label, which is the hostname for now; the
+ * operator references the links headlessly, not by a hand-written title.
  */
 function links(form: FormData): Result<LinkEntry[]> {
-  const raw = value(form, 'links')
-  if (raw === '') return { ok: true, value: [] }
+  const urls = form
+    .getAll('linkUrl')
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
 
   const entries: LinkEntry[] = []
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim()
-    if (trimmed === '') continue
 
-    const parts = trimmed.split('|')
-    const label = (parts[0] ?? '').trim()
-    const url = parts.slice(1).join('|').trim()
+  for (const url of urls) {
+    if (url === '') continue
 
-    if (label === '' || url === '') {
-      return { ok: false, reason: `the link '${trimmed}' needs a label and a URL: Label | URL` }
-    }
     if (!/^https?:\/\//i.test(url)) {
-      return { ok: false, reason: `the link '${label}' must start with http:// or https://` }
+      return { ok: false, reason: `the link '${url}' must start with http:// or https://` }
     }
 
-    entries.push({ label, url })
+    let label: string
+    try {
+      label = new URL(url).hostname
+    } catch {
+      return { ok: false, reason: `the link '${url}' is not a valid URL` }
+    }
+
+    entries.push({ url, label })
   }
 
   return { ok: true, value: entries }

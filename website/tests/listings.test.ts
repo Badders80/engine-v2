@@ -55,7 +55,6 @@ const ROW: ListingRow = {
   step: 0.1,
   stake_remaining: 62.5,
   retail_monthly_per_percent: 109,
-  wholesale_monthly_total: 10000,
   horses: {
     id: 'horse-1',
     slug: 'lady-ketchikan',
@@ -80,7 +79,6 @@ describe('the listing projection', () => {
       step: 0.1,
       stakeRemaining: 62.5,
       retailMonthlyPerPercent: 109,
-      wholesaleMonthlyTotal: 10000,
       horse: {
         id: 'horse-1',
         slug: 'lady-ketchikan',
@@ -99,11 +97,10 @@ describe('the listing projection', () => {
   })
 
   it('keeps every financial figure exactly as stored', () => {
-    // The website never prices and never compiles: retail and wholesale totals are
-    // generated columns, read and never recomputed.
+    // The website never prices and never compiles: retail is a generated column,
+    // read and never recomputed. Wholesale never reaches the public payload.
     const listing = toListing(ROW)
     expect(listing.retailMonthlyPerPercent).toBe(ROW.retail_monthly_per_percent)
-    expect(listing.wholesaleMonthlyTotal).toBe(ROW.wholesale_monthly_total)
   })
 })
 

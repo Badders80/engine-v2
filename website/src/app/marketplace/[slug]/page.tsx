@@ -158,11 +158,6 @@ async function DslBlock({
           value={`$${String(listing.retailMonthlyPerPercent)}`}
           unit="per 1% / month"
         />
-        <Figure
-          label="Wholesale"
-          value={`$${String(listing.wholesaleMonthlyTotal)}`}
-          unit="at 100%"
-        />
         {splitDisplay ? <Figure label="Investor split" value={splitDisplay} /> : null}
         <Figure label="Term start" value={listing.termStart} />
         <Figure label="End date" value={listing.endDate} />

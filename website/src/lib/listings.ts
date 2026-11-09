@@ -42,7 +42,6 @@ export type ListingRow = {
   step: number
   stake_remaining: number
   retail_monthly_per_percent: number
-  wholesale_monthly_total: number
   horses: {
     id: string
     slug: string
@@ -65,7 +64,6 @@ export type Listing = {
   step: number
   stakeRemaining: number
   retailMonthlyPerPercent: number
-  wholesaleMonthlyTotal: number
   horse: {
     id: string
     slug: string
@@ -94,7 +92,6 @@ const LISTING_SELECT = [
   'step',
   'stake_remaining',
   'retail_monthly_per_percent',
-  'wholesale_monthly_total',
   'horses!inner(id, slug, legal_name, registered, image_count)',
 ].join(', ')
 
@@ -117,7 +114,6 @@ export function toListing(row: ListingRow): Listing {
     step: row.step,
     stakeRemaining: row.stake_remaining,
     retailMonthlyPerPercent: row.retail_monthly_per_percent,
-    wholesaleMonthlyTotal: row.wholesale_monthly_total,
     horse: {
       id: row.horses.id,
       slug: row.horses.slug,

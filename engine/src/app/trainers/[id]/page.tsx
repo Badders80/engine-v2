@@ -1,25 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import {
-  Button,
-  ErrorSlot,
-  Field,
-  FormShell,
-  SummaryRow,
-  TextInput,
-} from '../../_components/forms'
-import { ProfileFields } from '../../_components/ProfileFields'
-import { TrainerNames } from '../../_components/TrainerNames'
-import { updateTrainerAction } from '../../records/actions'
+import { socialHandle } from '@/lib/social'
+
+import { SummaryRow } from '../../_components/forms'
 import { recordStore } from '../../records/store'
 
 export const dynamic = 'force-dynamic'
-
-/** A stored `A & B` name is edited as two boxes, which is how it was entered. */
-function trainerNames(name: string): string[] {
-  return name.split(/\s+&\s+/).filter((part) => part !== '')
-}
 
 function TextBlock({ value }: { value: string | null }) {
   return value === null ? (
@@ -29,15 +16,23 @@ function TextBlock({ value }: { value: string | null }) {
   )
 }
 
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>
-  searchParams: Promise<{ error?: string }>
-}) {
+function SocialRow({ label, url }: { label: string; url: string | null }) {
+  return (
+    <SummaryRow
+      label={label}
+      value={
+        url === null ? '—' : (
+          <a href={url} title={url}>
+            {socialHandle(url)}
+          </a>
+        )
+      }
+    />
+  )
+}
+
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { error } = await searchParams
   const trainer = await recordStore().findTrainerById(id)
 
   if (trainer === null) notFound()
@@ -48,7 +43,15 @@ export default async function Page({
         <p className="text-caption uppercase tracking-caption text-low">
           <Link href="/trainers">Trainers</Link> / Profile
         </p>
-        <h1 className="mt-1">{trainer.name}</h1>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
+          <h1>{trainer.name}</h1>
+          <Link
+            href={`/trainers/${trainer.id}/edit`}
+            className="rounded-sm border border-line px-3 py-1 text-caption uppercase tracking-caption text-body"
+          >
+            Edit
+          </Link>
+        </div>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -63,7 +66,7 @@ export default async function Page({
                 trainer.website === null ? (
                   '—'
                 ) : (
-                  <a href={trainer.website} rel="noreferrer">
+                  <a href={trainer.website} className="break-all">
                     {trainer.website}
                   </a>
                 )
@@ -75,30 +78,9 @@ export default async function Page({
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Social</h3>
           <dl className="grid gap-0">
-            <SummaryRow
-              label="X / Twitter"
-              value={trainer.xUrl === null ? '—' : <a href={trainer.xUrl}>{trainer.xUrl}</a>}
-            />
-            <SummaryRow
-              label="Facebook"
-              value={
-                trainer.facebookUrl === null ? (
-                  '—'
-                ) : (
-                  <a href={trainer.facebookUrl}>{trainer.facebookUrl}</a>
-                )
-              }
-            />
-            <SummaryRow
-              label="Instagram"
-              value={
-                trainer.instagramUrl === null ? (
-                  '—'
-                ) : (
-                  <a href={trainer.instagramUrl}>{trainer.instagramUrl}</a>
-                )
-              }
-            />
+            <SocialRow label="X / Twitter" url={trainer.xUrl} />
+            <SocialRow label="Facebook" url={trainer.facebookUrl} />
+            <SocialRow label="Instagram" url={trainer.instagramUrl} />
           </dl>
         </section>
       </div>
@@ -126,76 +108,15 @@ export default async function Page({
         ) : (
           <ul className="grid gap-2">
             {trainer.links.map((link) => (
-              <li key={`${link.label}-${link.url}`} className="flex flex-wrap gap-3 text-body">
-                <span className="text-muted">{link.label}</span>
-                <a href={link.url}>{link.url}</a>
+              <li key={`${link.label}-${link.url}`}>
+                <a href={link.url} className="break-all">
+                  {link.url}
+                </a>
               </li>
             ))}
           </ul>
         )}
       </section>
-
-      <details className="rounded-md border border-line bg-panel p-5">
-        <summary className="cursor-pointer text-caption uppercase tracking-caption text-muted">
-          Edit trainer
-        </summary>
-
-        <FormShell className="mt-5">
-          <ErrorSlot message={error ?? null} />
-
-          <form action={updateTrainerAction} className="grid gap-8">
-            <input type="hidden" name="id" value={trainer.id} />
-
-            <div className="grid gap-4">
-              <Field
-                label="Company name"
-                htmlFor="stable"
-                help="The stable or business, for example Wexford Stables."
-              >
-                <TextInput
-                  id="stable"
-                  name="stable"
-                  defaultValue={trainer.stable}
-                  required
-                />
-              </Field>
-
-              <TrainerNames defaultNames={trainerNames(trainer.name)} />
-
-              <Field label="Location" htmlFor="location">
-                <TextInput
-                  id="location"
-                  name="location"
-                  defaultValue={trainer.location}
-                  required
-                />
-              </Field>
-              <Field label="Website" htmlFor="website">
-                <TextInput
-                  id="website"
-                  name="website"
-                  type="url"
-                  defaultValue={trainer.website ?? ''}
-                />
-              </Field>
-            </div>
-
-            <ProfileFields
-              profileName="bio"
-              profileLabel="Profile"
-              profileHelp="The bio the PDS reads. Blank a bio only while no Available DSL depends on it."
-              profileValue={trainer.bio}
-              defaults={trainer}
-            />
-
-            <div>
-              <Button type="submit" variant="primary">
-                Save changes
-              </Button>
-            </div>
-          </form>
-        </FormShell>
-      </details>
     </main>
   )
 }

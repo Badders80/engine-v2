@@ -1,17 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import {
-  Button,
-  ErrorSlot,
-  Field,
-  FieldGroup,
-  FormShell,
-  SummaryRow,
-  TextInput,
-} from '../../_components/forms'
-import { ProfileFields } from '../../_components/ProfileFields'
-import { updateOwnerAction } from '../../records/actions'
+import { socialHandle } from '@/lib/social'
+
+import { SummaryRow } from '../../_components/forms'
 import { recordStore } from '../../records/store'
 
 export const dynamic = 'force-dynamic'
@@ -24,15 +16,23 @@ function TextBlock({ value }: { value: string | null }) {
   )
 }
 
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>
-  searchParams: Promise<{ error?: string }>
-}) {
+function SocialRow({ label, url }: { label: string; url: string | null }) {
+  return (
+    <SummaryRow
+      label={label}
+      value={
+        url === null ? '—' : (
+          <a href={url} title={url}>
+            {socialHandle(url)}
+          </a>
+        )
+      }
+    />
+  )
+}
+
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { error } = await searchParams
   const owner = await recordStore().findOwnerById(id)
 
   if (owner === null) notFound()
@@ -43,7 +43,15 @@ export default async function Page({
         <p className="text-caption uppercase tracking-caption text-low">
           <Link href="/owners">Owners</Link> / Profile
         </p>
-        <h1 className="mt-1">{owner.entity}</h1>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
+          <h1>{owner.entity}</h1>
+          <Link
+            href={`/owners/${owner.id}/edit`}
+            className="rounded-sm border border-line px-3 py-1 text-caption uppercase tracking-caption text-body"
+          >
+            Edit
+          </Link>
+        </div>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -54,7 +62,13 @@ export default async function Page({
             <SummaryRow
               label="Website"
               value={
-                owner.website === null ? '—' : <a href={owner.website}>{owner.website}</a>
+                owner.website === null ? (
+                  '—'
+                ) : (
+                  <a href={owner.website} className="break-all">
+                    {owner.website}
+                  </a>
+                )
               }
             />
           </dl>
@@ -63,26 +77,9 @@ export default async function Page({
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Social</h3>
           <dl className="grid gap-0">
-            <SummaryRow
-              label="X / Twitter"
-              value={owner.xUrl === null ? '—' : <a href={owner.xUrl}>{owner.xUrl}</a>}
-            />
-            <SummaryRow
-              label="Facebook"
-              value={
-                owner.facebookUrl === null ? '—' : (
-                  <a href={owner.facebookUrl}>{owner.facebookUrl}</a>
-                )
-              }
-            />
-            <SummaryRow
-              label="Instagram"
-              value={
-                owner.instagramUrl === null ? '—' : (
-                  <a href={owner.instagramUrl}>{owner.instagramUrl}</a>
-                )
-              }
-            />
+            <SocialRow label="X / Twitter" url={owner.xUrl} />
+            <SocialRow label="Facebook" url={owner.facebookUrl} />
+            <SocialRow label="Instagram" url={owner.instagramUrl} />
           </dl>
         </section>
       </div>
@@ -110,58 +107,15 @@ export default async function Page({
         ) : (
           <ul className="grid gap-2">
             {owner.links.map((link) => (
-              <li key={`${link.label}-${link.url}`} className="flex flex-wrap gap-3 text-body">
-                <span className="text-muted">{link.label}</span>
-                <a href={link.url}>{link.url}</a>
+              <li key={`${link.label}-${link.url}`}>
+                <a href={link.url} className="break-all">
+                  {link.url}
+                </a>
               </li>
             ))}
           </ul>
         )}
       </section>
-
-      <details className="rounded-md border border-line bg-panel p-5">
-        <summary className="cursor-pointer text-caption uppercase tracking-caption text-muted">
-          Edit owner
-        </summary>
-
-        <FormShell className="mt-5">
-          <ErrorSlot message={error ?? null} />
-
-          <form action={updateOwnerAction} className="grid gap-8">
-            <input type="hidden" name="id" value={owner.id} />
-
-            <FieldGroup legend="Identity">
-              <Field label="Entity" htmlFor="entity">
-                <TextInput id="entity" name="entity" defaultValue={owner.entity} required />
-              </Field>
-              <Field label="Contact person" htmlFor="contact">
-                <TextInput id="contact" name="contact" defaultValue={owner.contact} required />
-              </Field>
-              <Field label="Website" htmlFor="website">
-                <TextInput
-                  id="website"
-                  name="website"
-                  type="url"
-                  defaultValue={owner.website ?? ''}
-                />
-              </Field>
-            </FieldGroup>
-
-            <ProfileFields
-              profileName="profile"
-              profileLabel="Profile"
-              profileValue={owner.profile}
-              defaults={owner}
-            />
-
-            <div>
-              <Button type="submit" variant="primary">
-                Save changes
-              </Button>
-            </div>
-          </form>
-        </FormShell>
-      </details>
     </main>
   )
 }

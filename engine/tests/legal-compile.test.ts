@@ -53,8 +53,8 @@ function input(overrides: Overrides = {}): LegalPackInput {
       raceExpectation: 'Race expectation.',
       ...overrides.horse,
     },
-    trainer: { name: 'T Trainer', location: 'Cambridge', bio: 'One bio.', ...overrides.trainer },
-    owner: { entity: 'Ketchikan Bloodstock Ltd', ...overrides.owner },
+    trainer: { displayName: 'T Trainer', location: 'Cambridge', bio: 'One bio.', ...overrides.trainer },
+    owner: { displayName: 'Ketchikan Bloodstock Ltd', ...overrides.owner },
     sale: { stake: 1, executedDate: '2026-10-20', ...overrides.sale },
   }
 }

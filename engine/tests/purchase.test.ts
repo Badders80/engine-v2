@@ -33,10 +33,15 @@ import {
 } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore, type InMemoryPurchaseStore } from '../src/lib/purchaseStore'
 import type { StripeGateway } from '../src/lib/stripe'
+import { approvedDraft, seedStore as seedDslRecords } from './helpers/dsl-fixture'
 
-function baseSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslInput {
-  return {
+async function baseSaveInput(
+  store: InMemoryPurchaseStore,
+  overrides: Partial<SaveDslInput['dsl']> = {},
+): Promise<SaveDslInput> {
+  const { horse, trainer, owner } = await seedDslRecords(store, {
     horse: {
+      slug: 'lady-ketchikan',
       legalName: 'Lady Ketchikan',
       foalingDate: '2022-09-14',
       sex: 'Mare',
@@ -44,30 +49,13 @@ function baseSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslInp
       breeder: 'Trelawney Stud',
       sireName: 'Savabeel',
       damName: 'Ketchikan',
-      microchip: '985125000123456',
-      lifeNumber: 'NZ-2022-LK',
-      loveracingId: '12345',
-      registered: true,
-      aboutHorse: 'Athletic bay mare progressing well in work.',
-      racingOutlookAndPedigree: 'By Savabeel out of a stakes-producing dam line.',
-      raceExpectation: 'Targeting spring maiden and rating bands.',
-      imageCount: 3,
-      raceRecord: { starts: 2, wins: 1 },
     },
-    trainer: {
-      name: 'Lance O’Sullivan',
-      stable: 'Wexford Stables',
-      location: 'Matamata',
-      website: 'https://wexfordstables.co.nz',
-      bio: 'Multiple premiership-winning Matamata training partnership.',
-    },
-    owner: {
-      entity: 'Ketchikan Bloodstock Ltd',
-      contact: 'David Ellis',
-      website: null,
-      profile: 'Longstanding New Zealand thoroughbred breeders.',
-    },
-    dsl: {
+  })
+  return {
+    horseId: horse.id,
+    trainerId: trainer.id,
+    ownerId: owner.id,
+    dsl: approvedDraft({
       termStart: '2026-11-01',
       endDate: '2027-10-31',
       paymentModel: 'subscription_float',
@@ -81,7 +69,7 @@ function baseSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslInp
       step: 0.5,
       distributionSchedule: 'Quarterly within 14 days of NZTR settlement',
       ...overrides,
-    },
+    }),
   }
 }
 
@@ -122,7 +110,7 @@ async function seedAvailableDsl(
   store: InMemoryPurchaseStore,
   overrides: Partial<SaveDslInput['dsl']> = {},
 ) {
-  const saved = await saveDsl(baseSaveInput(overrides), store)
+  const saved = await saveDsl(await baseSaveInput(store, overrides), store)
   if (!saved.ok) throw new Error(saved.reason)
   return saved.value
 }
@@ -475,7 +463,7 @@ describe('B7 — the bucket, not the form, decides whether a listing has images'
 describe('Step 8a — frozen sale documents survive later horse rename and DSL edits', () => {
   it('keeps sold PDS/SA markdown and hashes untouched when the horse is renamed or re-priced', async () => {
     const store = createInMemoryPurchaseStore()
-    const { dsl, trainer, owner } = await seedAvailableDsl(store, {
+    const { dsl, horse, trainer, owner } = await seedAvailableDsl(store, {
       listedStake: 10,
       minStake: 2.5,
       step: 2.5,
@@ -540,33 +528,24 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
     expect(frozen.pdsMarkdown).toContain('Lady Ketchikan')
     expect(frozen.saMarkdown).toContain('Lady Ketchikan')
 
-    // Now edit the horse (rename + soft prose) and re-price the DSL
-    const base = baseSaveInput()
+    // Records renames the horse; the DSL is re-priced. Neither may reach the
+    // document the buyer already accepted.
+    await store.updateHorse(horse.id, {
+      legalName: 'Renamed Star',
+      slug: 'renamed-star',
+      aboutHorse: 'Completely rewritten about text after sale.',
+    })
     const edited = await updateDsl(
       {
         dslId: dsl.id,
-        horse: {
-          ...base.horse,
-          legalName: 'Renamed Star',
-          aboutHorse: 'Completely rewritten about text after sale.',
-        },
-        trainer: {
-          name: trainer.name,
-          stable: trainer.stable,
-          location: trainer.location,
-          website: trainer.website,
-          bio: trainer.bio,
-        },
-        owner: {
-          entity: owner.entity,
-          contact: owner.contact,
-          website: owner.website,
-          profile: owner.profile,
-        },
-        dsl: {
-          ...base.dsl,
+        trainerId: trainer!.id,
+        ownerId: owner!.id,
+        dsl: approvedDraft({
           wholesaleMonthlyPerPercent: 95,
-        },
+          listedStake: 10,
+          minStake: 2.5,
+          step: 2.5,
+        }),
       },
       store,
     )
@@ -584,7 +563,7 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
 
   it('B5 — writes the checkout-time quote and documents even when the DSL is re-priced and renamed in between', async () => {
     const store = createInMemoryPurchaseStore()
-    const { dsl, trainer, owner } = await seedAvailableDsl(store, {
+    const { dsl, horse, trainer, owner } = await seedAvailableDsl(store, {
       listedStake: 10,
       minStake: 2.5,
       step: 2.5,
@@ -624,25 +603,18 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
 
     // The buyer is on Stripe's page while the operator re-prices the DSL and
     // renames the horse. Neither may reach the document the buyer accepted.
-    const base = baseSaveInput()
+    await store.updateHorse(horse.id, { legalName: 'Renamed Star', slug: 'renamed-star' })
     const edited = await updateDsl(
       {
         dslId: dsl.id,
-        horse: { ...base.horse, legalName: 'Renamed Star' },
-        trainer: {
-          name: trainer.name,
-          stable: trainer.stable,
-          location: trainer.location,
-          website: trainer.website,
-          bio: trainer.bio,
-        },
-        owner: {
-          entity: owner.entity,
-          contact: owner.contact,
-          website: owner.website,
-          profile: owner.profile,
-        },
-        dsl: { ...base.dsl, wholesaleMonthlyPerPercent: 95 },
+        trainerId: trainer!.id,
+        ownerId: owner!.id,
+        dsl: approvedDraft({
+          wholesaleMonthlyPerPercent: 95,
+          listedStake: 10,
+          minStake: 2.5,
+          step: 2.5,
+        }),
       },
       store,
     )

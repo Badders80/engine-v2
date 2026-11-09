@@ -18,41 +18,30 @@ import {
   type NewCheckoutSession,
 } from '../src/lib/purchaseStore'
 import type { StripeGateway } from '../src/lib/stripe'
+import type { DslStore } from '../src/lib/dslStore'
+import { approvedDraft, seedStore } from './helpers/dsl-fixture'
 
-function sampleSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslInput {
-  return {
+async function sampleSaveInput(
+  store: DslStore,
+  overrides: Partial<SaveDslInput['dsl']> = {},
+): Promise<SaveDslInput> {
+  const { horse, trainer, owner } = await seedStore(store, {
     horse: {
+      slug: 'reservation-belle',
       legalName: 'Reservation Belle',
+      sireName: 'Almanzor',
+      damName: 'Belle Rose',
       foalingDate: '2021-08-11',
       sex: 'Mare',
       colour: 'Brown',
       breeder: 'Pencarrow Stud',
-      sireName: 'Almanzor',
-      damName: 'Belle Rose',
-      microchip: '985125000777777',
-      lifeNumber: 'NZ-2021-RB',
-      loveracingId: '77777',
-      registered: true,
-      aboutHorse: 'Strong staying mare with a late-maturing frame.',
-      racingOutlookAndPedigree: 'Out of a Group-placed dam; staying family.',
-      raceExpectation: 'Targeting 2000m handicaps this prep.',
-      imageCount: 3,
-      raceRecord: { starts: 3, wins: 1 },
     },
-    trainer: {
-      name: 'Shaun Ritchie',
-      stable: 'Matamata Lodge',
-      location: 'Matamata',
-      website: null,
-      bio: 'Matamata trainer with a small, select team.',
-    },
-    owner: {
-      entity: 'Belle Rose Racing Ltd',
-      contact: 'Mere Tane',
-      website: null,
-      profile: 'Longstanding Waikato owners.',
-    },
-    dsl: {
+  })
+  return {
+    horseId: horse.id,
+    trainerId: trainer.id,
+    ownerId: owner.id,
+    dsl: approvedDraft({
       termStart: '2026-11-01',
       endDate: '2027-10-31',
       paymentModel: 'subscription_float',
@@ -66,12 +55,12 @@ function sampleSaveInput(overrides: Partial<SaveDslInput['dsl']> = {}): SaveDslI
       step: 2.5,
       distributionSchedule: 'Quarterly within 14 days of NZTR settlement',
       ...overrides,
-    },
+    }),
   }
 }
 
 async function seed(store: InMemoryPurchaseStore) {
-  const saved = await saveDsl(sampleSaveInput(), store)
+  const saved = await saveDsl(await sampleSaveInput(store), store)
   if (!saved.ok) throw new Error(saved.reason)
   const account = await store.insertAccount({
     id: 'acc-reserve-1',

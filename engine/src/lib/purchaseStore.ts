@@ -16,9 +16,8 @@ import {
   type DslRow,
   type DslStore,
   type HorseRow,
-  type OwnerRow,
+  type PartyRow,
   type StoreSnapshot,
-  type TrainerRow,
 } from './dslStore'
 
 export const KYC_STATUS_VALUES = ['unverified', 'pending', 'verified', 'failed'] as const
@@ -372,8 +371,7 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       const dslDump = base.dump()
       return {
         horses: dslDump.horses as HorseRow[],
-        trainers: dslDump.trainers as TrainerRow[],
-        owners: dslDump.owners as OwnerRow[],
+        parties: dslDump.parties as PartyRow[],
         dsls: dslDump.dsls as DslRow[],
         accounts: accounts.map((row) => ({ ...row })),
         sales: sales.map((row) => ({ ...row })),

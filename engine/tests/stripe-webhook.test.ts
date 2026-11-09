@@ -13,6 +13,7 @@ import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 import { saveDsl } from '../src/lib/dsl'
+import { approvedDraft, seedStore as seedDslRecords } from './helpers/dsl-fixture'
 import { createInMemoryEmailSender } from '../src/lib/email'
 import { openCheckoutSession, recordWebhookEvent, SA_DECLARATIONS } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore } from '../src/lib/purchaseStore'
@@ -67,53 +68,37 @@ describe('Step 8a — verifyStripeSignature', () => {
 describe('Step 8a — recordWebhookEvent', () => {
   async function setupStore() {
     const store = createInMemoryPurchaseStore()
+    const { horse, trainer, owner } = await seedDslRecords(store, {
+      horse: {
+        slug: 'mulan-the-brave',
+        legalName: 'Mulan The Brave',
+        foalingDate: '2022-10-02',
+        sex: 'Filly',
+        colour: 'Brown',
+        breeder: 'Waikato Stud',
+        sireName: 'Super Seth',
+        damName: 'Warrior Queen',
+      },
+    })
     const saved = await saveDsl(
       {
-        horse: {
-          legalName: 'Mulan The Brave',
-          foalingDate: '2022-10-02',
-          sex: 'Filly',
-          colour: 'Brown',
-          breeder: 'Waikato Stud',
-          sireName: 'Super Seth',
-          damName: 'Warrior Queen',
-          microchip: '985125000654321',
-          lifeNumber: 'NZ-2022-MTB',
-          loveracingId: '54321',
-          registered: true,
-          aboutHorse: 'Sharp brown filly with clean action.',
-          racingOutlookAndPedigree: 'By Super Seth from a proven juvenile family.',
-          raceExpectation: 'Aimed at autumn 3YO fillies features.',
-          imageCount: 3,
-          raceRecord: {},
-        },
-        trainer: {
-          name: 'Stephen Marsh',
-          stable: 'Marsh Racing',
-          location: 'Cambridge',
-          website: null,
-          bio: 'Leading Cambridge stable.',
-        },
-        owner: {
-          entity: 'Brave Bloodstock',
-          contact: 'Alex Baddeley',
-          website: null,
-          profile: null,
-        },
-        dsl: {
+        horseId: horse.id,
+        trainerId: trainer.id,
+        ownerId: owner.id,
+        dsl: approvedDraft({
           termStart: '2026-11-01',
           endDate: '2027-10-31',
           paymentModel: 'subscription_float',
           closeStyle: 'three_x_remaining',
           status: 'available',
           published: true,
-          wholesaleMonthlyPerPercent: 70, // retail 76, float 380 per 1%
+          wholesaleMonthlyPerPercent: 70,
           investorSplit: 75,
           listedStake: 10,
           minStake: 5,
           step: 5,
           distributionSchedule: 'Monthly within 14 days of NZTR settlement',
-        },
+        }),
       },
       store,
     )

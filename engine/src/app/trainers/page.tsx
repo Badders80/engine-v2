@@ -4,8 +4,9 @@ import { recordStore } from '../records/store'
 
 export const dynamic = 'force-dynamic'
 
+/** A role-filtered view of `parties` (ruling 10). */
 export default async function Page() {
-  const rows = await recordStore().listTrainers()
+  const rows = await recordStore().listPartiesByRole('trainer')
 
   return (
     <main className="grid gap-6">
@@ -31,9 +32,9 @@ export default async function Page() {
             href={`/trainers/${row.id}`}
             className="grid min-h-32 gap-2 rounded-md border border-line bg-panel p-5 hover:border-line-strong"
           >
-            <p className="text-body text-ink">{row.name}</p>
-            <p className="text-caption text-muted">{row.stable}</p>
-            <p className="text-caption text-low">{row.location}</p>
+            <p className="text-body text-ink">{row.displayName}</p>
+            <p className="text-caption text-muted">{row.company ?? '—'}</p>
+            <p className="text-caption text-low">{row.location ?? '—'}</p>
           </Link>
         ))}
       </div>

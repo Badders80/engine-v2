@@ -1,20 +1,17 @@
 /**
- * The DSL action. PLAN.md step 4, OUTCOME.md § How a horse gets in and § DSL.
+ * The DSL action. PLAN.md step 4; chunk 2 (2026-11-10).
  *
- * One operator save writes the horse, the trainer, the owner, and the DSL.
- * Horse, trainer, and owner have no screens of their own, so this pure function
- * is the only door those rows come through. It takes a store and returns a
- * result: no React, no Supabase client, no network, so the whole contract is
- * testable in plain Node.
+ * The DSL attaches existing records. A horse, a trainer and an owner are
+ * authored in Records; this module takes their ids and writes one `dsls` row
+ * at Confirm. A failure leaves zero rows because there is no earlier write to
+ * unwind.
  *
- * Two rules live here rather than in the database:
+ * Two rules live in TypeScript as well as in the database:
  *
- * - An unregistered horse is typed by hand and cannot pass Coming Soon. The
- *   trigger in `supabase/migrations/00008` only guards status `available`, so
- *   `fully_allocated` and `completed` are gated here.
- * - The retail price is derived, never supplied. A DSL row holds one price
- *   input, `wholesaleMonthlyPerPercent`; the generated column and the Step 3
- *   rules module both derive the rest.
+ * - The status is a machine (`checkStatusTransition`), mirrored by
+ *   `assert_dsl_status_transition()` in `00021`.
+ * - An unregistered horse cannot pass Coming Soon, and Available needs the
+ *   full readiness list, including the four approved narrative slots.
  */
 
 import {
@@ -24,9 +21,9 @@ import {
   type DslStatus,
   type DslStore,
   type HorseRow,
-  type OwnerRow,
+  type PartyRole,
+  type PartyRow,
   type PaymentModel,
-  type TrainerRow,
 } from './dslStore'
 import { isInvestorReturnPctInRange, retailPerPercentFromWholesale, validateStake } from './pricing'
 import { checkDslReadiness, readinessReason, type ReadinessResult } from './readiness'
@@ -48,55 +45,45 @@ export type StatusTransitionInput = {
 }
 
 /**
- * The registration gate.
+ * The legal moves. `from === to` is always allowed (the no-op), and `null`
+ * may only start at Coming Soon or Available. Completion is manual (ruling
+ * 13): both `fully_allocated → completed` and `available → completed` are
+ * deliberate operator acts on the ledger.
+ */
+const ALLOWED_TRANSITIONS: Record<DslStatus, readonly DslStatus[]> = {
+  coming_soon: ['available'],
+  available: ['fully_allocated', 'coming_soon', 'completed'],
+  fully_allocated: ['completed'],
+  completed: [],
+}
+
+/**
+ * The status machine, in one place.
  *
- * A registered horse walks the full lifecycle. An unregistered horse may only
- * ever sit at Coming Soon, published or not: it is refused every other status,
- * including a direct jump with no prior status.
+ * An unregistered horse may only ever sit at Coming Soon, published or not.
+ * Every other status is refused, including a direct jump with no prior status.
  */
 export function checkStatusTransition(input: StatusTransitionInput): CheckResult {
-  if (input.registered) return { ok: true }
+  const legal =
+    input.from === null
+      ? input.to === 'coming_soon' || input.to === 'available'
+      : input.from === input.to || ALLOWED_TRANSITIONS[input.from].includes(input.to)
 
-  if (input.to === 'coming_soon') return { ok: true }
-
-  return {
-    ok: false,
-    reason: `an unregistered horse cannot be set to '${input.to}': it cannot pass coming_soon until it is registered`,
+  if (!legal) {
+    return {
+      ok: false,
+      reason: `a DSL cannot move from ${input.from ?? 'no status'} to '${input.to}'`,
+    }
   }
-}
 
-export type HorseDraft = {
-  legalName: string
-  foalingDate: string
-  sex: string
-  colour: string
-  breeder?: string | null
-  sireName: string
-  damName: string
-  microchip?: string | null
-  lifeNumber?: string | null
-  loveracingId?: string | null
-  registered: boolean
-  aboutHorse?: string | null
-  racingOutlookAndPedigree?: string | null
-  raceExpectation?: string | null
-  imageCount?: number
-  raceRecord?: Record<string, unknown>
-}
+  if (!input.registered && input.to !== 'coming_soon') {
+    return {
+      ok: false,
+      reason: `an unregistered horse cannot be set to '${input.to}': it cannot pass coming_soon until it is registered`,
+    }
+  }
 
-export type TrainerDraft = {
-  name: string
-  stable: string
-  location: string
-  website?: string | null
-  bio?: string | null
-}
-
-export type OwnerDraft = {
-  entity: string
-  contact: string
-  website?: string | null
-  profile?: string | null
+  return { ok: true }
 }
 
 export type DslDraft = {
@@ -112,28 +99,27 @@ export type DslDraft = {
   minStake: number
   step: number
   distributionSchedule?: string | null
+  /** Written by the narrative editor; absent means "leave where it is". */
+  narrativeSignoff?: Record<string, boolean> | null
+  narrativeApprovedAt?: string | null
+  narrativeApprovedHash?: string | null
 }
 
+/**
+ * The DSL is the only place a deal links these three ids. Every id must name
+ * an existing row; a party must hold the role its column names.
+ */
 export type SaveDslInput = {
-  horse: HorseDraft
-  /**
-   * An existing trainer to attach. When set, the trainer draft is ignored and
-   * that row is used untouched; its bio is edited on its own page. When null,
-   * the draft is resolved by name and stable, which updates an existing row or
-   * inserts a new one.
-   */
-  trainerId?: string | null
-  trainer: TrainerDraft
-  /** The same rule for the owner, matched by entity when no id is given. */
-  ownerId?: string | null
-  owner: OwnerDraft
+  horseId: string
+  trainerId: string | null
+  ownerId: string | null
   dsl: DslDraft
 }
 
 export type SavedDsl = {
   horse: HorseRow
-  trainer: TrainerRow
-  owner: OwnerRow
+  trainer: PartyRow | null
+  owner: PartyRow | null
   dsl: DslRow
 }
 
@@ -174,51 +160,16 @@ function text(value: string | null | undefined): string | null {
   return trimmed === '' ? null : trimmed
 }
 
-/**
- * The draft as the readiness gate sees it. An unset number arrives from the
- * form as `NaN`, and an unset text field as `''`, so both become null here.
- */
-function draftReadiness(args: {
-  horse: {
-    registered: boolean
-    imageCount?: number
-    aboutHorse?: string | null
-    racingOutlookAndPedigree?: string | null
-    raceExpectation?: string | null
-  }
-  trainerBio: string | null | undefined
-  ownerId: string | null
-  dsl: DslDraft
-  stakeRemaining: number | null
-}): ReadinessResult {
-  return checkDslReadiness({
-    dsl: {
-      ownerId: args.ownerId,
-      endDate: text(args.dsl.endDate),
-      termStart: text(args.dsl.termStart),
-      paymentModel: text(args.dsl.paymentModel),
-      closeStyle: text(args.dsl.closeStyle),
-      wholesaleMonthlyPerPercent: numberOrNull(args.dsl.wholesaleMonthlyPerPercent),
-      investorSplit: args.dsl.investorSplit,
-      listedStake: numberOrNull(args.dsl.listedStake),
-      minStake: numberOrNull(args.dsl.minStake),
-      step: numberOrNull(args.dsl.step),
-      stakeRemaining: args.stakeRemaining,
-      distributionSchedule: text(args.dsl.distributionSchedule),
-    },
-    horse: {
-      registered: args.horse.registered,
-      imageCount: args.horse.imageCount ?? 0,
-      aboutHorse: text(args.horse.aboutHorse),
-      racingOutlookAndPedigree: text(args.horse.racingOutlookAndPedigree),
-      raceExpectation: text(args.horse.raceExpectation),
-    },
-    trainer: { bio: text(args.trainerBio) },
-  })
+function numberOrNull(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) return null
+  return Number.isFinite(value) ? value : null
 }
 
-function numberOrNull(value: number): number | null {
-  return Number.isFinite(value) ? value : null
+/** `undefined` means "leave this column where it is"; never write it as null. */
+function compact<T extends object>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as T
 }
 
 /**
@@ -229,47 +180,27 @@ function numberOrNull(value: number): number | null {
 function dealColumns(dsl: DslDraft) {
   const wholesale = numberOrNull(dsl.wholesaleMonthlyPerPercent)
 
-  return {
+  return compact({
     endDate: text(dsl.endDate),
     termStart: text(dsl.termStart),
     paymentModel: text(dsl.paymentModel) as PaymentModel | null,
     closeStyle: text(dsl.closeStyle) as CloseStyle | null,
     wholesaleMonthlyPerPercent: wholesale,
     retailMonthlyPerPercent: wholesale === null ? null : retailPerPercentFromWholesale(wholesale),
-    wholesaleMonthlyTotal: wholesale === null ? null : wholesale * 100,
-    investorSplit: dsl.investorSplit,
+    investorSplit: numberOrNull(dsl.investorSplit),
     listedStake: numberOrNull(dsl.listedStake),
     minStake: numberOrNull(dsl.minStake),
     step: numberOrNull(dsl.step),
     distributionSchedule: text(dsl.distributionSchedule),
-  }
-}
-
-/**
- * Validate everything before a single row is written, so a refusal leaves the
- * store exactly as it was.
- */
-function checkDraft(input: SaveDslInput): CheckResult {
-  const transition = checkStatusTransition({
-    registered: input.horse.registered,
-    from: null,
-    to: input.dsl.status,
+    narrativeSignoff: dsl.narrativeSignoff,
+    narrativeApprovedAt: dsl.narrativeApprovedAt,
+    narrativeApprovedHash: dsl.narrativeApprovedHash,
   })
-  if (!transition.ok) return transition
-
-  const terms = checkCommercialTerms(input.dsl)
-  if (!terms.ok) return terms
-
-  if (text(input.horse.legalName) === null) {
-    return { ok: false, reason: 'the horse needs a legal name, which makes the slug' }
-  }
-
-  return { ok: true }
 }
 
 /**
- * The commercial terms, validated before a single row is written so that a
- * refusal leaves the store exactly as it was. Shared by create and edit.
+ * The commercial terms, validated before a row is written so that a refusal
+ * leaves the store exactly as it was. Shared by create and edit.
  *
  * A DSL exists before its deal does, so an unset field is not an error: it is
  * simply not filled yet. Each rule applies only when its field is present.
@@ -278,7 +209,7 @@ function checkDraft(input: SaveDslInput): CheckResult {
 function checkCommercialTerms(dsl: DslDraft): CheckResult {
   const { investorSplit, listedStake, minStake, step, wholesaleMonthlyPerPercent } = dsl
 
-  if (investorSplit !== null && !isInvestorReturnPctInRange(investorSplit)) {
+  if (investorSplit !== null && Number.isFinite(investorSplit) && !isInvestorReturnPctInRange(investorSplit)) {
     return { ok: false, reason: `investor split ${investorSplit} sits outside the 50 to 85 range` }
   }
 
@@ -325,192 +256,144 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
 }
 
 /**
- * The trainer this save attaches.
- *
- * An id means "use that row". No id means the draft names one: a matching
- * name and stable is updated in place, and anything else is inserted. Picking
- * by id is what stops a renamed stable from creating a second row.
+ * An id names a row that must exist and hold the role its column names.
+ * `null` is allowed: a DSL may sit at Coming Soon with no trainer or owner,
+ * and the readiness gate refuses Available without both.
  */
-async function resolveTrainer(
-  input: Pick<SaveDslInput, 'trainerId' | 'trainer'>,
+async function loadParty(
+  id: string | null,
+  role: PartyRole,
   store: DslStore,
-): Promise<Result<TrainerRow>> {
-  if (input.trainerId) {
-    const found = await store.findTrainerById(input.trainerId)
-    if (found === null) {
-      return { ok: false, reason: `trainer ${input.trainerId} does not exist` }
-    }
-    return { ok: true, value: found }
-  }
+): Promise<Result<PartyRow | null>> {
+  if (id === null) return { ok: true, value: null }
 
-  const draft = input.trainer
-  if (text(draft.name) === null || text(draft.stable) === null) {
-    return {
-      ok: false,
-      reason: 'a new trainer needs a name and a stable, or pick an existing trainer',
-    }
+  const party = await store.findPartyById(id)
+  if (party === null) {
+    return { ok: false, reason: `${role} ${id} does not exist` }
   }
-
-  const fields = {
-    name: draft.name,
-    stable: draft.stable,
-    location: draft.location,
-    website: text(draft.website),
-    bio: text(draft.bio),
+  if (!party.roles.includes(role)) {
+    return { ok: false, reason: `party ${id} does not hold the ${role} role` }
   }
+  return { ok: true, value: party }
+}
 
-  const existing = await store.findTrainer({ name: draft.name, stable: draft.stable })
-  if (existing !== null) {
-    // The six profile fields are authored in Records (U3); a DSL save must not
-    // blank a value the operator entered there.
-    return { ok: true, value: await store.updateTrainer(existing.id, fields) }
-  }
+type Narrative = {
+  signoff: Record<string, boolean> | null
+  approvedAt: string | null
+  approvedHash: string | null
+}
 
+function narrativeOf(dsl: DslDraft | DslRow): Narrative {
   return {
-    ok: true,
-    value: await store.insertTrainer({
-      ...fields,
-      achievements: null,
-      other: null,
-      xUrl: null,
-      facebookUrl: null,
-      instagramUrl: null,
-      links: [],
-    }),
+    signoff: dsl.narrativeSignoff ?? null,
+    approvedAt: dsl.narrativeApprovedAt ?? null,
+    approvedHash: dsl.narrativeApprovedHash ?? null,
   }
 }
 
-/** The owner this save attaches. Same rule, matched by entity when no id is given. */
-async function resolveOwner(
-  input: Pick<SaveDslInput, 'ownerId' | 'owner'>,
-  store: DslStore,
-): Promise<Result<OwnerRow>> {
-  if (input.ownerId) {
-    const found = await store.findOwnerById(input.ownerId)
-    if (found === null) {
-      return { ok: false, reason: `owner ${input.ownerId} does not exist` }
-    }
-    return { ok: true, value: found }
-  }
+/** The draft as the readiness gate sees it, with the stake it will hold. */
+function readinessFor(args: {
+  horse: HorseRow
+  trainer: PartyRow | null
+  ownerId: string | null
+  dsl: DslDraft
+  stakeRemaining: number | null
+  narrative: Narrative
+}): ReadinessResult {
+  const { horse, dsl } = args
 
-  const draft = input.owner
-  if (text(draft.entity) === null || text(draft.contact) === null) {
-    return {
-      ok: false,
-      reason: 'a new owner needs an entity and a contact, or pick an existing owner',
-    }
-  }
-
-  const fields = {
-    entity: draft.entity,
-    contact: draft.contact,
-    website: text(draft.website),
-    profile: text(draft.profile),
-  }
-
-  const existing = await store.findOwner({ entity: draft.entity })
-  if (existing !== null) {
-    // Same rule as the trainer: a DSL save never blanks a Records profile field.
-    return { ok: true, value: await store.updateOwner(existing.id, fields) }
-  }
-
-  return {
-    ok: true,
-    value: await store.insertOwner({
-      ...fields,
-      achievements: null,
-      other: null,
-      xUrl: null,
-      facebookUrl: null,
-      instagramUrl: null,
-      links: [],
-    }),
-  }
+  return checkDslReadiness({
+    dsl: {
+      ownerId: args.ownerId,
+      endDate: text(dsl.endDate),
+      termStart: text(dsl.termStart),
+      paymentModel: text(dsl.paymentModel),
+      closeStyle: text(dsl.closeStyle),
+      wholesaleMonthlyPerPercent: numberOrNull(dsl.wholesaleMonthlyPerPercent),
+      investorSplit: dsl.investorSplit,
+      listedStake: numberOrNull(dsl.listedStake),
+      minStake: numberOrNull(dsl.minStake),
+      step: numberOrNull(dsl.step),
+      stakeRemaining: args.stakeRemaining,
+      distributionSchedule: text(dsl.distributionSchedule),
+    },
+    horse: {
+      registered: horse.registered,
+      imageCount: horse.imageCount,
+      aboutHorse: horse.aboutHorse,
+      racingOutlookAndPedigree: horse.racingOutlookAndPedigree,
+      raceExpectation: horse.raceExpectation,
+    },
+    trainer: args.trainer === null ? null : { bio: args.trainer.bio },
+    narrative: args.narrative,
+  })
 }
 
 /**
- * Write the horse, the trainer, the owner, and the DSL in one save.
+ * Create one DSL row. No horse, party or other row is written here: the ids
+ * point at Records. A failure leaves zero rows because there is exactly one
+ * write, at the end.
  *
- * The trainer and the owner are reused when one already exists with the same
- * name and stable, or the same entity. The horse is keyed by the slug from its
- * legal name.
- *
- * The four rows go out as separate statements, so the save can die between
- * them: a horse row that landed without its DSL row is an orphan. A later save
- * that produces the same slug adopts that orphan and updates it, rather than
- * refusing the slug and locking the horse out for good. A horse that already
- * has a DSL is still a real collision and is still refused.
+ * Pin 1: `stake_remaining` starts at the listed stake.
+ * Pin 3: a horse that already holds a DSL is refused.
  */
 export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Result<SavedDsl>> {
-  const checked = checkDraft(input)
-  if (!checked.ok) return checked
+  const horse = await store.findHorseById(input.horseId)
+  if (horse === null) {
+    return { ok: false, reason: `horse ${input.horseId} does not exist` }
+  }
 
-  const slug = slugFromLegalName(input.horse.legalName)
-  const existing = await store.findHorseBySlug(slug)
-  if (existing !== null && (await store.countDslsByHorse(existing.id)) > 0) {
+  if ((await store.countDslsByHorse(horse.id)) > 0) {
     return {
       ok: false,
-      reason: `a horse with the slug '${slug}' already exists; a rename changes the slug`,
+      reason: `horse ${horse.id} already holds a DSL; a second deal is a second term, not a second listing`,
     }
   }
 
-  const trainerResult = await resolveTrainer(input, store)
+  const transition = checkStatusTransition({
+    registered: horse.registered,
+    from: null,
+    to: input.dsl.status,
+  })
+  if (!transition.ok) return transition
+
+  const terms = checkCommercialTerms(input.dsl)
+  if (!terms.ok) return terms
+
+  const trainerResult = await loadParty(input.trainerId, 'trainer', store)
   if (!trainerResult.ok) return trainerResult
-  const ownerResult = await resolveOwner(input, store)
+  const ownerResult = await loadParty(input.ownerId, 'owner', store)
   if (!ownerResult.ok) return ownerResult
 
   const trainer = trainerResult.value
   const owner = ownerResult.value
+  const stakeRemaining = numberOrNull(input.dsl.listedStake)
 
   if (input.dsl.status === 'available') {
-    const ready = draftReadiness({
-      horse: input.horse,
-      trainerBio: trainer.bio,
-      ownerId: owner.id,
+    const ready = readinessFor({
+      horse,
+      trainer,
+      ownerId: owner?.id ?? null,
       dsl: input.dsl,
-      stakeRemaining: numberOrNull(input.dsl.listedStake),
+      stakeRemaining,
+      narrative: narrativeOf(input.dsl),
     })
     if (!ready.ok) {
       return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
     }
   }
 
-  const horseFields = {
-    slug,
-    legalName: input.horse.legalName.trim(),
-    foalingDate: input.horse.foalingDate,
-    sex: input.horse.sex,
-    colour: input.horse.colour,
-    breeder: text(input.horse.breeder),
-    sireName: input.horse.sireName,
-    damName: input.horse.damName,
-    microchip: text(input.horse.microchip),
-    lifeNumber: text(input.horse.lifeNumber),
-    loveracingId: text(input.horse.loveracingId),
-    registered: input.horse.registered,
-    aboutHorse: text(input.horse.aboutHorse),
-    racingOutlookAndPedigree: text(input.horse.racingOutlookAndPedigree),
-    raceExpectation: text(input.horse.raceExpectation),
-    // An adopted orphan keeps the images already uploaded to it, so a save that
-    // follows an upload cannot silently drop the horse back under the three
-    // images that `00008_dsl_availability_trigger.sql` requires.
-    imageCount: input.horse.imageCount ?? existing?.imageCount ?? 0,
-    raceRecord: input.horse.raceRecord ?? {},
-    trainerId: trainer.id,
-  }
-
-  const horse =
-    existing === null
-      ? await store.insertHorse(horseFields)
-      : await store.updateHorse(existing.id, horseFields)
-
   const dsl = await store.insertDsl({
     horseId: horse.id,
-    ownerId: owner.id,
+    trainerId: trainer?.id ?? null,
+    ownerId: owner?.id ?? null,
     ...dealColumns(input.dsl),
     status: input.dsl.status,
     published: input.dsl.published,
-    stakeRemaining: numberOrNull(input.dsl.listedStake),
+    stakeRemaining,
+    narrativeSignoff: input.dsl.narrativeSignoff ?? null,
+    narrativeApprovedAt: input.dsl.narrativeApprovedAt ?? null,
+    narrativeApprovedHash: input.dsl.narrativeApprovedHash ?? null,
   })
 
   return { ok: true, value: { horse, trainer, owner, dsl } }
@@ -518,25 +401,21 @@ export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Res
 
 export type EditDslInput = {
   dslId: string
-  horse: Partial<HorseDraft>
-  trainerId?: string | null
-  trainer: TrainerDraft
-  ownerId?: string | null
-  owner: OwnerDraft
+  trainerId: string | null
+  ownerId: string | null
   dsl: DslDraft
 }
 
 /**
- * Edit an existing DSL. The same door as create, with the horse and the DSL
- * already in place.
+ * Edit one DSL. The same rules as create, against the status the DSL is at
+ * now, so an unregistered horse already sitting at Coming Soon cannot be
+ * walked forward by an edit.
  *
- * The gate runs against the status the DSL is at now, not against a blank
- * slate, so an unregistered horse already sitting at Coming Soon cannot be
- * walked forward by an edit. Two rules are specific to editing:
+ * Specific to editing:
  *
- * - The stake remaining is never reset. Buyers have drawn it down, and an edit
- *   is not a fresh sale.
- * - A rename moves the slug, and a second horse holding that slug is refused.
+ * - The stake remaining is never reset. Buyers have drawn it down, and an
+ *   edit is not a fresh sale.
+ * - The horse and the parties are not written. Records owns them.
  */
 export async function updateDsl(
   input: EditDslInput,
@@ -547,15 +426,13 @@ export async function updateDsl(
     return { ok: false, reason: `DSL ${input.dslId} does not exist` }
   }
 
-  const currentHorse = await store.findHorseById(currentDsl.horseId)
-  if (currentHorse === null) {
+  const horse = await store.findHorseById(currentDsl.horseId)
+  if (horse === null) {
     return { ok: false, reason: `horse ${currentDsl.horseId} does not exist` }
   }
 
-  const registered = input.horse.registered ?? currentHorse.registered
-
   const transition = checkStatusTransition({
-    registered,
+    registered: horse.registered,
     from: currentDsl.status,
     to: input.dsl.status,
   })
@@ -565,94 +442,54 @@ export async function updateDsl(
   if (!terms.ok) return terms
 
   if (input.dsl.endDate !== currentDsl.endDate) {
-    const clash = await store.findDslByHorseAndEndDate(currentHorse.id, input.dsl.endDate)
+    const clash = await store.findDslByHorseAndEndDate(horse.id, input.dsl.endDate)
     if (clash !== null) {
       return { ok: false, reason: `this horse already has a DSL ending ${input.dsl.endDate}` }
     }
   }
 
-  let slug = currentHorse.slug
-  const named = input.horse.legalName?.trim()
-  if (named !== undefined && named !== '' && named !== currentHorse.legalName) {
-    slug = slugFromLegalName(named)
-    const clash = await store.findHorseBySlug(slug)
-    if (clash !== null && clash.id !== currentHorse.id) {
-      return {
-        ok: false,
-        reason: `a horse with the slug '${slug}' already exists; a rename changes the slug`,
-      }
-    }
-  }
-
-  const trainerResult = await resolveTrainer(input, store)
+  const trainerResult = await loadParty(input.trainerId, 'trainer', store)
   if (!trainerResult.ok) return trainerResult
-  const ownerResult = await resolveOwner(input, store)
+  const ownerResult = await loadParty(input.ownerId, 'owner', store)
   if (!ownerResult.ok) return ownerResult
 
   const trainer = trainerResult.value
   const owner = ownerResult.value
 
+  // An absent narrative field means "leave the stored sign-off alone", so an
+  // ordinary edit cannot silently clear an approval.
+  const narrative: Narrative = {
+    signoff:
+      input.dsl.narrativeSignoff === undefined
+        ? currentDsl.narrativeSignoff
+        : input.dsl.narrativeSignoff,
+    approvedAt:
+      input.dsl.narrativeApprovedAt === undefined
+        ? currentDsl.narrativeApprovedAt
+        : input.dsl.narrativeApprovedAt,
+    approvedHash:
+      input.dsl.narrativeApprovedHash === undefined
+        ? currentDsl.narrativeApprovedHash
+        : input.dsl.narrativeApprovedHash,
+  }
+
   if (input.dsl.status === 'available') {
-    const ready = draftReadiness({
-      horse: {
-        registered,
-        imageCount: input.horse.imageCount ?? currentHorse.imageCount,
-        aboutHorse:
-          input.horse.aboutHorse === undefined ? currentHorse.aboutHorse : input.horse.aboutHorse,
-        racingOutlookAndPedigree:
-          input.horse.racingOutlookAndPedigree === undefined
-            ? currentHorse.racingOutlookAndPedigree
-            : input.horse.racingOutlookAndPedigree,
-        raceExpectation:
-          input.horse.raceExpectation === undefined
-            ? currentHorse.raceExpectation
-            : input.horse.raceExpectation,
-      },
-      trainerBio: trainer.bio,
-      ownerId: owner.id,
+    const ready = readinessFor({
+      horse,
+      trainer,
+      ownerId: owner?.id ?? null,
       dsl: input.dsl,
       stakeRemaining: currentDsl.stakeRemaining,
+      narrative,
     })
     if (!ready.ok) {
       return { ok: false, reason: readinessReason(ready) ?? 'this DSL is not ready' }
     }
   }
 
-  const horse = await store.updateHorse(currentHorse.id, {
-    slug,
-    legalName: named === undefined || named === '' ? currentHorse.legalName : named,
-    foalingDate: input.horse.foalingDate ?? currentHorse.foalingDate,
-    sex: input.horse.sex ?? currentHorse.sex,
-    colour: input.horse.colour ?? currentHorse.colour,
-    sireName: input.horse.sireName ?? currentHorse.sireName,
-    damName: input.horse.damName ?? currentHorse.damName,
-    breeder: input.horse.breeder === undefined ? currentHorse.breeder : text(input.horse.breeder),
-    microchip:
-      input.horse.microchip === undefined ? currentHorse.microchip : text(input.horse.microchip),
-    lifeNumber:
-      input.horse.lifeNumber === undefined ? currentHorse.lifeNumber : text(input.horse.lifeNumber),
-    loveracingId:
-      input.horse.loveracingId === undefined
-        ? currentHorse.loveracingId
-        : text(input.horse.loveracingId),
-    registered,
-    aboutHorse:
-      input.horse.aboutHorse === undefined ? currentHorse.aboutHorse : text(input.horse.aboutHorse),
-    racingOutlookAndPedigree:
-      input.horse.racingOutlookAndPedigree === undefined
-        ? currentHorse.racingOutlookAndPedigree
-        : text(input.horse.racingOutlookAndPedigree),
-    raceExpectation:
-      input.horse.raceExpectation === undefined
-        ? currentHorse.raceExpectation
-        : text(input.horse.raceExpectation),
-    imageCount: input.horse.imageCount ?? currentHorse.imageCount,
-    raceRecord: input.horse.raceRecord ?? currentHorse.raceRecord,
-    trainerId: trainer.id,
-  })
-
   const dsl = await store.updateDsl(currentDsl.id, {
-    ownerId: owner.id,
+    trainerId: trainer?.id ?? null,
+    ownerId: owner?.id ?? null,
     ...dealColumns(input.dsl),
     status: input.dsl.status,
     published: input.dsl.published,

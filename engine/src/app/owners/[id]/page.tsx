@@ -33,9 +33,9 @@ function SocialRow({ label, url }: { label: string; url: string | null }) {
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const owner = await recordStore().findOwnerById(id)
+  const party = await recordStore().findPartyById(id)
 
-  if (owner === null) notFound()
+  if (party === null || !party.roles.includes('owner')) notFound()
 
   return (
     <main className="grid gap-8">
@@ -44,9 +44,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <Link href="/owners">Owners</Link> / Profile
         </p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-3">
-          <h1>{owner.entity}</h1>
+          <h1>{party.displayName}</h1>
           <Link
-            href={`/owners/${owner.id}/edit`}
+            href={`/owners/${party.id}/edit`}
             className="rounded-sm border border-line px-3 py-1 text-caption uppercase tracking-caption text-body"
           >
             Edit
@@ -56,17 +56,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       <div className="grid gap-6 md:grid-cols-2">
         <section className="rounded-md border border-line bg-panel p-5">
-          <h3 className="mb-3">Identity</h3>
+          <h3 className="mb-3">Owner</h3>
           <dl className="grid gap-0">
-            <SummaryRow label="Contact" value={owner.contact} />
+            <SummaryRow label="Contact" value={party.contact ?? '—'} />
             <SummaryRow
               label="Website"
               value={
-                owner.website === null ? (
+                party.website === null ? (
                   '—'
                 ) : (
-                  <a href={owner.website} className="break-all">
-                    {owner.website}
+                  <a href={party.website} className="break-all">
+                    {party.website}
                   </a>
                 )
               }
@@ -77,36 +77,36 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Social</h3>
           <dl className="grid gap-0">
-            <SocialRow label="X / Twitter" url={owner.xUrl} />
-            <SocialRow label="Facebook" url={owner.facebookUrl} />
-            <SocialRow label="Instagram" url={owner.instagramUrl} />
+            <SocialRow label="X / Twitter" url={party.xUrl} />
+            <SocialRow label="Facebook" url={party.facebookUrl} />
+            <SocialRow label="Instagram" url={party.instagramUrl} />
           </dl>
         </section>
       </div>
 
       <section className="rounded-md border border-line bg-panel p-5">
         <h3 className="mb-3">Profile</h3>
-        <TextBlock value={owner.profile} />
+        <TextBlock value={party.bio} />
       </section>
 
       <div className="grid gap-6 md:grid-cols-2">
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Achievements</h3>
-          <TextBlock value={owner.achievements} />
+          <TextBlock value={party.achievements} />
         </section>
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Other</h3>
-          <TextBlock value={owner.other} />
+          <TextBlock value={party.other} />
         </section>
       </div>
 
       <section className="rounded-md border border-line bg-panel p-5">
         <h3 className="mb-3">Links</h3>
-        {owner.links.length === 0 ? (
+        {party.links.length === 0 ? (
           <p className="text-body text-low">—</p>
         ) : (
           <ul className="grid gap-2">
-            {owner.links.map((link) => (
+            {party.links.map((link) => (
               <li key={`${link.label}-${link.url}`}>
                 <a href={link.url} className="break-all">
                   {link.url}

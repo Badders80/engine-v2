@@ -20,14 +20,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const horse = await store.findHorseById(id)
   if (horse === null) notFound()
 
-  const [trainer, dsls, owners] = await Promise.all([
-    horse.trainerId === null ? Promise.resolve(null) : store.findTrainerById(horse.trainerId),
-    store.listDsls(),
-    store.listOwners(),
-  ])
+  // The trainer and the owner are derived through the horse's DSLs. Records
+  // never author the link (R1, ruling 10).
+  const [dsls, parties] = await Promise.all([store.listDsls(), store.listParties()])
 
   const horseDsls = dsls.filter((dsl) => dsl.horseId === horse.id)
-  const ownerNames = new Map(owners.map((owner) => [owner.id, owner.entity]))
+  const partyById = new Map(parties.map((party) => [party.id, party]))
+  const ownerNames = new Map(parties.map((party) => [party.id, party.displayName]))
+
+  const trainerDsl = horseDsls.find((dsl) => dsl.trainerId !== null)
+  const trainer =
+    trainerDsl === undefined || trainerDsl.trainerId === null
+      ? null
+      : (partyById.get(trainerDsl.trainerId) ?? null)
+
   const horseOwners = [
     ...new Map(
       horseDsls
@@ -91,10 +97,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           ) : (
             <div className="grid gap-1">
               <Link href={`/trainers/${trainer.id}`} className="text-body">
-                {trainer.name}
+                {trainer.displayName}
               </Link>
-              <p className="text-caption text-muted">{trainer.stable}</p>
-              <p className="text-caption text-low">{trainer.location}</p>
+              <p className="text-caption text-muted">{trainer.company ?? '—'}</p>
+              <p className="text-caption text-low">{trainer.location ?? '—'}</p>
             </div>
           )}
         </section>

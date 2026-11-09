@@ -1,17 +1,13 @@
 /**
- * The storage seam for the DSL page. PLAN.md step 4.
+ * The storage seam for the DSL page. Chunk 2, ruling 10.
+ *
+ * A real-world person or company is one `parties` row. Roles are
+ * relationships on `party_roles`, never permissions (ruling 22). Records
+ * author entities; the DSL attaches their ids and writes `dsls` only.
  *
  * The action layer never talks to Supabase directly. It talks to this
  * interface. The in-memory implementation carries the contract assertions in
- * CI, where no database and no credentials exist; the Supabase implementation
- * sits behind the same shape.
- *
- * Row types mirror the column names in `supabase/migrations/`. The interface
- * generates the ids for trainers and owners because those two tables declare
- * `id uuid primary key` with no default, unlike horses and dsls.
- *
- * Nothing here holds a branding field. Branding choices on the page are page
- * state and are not stored.
+ * CI, where no database and no credentials exist.
  */
 
 export type PaymentModel = 'subscription_float' | 'upfront'
@@ -30,13 +26,23 @@ export const DSL_STATUS_VALUES = [
 
 export type DslStatus = (typeof DSL_STATUS_VALUES)[number]
 
-/** One extra link on a trainer or owner. Stored as a jsonb array. */
+/** One extra link on a party. Stored as a jsonb array. */
 export type LinkEntry = { label: string; url: string }
 
-export type NewTrainer = {
-  name: string
-  stable: string
-  location: string
+/** The roles a profile may hold. Extensible: the column is plain text. */
+export const PARTY_ROLES = ['trainer', 'owner'] as const
+export type PartyRole = (typeof PARTY_ROLES)[number]
+
+/**
+ * Shared fields live once. `company` is the trainer's stable, `contact` is the
+ * owner's contact person; `bio` is both the trainer bio and the owner profile.
+ * The trainer block and owner block render by role.
+ */
+export type NewParty = {
+  displayName: string
+  company: string | null
+  contact: string | null
+  location: string | null
   website: string | null
   bio: string | null
   achievements: string | null
@@ -47,31 +53,14 @@ export type NewTrainer = {
   links: LinkEntry[]
 }
 
-export type TrainerRow = NewTrainer & { id: string }
-
-export type NewOwner = {
-  entity: string
-  contact: string
-  website: string | null
-  profile: string | null
-  achievements: string | null
-  other: string | null
-  xUrl: string | null
-  facebookUrl: string | null
-  instagramUrl: string | null
-  links: LinkEntry[]
-}
-
-export type OwnerRow = NewOwner & { id: string }
+export type PartyRow = NewParty & { id: string; roles: PartyRole[] }
 
 export type NewHorse = {
   slug: string
   legalName: string
   /**
    * The unofficial stable nickname (Nellie, Mulan, Coco). Optional and
-   * display-only — never a slug, folder or key. Null when there is no real
-   * nickname, and never set equal to `legalName`
-   * (`engine/SSOT/doc/HORSE-IDENTITY-NAMING-LAW.md` §1–§4).
+   * display-only — never a slug, folder or key.
    */
   barnName?: string | null
   foalingDate: string
@@ -89,22 +78,21 @@ export type NewHorse = {
   raceExpectation: string | null
   imageCount: number
   raceRecord: Record<string, unknown>
-  /**
-   * A horse has 0..1 current trainer (`horses.trainer_id`, nullable). The
-   * trainer is authored on the horse; the DSL reads it read-only.
-   */
-  trainerId: string | null
 }
 
 export type HorseRow = NewHorse & { id: string }
 
 /**
  * A DSL row. The commercial and term fields are nullable on purpose: a DSL
- * exists from the moment the horse does, and its deal may not be done yet.
- * Anything that reads a price must narrow through `isPricedDsl` first.
+ * exists from the moment the deal does, and its terms may not be complete
+ * yet. Anything that reads a price must narrow through `isPricedDsl` first.
+ *
+ * `trainerId` and `ownerId` point at `parties`; the row is the only place a
+ * deal links a horse, a trainer and an owner.
  */
 export type NewDsl = {
   horseId: string
+  trainerId: string | null
   ownerId: string | null
   endDate: string | null
   termStart: string | null
@@ -114,19 +102,22 @@ export type NewDsl = {
   published: boolean
   wholesaleMonthlyPerPercent: number | null
   retailMonthlyPerPercent: number | null
-  wholesaleMonthlyTotal: number | null
   investorSplit: number | null
   listedStake: number | null
   minStake: number | null
   step: number | null
   stakeRemaining: number | null
   distributionSchedule: string | null
+  narrativeSignoff: Record<string, boolean> | null
+  narrativeApprovedAt: string | null
+  narrativeApprovedHash: string | null
 }
 
 export type DslRow = NewDsl & { id: string }
 
 /** A DSL whose deal is done: every field the quote and the pack need is set. */
 export type PricedDsl = DslRow & {
+  trainerId: string
   ownerId: string
   endDate: string
   termStart: string
@@ -134,7 +125,6 @@ export type PricedDsl = DslRow & {
   closeStyle: CloseStyle
   wholesaleMonthlyPerPercent: number
   retailMonthlyPerPercent: number
-  wholesaleMonthlyTotal: number
   investorSplit: number
   listedStake: number
   minStake: number
@@ -144,6 +134,7 @@ export type PricedDsl = DslRow & {
 
 export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
   return (
+    dsl.trainerId !== null &&
     dsl.ownerId !== null &&
     dsl.endDate !== null &&
     dsl.termStart !== null &&
@@ -151,7 +142,6 @@ export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
     dsl.closeStyle !== null &&
     dsl.wholesaleMonthlyPerPercent !== null &&
     dsl.retailMonthlyPerPercent !== null &&
-    dsl.wholesaleMonthlyTotal !== null &&
     dsl.investorSplit !== null &&
     dsl.listedStake !== null &&
     dsl.minStake !== null &&
@@ -161,16 +151,12 @@ export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
 }
 
 export interface DslStore {
-  findTrainer(match: { name: string; stable: string }): Promise<TrainerRow | null>
-  insertTrainer(row: NewTrainer): Promise<TrainerRow>
-  findTrainerById(id: string): Promise<TrainerRow | null>
-  listTrainers(): Promise<TrainerRow[]>
-  updateTrainer(id: string, patch: Partial<NewTrainer>): Promise<TrainerRow>
-  findOwner(match: { entity: string }): Promise<OwnerRow | null>
-  insertOwner(row: NewOwner): Promise<OwnerRow>
-  findOwnerById(id: string): Promise<OwnerRow | null>
-  listOwners(): Promise<OwnerRow[]>
-  updateOwner(id: string, patch: Partial<NewOwner>): Promise<OwnerRow>
+  findPartyById(id: string): Promise<PartyRow | null>
+  listParties(): Promise<PartyRow[]>
+  listPartiesByRole(role: PartyRole): Promise<PartyRow[]>
+  insertParty(row: NewParty, roles: readonly PartyRole[]): Promise<PartyRow>
+  updateParty(id: string, patch: Partial<NewParty>): Promise<PartyRow>
+  setPartyRoles(id: string, roles: readonly PartyRole[]): Promise<PartyRow>
   listHorses(): Promise<HorseRow[]>
   findHorseBySlug(slug: string): Promise<HorseRow | null>
   findHorseById(id: string): Promise<HorseRow | null>
@@ -186,8 +172,7 @@ export interface DslStore {
 
 export type StoreSnapshot = {
   horses: HorseRow[]
-  trainers: TrainerRow[]
-  owners: OwnerRow[]
+  parties: PartyRow[]
   dsls: DslRow[]
 }
 
@@ -206,32 +191,43 @@ function mustFind<T>(row: T | undefined, table: string, id: string): T {
 /**
  * An in-memory store with the same shape as the Supabase one.
  *
- * It enforces the two uniqueness rules the schema declares, so a test that
- * would collide in the database collides here too: one horse per slug, one DSL
- * per horse per end date.
+ * It enforces the uniqueness rules the schema declares, so a test that would
+ * collide in the database collides here too: one horse per slug, one DSL per
+ * horse per end date.
  */
 export function createInMemoryDslStore(): InMemoryDslStore {
   const horses: HorseRow[] = []
-  const trainers: TrainerRow[] = []
-  const owners: OwnerRow[] = []
+  const parties: PartyRow[] = []
   const dsls: DslRow[] = []
 
   return {
-    async findTrainer(match) {
-      return trainers.find((row) => row.name === match.name && row.stable === match.stable) ?? null
+    async findPartyById(id) {
+      return parties.find((row) => row.id === id) ?? null
     },
-    async insertTrainer(row) {
-      const created = { ...row, id: newId() }
-      trainers.push(created)
+    async listParties() {
+      return [...parties]
+    },
+    async listPartiesByRole(role) {
+      return parties.filter((row) => row.roles.includes(role))
+    },
+    async insertParty(row, roles) {
+      const created = { ...row, id: newId(), roles: [...new Set(roles)] }
+      parties.push(created)
       return created
     },
-    async findOwner(match) {
-      return owners.find((row) => row.entity === match.entity) ?? null
+    async updateParty(id, patch) {
+      const index = parties.findIndex((row) => row.id === id)
+      mustFind(parties[index], 'party', id)
+      const updated = { ...parties[index], ...patch }
+      parties[index] = updated
+      return updated
     },
-    async insertOwner(row) {
-      const created = { ...row, id: newId() }
-      owners.push(created)
-      return created
+    async setPartyRoles(id, roles) {
+      const index = parties.findIndex((row) => row.id === id)
+      mustFind(parties[index], 'party', id)
+      const updated = { ...parties[index], roles: [...new Set(roles)] }
+      parties[index] = updated
+      return updated
     },
     async findHorseBySlug(slug) {
       return horses.find((row) => row.slug === slug) ?? null
@@ -250,34 +246,8 @@ export function createInMemoryDslStore(): InMemoryDslStore {
     async countDslsByHorse(horseId) {
       return dsls.filter((row) => row.horseId === horseId).length
     },
-    async findTrainerById(id) {
-      return trainers.find((row) => row.id === id) ?? null
-    },
-    async listTrainers() {
-      return [...trainers]
-    },
-    async updateTrainer(id, patch) {
-      const index = trainers.findIndex((row) => row.id === id)
-      mustFind(trainers[index], 'trainer', id)
-      const updated = { ...trainers[index], ...patch }
-      trainers[index] = updated
-      return updated
-    },
-    async listOwners() {
-      return [...owners]
-    },
-    async updateOwner(id, patch) {
-      const index = owners.findIndex((row) => row.id === id)
-      mustFind(owners[index], 'owner', id)
-      const updated = { ...owners[index], ...patch }
-      owners[index] = updated
-      return updated
-    },
     async listHorses() {
       return [...horses]
-    },
-    async findOwnerById(id) {
-      return owners.find((row) => row.id === id) ?? null
     },
     async findDslById(id) {
       return dsls.find((row) => row.id === id) ?? null
@@ -307,8 +277,7 @@ export function createInMemoryDslStore(): InMemoryDslStore {
     dump() {
       return {
         horses: [...horses],
-        trainers: [...trainers],
-        owners: [...owners],
+        parties: [...parties],
         dsls: [...dsls],
       }
     },

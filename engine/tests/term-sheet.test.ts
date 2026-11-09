@@ -10,12 +10,13 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import type { DslRow, HorseRow, OwnerRow, TrainerRow } from '../src/lib/dslStore'
+import type { DslRow, HorseRow, PartyRow } from '../src/lib/dslStore'
 import { BLANK, buildTermSheet, termDateLabel } from '../src/lib/termSheet'
 
 const DSL: DslRow = {
   id: 'dsl-1',
   horseId: 'horse-1',
+  trainerId: 'trainer-1',
   ownerId: 'owner-1',
   endDate: '2027-09-30',
   termStart: '2026-01-01',
@@ -25,13 +26,15 @@ const DSL: DslRow = {
   published: false,
   wholesaleMonthlyPerPercent: 65,
   retailMonthlyPerPercent: 71,
-  wholesaleMonthlyTotal: 6500,
   investorSplit: 75,
   listedStake: 10,
   minStake: 2.5,
   step: 2.5,
   stakeRemaining: 10,
   distributionSchedule: 'Monthly on the 1st.',
+  narrativeSignoff: null,
+  narrativeApprovedAt: null,
+  narrativeApprovedHash: null,
 }
 
 const HORSE = {
@@ -53,25 +56,41 @@ const HORSE = {
   raceExpectation: 'Expectation.',
   imageCount: 3,
   raceRecord: {},
-  trainerId: 'trainer-1',
 } as HorseRow
 
 const TRAINER = {
   id: 'trainer-1',
-  name: 'T Trainer',
-  stable: 'Stable',
+  displayName: 'T Trainer',
+  company: 'Stable',
+  contact: null,
   location: 'Cambridge',
   website: null,
   bio: 'Bio.',
-} as TrainerRow
+  achievements: null,
+  other: null,
+  xUrl: null,
+  facebookUrl: null,
+  instagramUrl: null,
+  links: [],
+  roles: ['trainer'],
+} as PartyRow
 
 const OWNER = {
   id: 'owner-1',
-  entity: 'Ketchikan Bloodstock Ltd',
+  displayName: 'Ketchikan Bloodstock Ltd',
+  company: null,
   contact: 'Contact',
+  location: null,
   website: null,
-  profile: null,
-} as OwnerRow
+  bio: null,
+  achievements: null,
+  other: null,
+  xUrl: null,
+  facebookUrl: null,
+  instagramUrl: null,
+  links: [],
+  roles: ['owner'],
+} as PartyRow
 
 function section(sheets: ReturnType<typeof buildTermSheet>, title: string) {
   const found = sheets.find((entry) => entry.title.startsWith(title))

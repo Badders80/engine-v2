@@ -1,13 +1,13 @@
 /**
- * Loading a DSL for the view and edit pages. PLAN.md step 4.
+ * Loading a DSL for the view and edit pages. Chunk 2.
  *
- * The store throws when the environment has no credentials, and this returns the
+ * The trainer and the owner hang off the DSL, not the horse (ruling 10). The
+ * store throws when the environment has no credentials, and this returns the
  * reason instead, so the page can say what is missing rather than showing a
- * stack trace. `notFound()` is called by the page, outside this function, so
- * nothing here swallows a control-flow error.
+ * stack trace.
  */
 
-import type { DslRow, HorseRow, OwnerRow, TrainerRow } from '@/lib/dslStore'
+import type { DslRow, HorseRow, PartyRow } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
 
 export type DslView =
@@ -16,8 +16,8 @@ export type DslView =
       found: true
       dsl: DslRow
       horse: HorseRow
-      trainer: TrainerRow | null
-      owner: OwnerRow | null
+      trainer: PartyRow | null
+      owner: PartyRow | null
     }
   | { ok: true; found: false }
   | { ok: false; reason: string }
@@ -34,9 +34,8 @@ export async function loadDslView(id: string): Promise<DslView> {
       return { ok: false, reason: `the horse ${dsl.horseId} for this DSL does not exist` }
     }
 
-    const trainer =
-      horse.trainerId === null ? null : await store.findTrainerById(horse.trainerId)
-    const owner = dsl.ownerId === null ? null : await store.findOwnerById(dsl.ownerId)
+    const trainer = dsl.trainerId === null ? null : await store.findPartyById(dsl.trainerId)
+    const owner = dsl.ownerId === null ? null : await store.findPartyById(dsl.ownerId)
 
     return { ok: true, found: true, dsl, horse, trainer, owner }
   } catch (error) {

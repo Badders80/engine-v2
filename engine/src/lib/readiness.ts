@@ -1,20 +1,24 @@
 /**
- * The single readiness check. DSL engine decision 2026-11-07.
+ * The single readiness check. DSL engine decision 2026-11-07; chunk 2 2026-11-10.
  *
- * A DSL exists from the moment the horse does: it can sit on the website as
- * Coming Soon with no commercial terms at all. Completeness is therefore not a
- * property of saving, it is a property of *listing* — the same field list must
- * gate the save action, the publish action and the compiler, or the three
- * drift and a buyer can reach a document that cannot be rendered.
+ * A DSL exists from the moment the deal does: it can sit at Coming Soon with
+ * no commercial terms at all. Completeness is therefore not a property of
+ * saving, it is a property of *listing* — the same field list gates the save
+ * action, the publish action and the compiler, or the three drift and a buyer
+ * can reach a document that cannot be rendered.
  *
  * This module is the TypeScript half of `assert_dsl_available()` in
- * `supabase/migrations/00015_owner_moves_to_dsl.sql`. The two must stay in
+ * `supabase/migrations/00021_parties_and_hardening.sql`. The two must stay in
  * step; `readiness.test.ts` pins this list, and the SQL gate is probed against
  * a real database rather than asserted.
  *
- * It returns the missing fields, not a boolean, so the operator is told what
- * to fix rather than refused.
+ * The four soft slots are the PDS's own (`legal/tokens.ts`). Available
+ * requires all four approved, with an approval timestamp and hash.
  */
+
+import { SOFT_TOKEN_KEYS } from './legal/tokens'
+
+export const NARRATIVE_SLOTS = SOFT_TOKEN_KEYS
 
 export type ReadinessDsl = {
   ownerId: string | null
@@ -41,10 +45,17 @@ export type ReadinessHorse = {
 
 export type ReadinessTrainer = { bio: string | null } | null
 
+export type ReadinessNarrative = {
+  signoff: Record<string, boolean> | null
+  approvedAt: string | null
+  approvedHash: string | null
+}
+
 export type ReadinessInput = {
   dsl: ReadinessDsl
   horse: ReadinessHorse | null
   trainer: ReadinessTrainer
+  narrative: ReadinessNarrative
 }
 
 export type ReadinessResult =
@@ -57,6 +68,13 @@ function present(value: string | null | undefined): boolean {
   return value !== null && value !== undefined && value.trim() !== ''
 }
 
+export function narrativeApproved(narrative: ReadinessNarrative): boolean {
+  if (!present(narrative.approvedAt) || !present(narrative.approvedHash)) return false
+  const signoff = narrative.signoff
+  if (signoff === null) return false
+  return NARRATIVE_SLOTS.every((slot) => signoff[slot] === true)
+}
+
 /**
  * What stops this DSL going `available`. An empty list means ready.
  *
@@ -64,7 +82,7 @@ function present(value: string | null | undefined): boolean {
  * page shows is the next thing to do.
  */
 export function checkDslReadiness(input: ReadinessInput): ReadinessResult {
-  const { dsl, horse, trainer } = input
+  const { dsl, horse, trainer, narrative } = input
   const missing: string[] = []
 
   if (dsl.ownerId === null) missing.push('the owner on the term sheet')
@@ -99,6 +117,9 @@ export function checkDslReadiness(input: ReadinessInput): ReadinessResult {
   if (!present(horse.raceExpectation)) missing.push('the race expectation paragraph')
 
   if (trainer === null || !present(trainer.bio)) missing.push("the trainer's bio")
+  if (!narrativeApproved(narrative)) {
+    missing.push('the narrative sign-off (all four PDS soft slots approved)')
+  }
 
   return missing.length === 0 ? { ok: true } : { ok: false, missing }
 }

@@ -56,7 +56,16 @@ export default async function Page({
 
   const { dsl, horse, trainer, owner } = view
   const sections = buildTermSheet({ dsl, horse, trainer, owner })
-  const readiness = checkDslReadiness({ dsl, horse, trainer })
+  const readiness = checkDslReadiness({
+    dsl,
+    horse,
+    trainer,
+    narrative: {
+      signoff: dsl.narrativeSignoff,
+      approvedAt: dsl.narrativeApprovedAt,
+      approvedHash: dsl.narrativeApprovedHash,
+    },
+  })
 
   // The count is the source of truth for what to show; the keys are derived
   // from it, so this page never calls the bucket. `image_count` is written from

@@ -1,9 +1,8 @@
 /**
- * Edit one DSL. PLAN.md step 4.
+ * Edit one DSL. Chunk 2, ruling 11.
  *
- * The same form as create, with the horse and the DSL already in place. The
- * engine refuses any status an unregistered horse may not hold, refuses a rename
- * onto a taken slug, and never resets the stake remaining.
+ * The same form as create, with the horse, the parties and the DSL already in
+ * place. Records owns the entities; this page writes one `dsls` row.
  */
 
 import Link from 'next/link'
@@ -45,8 +44,11 @@ export default async function Page({
   const { dsl, horse, trainer, owner } = view
 
   const store = recordStore()
-  const trainers = await store.listTrainers()
-  const owners = await store.listOwners()
+  const [horses, trainers, owners] = await Promise.all([
+    store.listHorses(),
+    store.listPartiesByRole('trainer'),
+    store.listPartiesByRole('owner'),
+  ])
 
   return (
     <main>
@@ -56,8 +58,8 @@ export default async function Page({
       </p>
 
       <p>
-        A rename changes the slug and the image folder, and a second horse holding that slug is
-        refused. The stake remaining is left where the sales put it.
+        The horse and the parties are edited in Records; this page only links them. The
+        stake remaining is left where the sales put it.
       </p>
 
       <DslForm
@@ -65,11 +67,21 @@ export default async function Page({
         submitLabel="Save changes"
         dslId={dsl.id}
         error={error ?? null}
-        defaults={{ horse, trainer: trainer ?? {}, owner: owner ?? {}, dsl }}
-        trainerOptions={trainers.map((t) => ({ id: t.id, name: t.name, stable: t.stable }))}
-        ownerOptions={owners.map((o) => ({ id: o.id, entity: o.entity }))}
-        currentTrainerId={horse.trainerId}
-        currentOwnerId={dsl.ownerId}
+        defaults={{ dsl }}
+        horseOptions={horses.map((h) => ({
+          id: h.id,
+          legalName: h.legalName,
+          slug: h.slug,
+        }))}
+        trainerOptions={trainers.map((t) => ({
+          id: t.id,
+          displayName: t.displayName,
+          company: t.company,
+        }))}
+        ownerOptions={owners.map((o) => ({ id: o.id, displayName: o.displayName }))}
+        currentHorseId={horse.id}
+        currentTrainerId={dsl.trainerId ?? trainer?.id ?? null}
+        currentOwnerId={dsl.ownerId ?? owner?.id ?? null}
       />
     </main>
   )

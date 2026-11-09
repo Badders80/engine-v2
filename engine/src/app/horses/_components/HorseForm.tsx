@@ -1,4 +1,4 @@
-import type { HorseRow, TrainerRow } from '@/lib/dslStore'
+import type { HorseRow } from '@/lib/dslStore'
 
 import {
   Button,
@@ -6,7 +6,6 @@ import {
   Field,
   FieldGroup,
   FormShell,
-  Select,
   TextArea,
   TextInput,
 } from '../../_components/forms'
@@ -20,7 +19,6 @@ import {
  */
 export function HorseForm({
   action,
-  trainers,
   horse = null,
   horseId = null,
   raceRecordJson,
@@ -28,7 +26,6 @@ export function HorseForm({
   error = null,
 }: {
   action: (formData: FormData) => void | Promise<void>
-  trainers: TrainerRow[]
   horse?: Partial<HorseRow> | null
   horseId?: string | null
   raceRecordJson: string
@@ -123,23 +120,6 @@ export function HorseForm({
             />
             Registered with loveracing.nz
           </label>
-        </FieldGroup>
-
-        <FieldGroup legend="Trainer">
-          <Field
-            label="Current trainer"
-            htmlFor="trainerId"
-            help="Optional. Pick an existing trainer, or leave unassigned and attach one later."
-          >
-            <Select id="trainerId" name="trainerId" defaultValue={horse?.trainerId ?? ''}>
-              <option value="">No trainer assigned</option>
-              {trainers.map((trainer) => (
-                <option key={trainer.id} value={trainer.id}>
-                  {trainer.name} — {trainer.stable}
-                </option>
-              ))}
-            </Select>
-          </Field>
         </FieldGroup>
 
         <details className="rounded-md border border-line bg-panel p-5">

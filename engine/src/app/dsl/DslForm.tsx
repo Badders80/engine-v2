@@ -1,38 +1,22 @@
 /**
- * The one operator form. PLAN.md step 4.
+ * The DSL form. Chunk 2, ruling 11.
  *
- * Horse, trainer, and owner are written from this page. They have no screens of
- * their own, so this is the only place those rows come in.
+ * The DSL attaches existing records: one horse, one trainer, one owner, all
+ * picked by id. It authors none of them. The horse prose, the trainer bio and
+ * the owner profile live in Records; the narrative editor that signs them off
+ * arrives with chunk 3.
  *
- * The branding controls at the bottom carry no `name` attribute. That is the
- * whole point: an input without a name is never submitted, so a branding choice
- * on this page cannot reach the database even by accident.
+ * The branding controls carry no `name` attribute, so a branding choice here
+ * cannot reach the database even by accident.
  */
 
-import type { DslDraft, HorseDraft } from '@/lib/dsl'
+import type { DslDraft } from '@/lib/dsl'
 
 import { PaymentModelField } from './PaymentModelField'
 import { TermDatesField } from './TermDatesField'
 
 export type DslFormDefaults = {
-  horse?: Partial<HorseDraft>
-  trainer?: {
-    name?: string
-    stable?: string
-    location?: string
-    website?: string | null
-    bio?: string | null
-  }
-  owner?: {
-    entity?: string
-    contact?: string
-    website?: string | null
-    profile?: string | null
-  }
-  /**
-   * A DSL row is nullable on every commercial field: the listing can exist
-   * before the deal is done. The form renders an absent field as blank.
-   */
+  /** A DSL row is nullable on every commercial field. */
   dsl?: { [K in keyof DslDraft]?: DslDraft[K] | null }
 }
 
@@ -42,9 +26,10 @@ type Props = {
   defaults?: DslFormDefaults
   error?: string | null
   dslId?: string
-  /** Existing rows the operator can attach instead of retyping one. */
-  trainerOptions?: readonly { id: string; name: string; stable: string }[]
-  ownerOptions?: readonly { id: string; entity: string }[]
+  horseOptions: readonly { id: string; legalName: string; slug: string }[]
+  trainerOptions: readonly { id: string; displayName: string; company: string | null }[]
+  ownerOptions: readonly { id: string; displayName: string }[]
+  currentHorseId?: string | null
   currentTrainerId?: string | null
   currentOwnerId?: string | null
 }
@@ -55,14 +40,13 @@ export function DslForm({
   defaults = {},
   error = null,
   dslId,
-  trainerOptions = [],
-  ownerOptions = [],
+  horseOptions,
+  trainerOptions,
+  ownerOptions,
+  currentHorseId = null,
   currentTrainerId = null,
   currentOwnerId = null,
 }: Props) {
-  const horse = defaults.horse ?? {}
-  const trainer = defaults.trainer ?? {}
-  const owner = defaults.owner ?? {}
   const dsl = defaults.dsl ?? {}
 
   return (
@@ -71,154 +55,40 @@ export function DslForm({
       {dslId !== undefined ? <input type="hidden" name="dslId" value={dslId} /> : null}
 
       <fieldset>
-        <legend>Horse</legend>
+        <legend>Parties</legend>
 
         <label>
-          Legal name
-          <input name="legalName" defaultValue={horse.legalName ?? ''} required />
+          Horse
+          <select name="horseId" defaultValue={currentHorseId ?? ''} required>
+            <option value="">— choose a horse —</option>
+            {horseOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.legalName} — {option.slug}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
-          Foaling date
-          <input type="date" name="foalingDate" defaultValue={horse.foalingDate ?? ''} required />
-        </label>
-
-        <label>
-          Sex
-          <input name="sex" defaultValue={horse.sex ?? ''} required />
-        </label>
-
-        <label>
-          Colour
-          <input name="colour" defaultValue={horse.colour ?? ''} required />
-        </label>
-
-        <label>
-          Breeder
-          <input name="breeder" defaultValue={horse.breeder ?? ''} />
-        </label>
-
-        <label>
-          Sire, entered by hand
-          <input name="sireName" defaultValue={horse.sireName ?? ''} required />
-        </label>
-
-        <label>
-          Dam, entered by hand
-          <input name="damName" defaultValue={horse.damName ?? ''} required />
-        </label>
-
-        <label>
-          Microchip
-          <input name="microchip" defaultValue={horse.microchip ?? ''} />
-        </label>
-
-        <label>
-          Life number
-          <input name="lifeNumber" defaultValue={horse.lifeNumber ?? ''} />
-        </label>
-
-        <label>
-          Loveracing id
-          <input name="loveracingId" defaultValue={horse.loveracingId ?? ''} />
-        </label>
-
-        <label>
-          <input type="checkbox" name="registered" defaultChecked={horse.registered ?? false} />
-          Registered with loveracing.nz
-        </label>
-
-        <label>
-          Race record, one json object
-          <textarea
-            name="raceRecord"
-            rows={8}
-            defaultValue={JSON.stringify(horse.raceRecord ?? {}, null, 2)}
-          />
-        </label>
-      </fieldset>
-
-      <fieldset>
-        <legend>The three soft slots, written by hand</legend>
-
-        <label>
-          About the horse
-          <textarea name="aboutHorse" rows={4} defaultValue={horse.aboutHorse ?? ''} />
-        </label>
-
-        <label>
-          Racing outlook and pedigree
-          <textarea
-            name="racingOutlookAndPedigree"
-            rows={4}
-            defaultValue={horse.racingOutlookAndPedigree ?? ''}
-          />
-        </label>
-
-        <label>
-          Race expectation
-          <textarea name="raceExpectation" rows={4} defaultValue={horse.raceExpectation ?? ''} />
-        </label>
-      </fieldset>
-
-      <fieldset>
-        <legend>Trainer</legend>
-
-        <label>
-          Attach an existing trainer
+          Trainer
           <select name="trainerId" defaultValue={currentTrainerId ?? ''}>
-            <option value="">— create a new trainer below —</option>
+            <option value="">— no trainer yet (Coming Soon only) —</option>
             {trainerOptions.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.name} — {option.stable}
+                {option.displayName}
+                {option.company === null ? '' : ` — ${option.company}`}
               </option>
             ))}
           </select>
         </label>
 
-        <p>
-          <small>
-            Picking a trainer ignores the fields below. Edit that trainer&apos;s bio on its own
-            page.
-          </small>
-        </p>
-
         <label>
-          Name
-          <input name="trainerName" defaultValue={trainer.name ?? ''} />
-        </label>
-
-        <label>
-          Stable
-          <input name="trainerStable" defaultValue={trainer.stable ?? ''} />
-        </label>
-
-        <label>
-          Location
-          <input name="trainerLocation" defaultValue={trainer.location ?? ''} />
-        </label>
-
-        <label>
-          Website
-          <input name="trainerWebsite" defaultValue={trainer.website ?? ''} />
-        </label>
-
-        <label>
-          Bio
-          <textarea name="trainerBio" rows={4} defaultValue={trainer.bio ?? ''} />
-        </label>
-      </fieldset>
-
-      <fieldset>
-        <legend>Owner</legend>
-
-        <label>
-          Attach an existing owner
+          Owner
           <select name="ownerId" defaultValue={currentOwnerId ?? ''}>
-            <option value="">— create a new owner below —</option>
+            <option value="">— no owner yet (Coming Soon only) —</option>
             {ownerOptions.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.entity}
+                {option.displayName}
               </option>
             ))}
           </select>
@@ -226,30 +96,10 @@ export function DslForm({
 
         <p>
           <small>
-            Picking an owner ignores the fields below. Edit that owner&apos;s profile on its own
-            page.
+            These are Records. Create or edit them on <code>/horses</code>,{' '}
+            <code>/trainers</code> and <code>/owners</code>; this page only links them.
           </small>
         </p>
-
-        <label>
-          Entity
-          <input name="ownerEntity" defaultValue={owner.entity ?? ''} />
-        </label>
-
-        <label>
-          Contact
-          <input name="ownerContact" defaultValue={owner.contact ?? ''} />
-        </label>
-
-        <label>
-          Website
-          <input name="ownerWebsite" defaultValue={owner.website ?? ''} />
-        </label>
-
-        <label>
-          Profile
-          <textarea name="ownerProfile" rows={4} defaultValue={owner.profile ?? ''} />
-        </label>
       </fieldset>
 
       <fieldset>

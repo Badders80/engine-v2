@@ -41,6 +41,16 @@ function ready(): ReadinessInput {
       raceExpectation: 'A paragraph about what to expect.',
     },
     trainer: { bio: 'A paragraph about the trainer.' },
+    narrative: {
+      signoff: {
+        'horse.about_horse': true,
+        'horse.racing_outlook_and_pedigree': true,
+        'horse.race_expectation': true,
+        'trainer.bio': true,
+      },
+      approvedAt: '2026-11-01T00:00:00.000Z',
+      approvedHash: 'a'.repeat(64),
+    },
   }
 }
 
@@ -153,6 +163,32 @@ describe('the content the legal pack needs', () => {
     const input = ready()
     input.horse = null
     expect(missingOf(checkDslReadiness(input))).toContain('the horse')
+  })
+})
+
+describe('the four soft slots must be approved', () => {
+  it('refuses when one slot is not approved', () => {
+    const input = ready()
+    input.narrative.signoff = { 'horse.about_horse': true }
+    expect(missingOf(checkDslReadiness(input))).toContain(
+      'the narrative sign-off (all four PDS soft slots approved)',
+    )
+  })
+
+  it('refuses when the approval timestamp is missing', () => {
+    const input = ready()
+    input.narrative.approvedAt = null
+    expect(missingOf(checkDslReadiness(input))).toContain(
+      'the narrative sign-off (all four PDS soft slots approved)',
+    )
+  })
+
+  it('refuses when the approval hash is missing', () => {
+    const input = ready()
+    input.narrative.approvedHash = ''
+    expect(missingOf(checkDslReadiness(input))).toContain(
+      'the narrative sign-off (all four PDS soft slots approved)',
+    )
   })
 })
 

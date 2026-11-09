@@ -262,11 +262,11 @@ export async function compileBuyerDocuments(
   if (horse === null) return { ok: false, reason: `horse ${dsl.horseId} does not exist` }
 
   const trainer =
-    horse.trainerId === null ? null : await store.findTrainerById(horse.trainerId)
+    dsl.trainerId === null ? null : await store.findPartyById(dsl.trainerId)
   if (trainer === null) return { ok: false, reason: 'horse has no trainer row' }
 
   if (dsl.ownerId === null) return { ok: false, reason: 'dsl has no owner row' }
-  const owner = await store.findOwnerById(dsl.ownerId)
+  const owner = await store.findPartyById(dsl.ownerId)
   if (owner === null) return { ok: false, reason: 'dsl has no owner row' }
 
   const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)

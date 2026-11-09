@@ -47,8 +47,8 @@ export type LegalPackInput = {
     racingOutlookAndPedigree: string | null
     raceExpectation: string | null
   }
-  trainer: { name: string; location: string; bio: string | null }
-  owner: { entity: string }
+  trainer: { displayName: string; location: string | null; bio: string | null }
+  owner: { displayName: string }
   sale: { stake: number; executedDate: string }
 }
 
@@ -211,7 +211,7 @@ export const RESOLVERS: Record<ScalarKey, (input: LegalPackInput) => string> = {
   'horse.sex': (input) => required(input.horse.sex, 'horse.sex'),
   'horse.sire_name': (input) => required(input.horse.sireName, 'horse.sire_name'),
 
-  'owner.entity_name': (input) => required(input.owner.entity, 'owner.entity_name'),
+  'owner.entity_name': (input) => required(input.owner.displayName, 'owner.entity_name'),
 
   'pricing.float_per_percent_nzd': (input) =>
     money(floatTotal(input.dsl.retailMonthlyPerPercent, 1)),
@@ -237,7 +237,7 @@ export const RESOLVERS: Record<ScalarKey, (input: LegalPackInput) => string> = {
 
   'trainer.bio': (input) => required(input.trainer.bio, 'trainer.bio'),
   'trainer.location': (input) => required(input.trainer.location, 'trainer.location'),
-  'trainer.name': (input) => required(input.trainer.name, 'trainer.name'),
+  'trainer.name': (input) => required(input.trainer.displayName, 'trainer.name'),
 }
 
 /**

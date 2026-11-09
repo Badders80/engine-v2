@@ -1,15 +1,12 @@
 /**
- * Create a DSL. PLAN.md step 4.
+ * Create a DSL. Chunk 2, ruling 11.
  *
- * The registered path starts here: paste the loveracing.nz link, press Load, and
- * the page comes back with the fields it found and the race record it will store
- * as one blob. The operator confirms or edits them, fills the soft slots by
- * hand, and saves. The unregistered path is the same form with nothing loaded.
+ * The horse, the trainer and the owner are Records. This page links them by
+ * id and writes the deal. The horse is created on `/horses/new`; the DSL form
+ * no longer authors one.
  */
 
 import Link from 'next/link'
-
-import { loadLoveracingPage } from '@/lib/loveracingFetch'
 
 import { recordStore } from '../../records/store'
 import { DslForm, type DslFormDefaults } from '../DslForm'
@@ -20,21 +17,17 @@ export const dynamic = 'force-dynamic'
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ loveracing?: string; error?: string }>
+  searchParams: Promise<{ error?: string }>
 }) {
   const params = await searchParams
-  const link = (params.loveracing ?? '').trim()
-
-  const loaded = link === '' ? null : await loadLoveracingPage(link)
-
   const store = recordStore()
-  const trainers = await store.listTrainers()
-  const owners = await store.listOwners()
+  const [horses, trainers, owners] = await Promise.all([
+    store.listHorses(),
+    store.listPartiesByRole('trainer'),
+    store.listPartiesByRole('owner'),
+  ])
 
-  const defaults: DslFormDefaults =
-    loaded !== null && loaded.ok
-      ? { horse: { ...loaded.value.horse, raceRecord: loaded.value.raceRecord } }
-      : {}
+  const defaults: DslFormDefaults = {}
 
   return (
     <main>
@@ -43,52 +36,29 @@ export default async function Page({
         <Link href="/">Back</Link>
       </p>
 
-      <section>
-        <h2>Start from a loveracing.nz link</h2>
-        <form method="get">
-          <label>
-            loveracing.nz link
-            <input
-              type="url"
-              name="loveracing"
-              defaultValue={link}
-              placeholder="https://loveracing.nz/..."
-            />
-          </label>
-          <button type="submit">Load</button>
-        </form>
+      <p>
+        A DSL links records that already exist. Add the horse on{' '}
+        <Link href="/horses/new">/horses/new</Link> first; add the trainer and the owner on
+        their Records pages. Nothing here authors one.
+      </p>
 
-        {loaded !== null && !loaded.ok ? <p role="alert">{loaded.reason}</p> : null}
-
-        {loaded !== null && loaded.ok ? (
-          <div>
-            <h3>Loaded, waiting for your confirmation</h3>
-            <p>
-              {loaded.value.horse.legalName}, foaled {loaded.value.horse.foalingDate}. The
-              fields below are filled in from the page. Correct anything that is wrong. The
-              race record is stored as one blob.
-            </p>
-            <pre>{JSON.stringify(loaded.value.raceRecord, null, 2)}</pre>
-          </div>
-        ) : null}
-      </section>
-
-      <section>
-        <h2>Type the horse in by hand</h2>
-        <p>
-          An unregistered horse is typed here, with its sire and dam entered by hand. It saves
-          at Coming Soon and no further until it is registered.
-        </p>
-
-        <DslForm
-          action={createDslAction}
-          submitLabel="Save the DSL"
-          defaults={defaults}
-          error={params.error ?? null}
-          trainerOptions={trainers.map((t) => ({ id: t.id, name: t.name, stable: t.stable }))}
-          ownerOptions={owners.map((o) => ({ id: o.id, entity: o.entity }))}
-        />
-      </section>
+      <DslForm
+        action={createDslAction}
+        submitLabel="Save the DSL"
+        defaults={defaults}
+        error={params.error ?? null}
+        horseOptions={horses.map((h) => ({
+          id: h.id,
+          legalName: h.legalName,
+          slug: h.slug,
+        }))}
+        trainerOptions={trainers.map((t) => ({
+          id: t.id,
+          displayName: t.displayName,
+          company: t.company,
+        }))}
+        ownerOptions={owners.map((o) => ({ id: o.id, displayName: o.displayName }))}
+      />
     </main>
   )
 }

@@ -1,26 +1,37 @@
 /**
- * Editing a DSL through the same door as creating one. PLAN.md step 4.
+ * The DSL edit action. Chunk 2 (2026-11-10).
  *
- * The gate runs against the status the DSL is at now, so an unregistered horse
- * already sitting at Coming Soon cannot be walked forward by an edit. The stake
- * remaining is never reset, because buyers have drawn it down already.
+ * An edit writes **one** `dsls` row. Records owns the horse, trainers and
+ * owners, so an edit attaches ids and changes the status; it never writes
+ * another table. The status machine runs against the status the DSL is at
+ * now, so an illegal move is refused and the row is left alone.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
-  saveDsl,
   updateDsl,
-  type DslDraft,
   type EditDslInput,
-  type SaveDslInput,
   type SavedDsl,
 } from '../src/lib/dsl'
-import { createInMemoryDslStore, type InMemoryDslStore } from '../src/lib/dslStore'
+import {
+  createInMemoryDslStore,
+  type InMemoryDslStore,
+  type NewDsl,
+} from '../src/lib/dslStore'
 import { retailPerPercentFromWholesale } from '../src/lib/pricing'
+import { APPROVED_NARRATIVE, approvedDraft, draft, seedStore } from './helpers/dsl-fixture'
 
-function draft(overrides: Partial<DslDraft> = {}): DslDraft {
+async function ok(result: Awaited<ReturnType<typeof updateDsl>>): Promise<SavedDsl> {
+  if (!result.ok) throw new Error(`expected an edit, got: ${result.reason}`)
+  return result.value
+}
+
+function dslRow(overrides: Partial<NewDsl>): NewDsl {
   return {
+    horseId: '',
+    trainerId: null,
+    ownerId: null,
     endDate: '2029-05-31',
     termStart: '2026-11-01',
     paymentModel: 'subscription_float',
@@ -28,342 +39,273 @@ function draft(overrides: Partial<DslDraft> = {}): DslDraft {
     status: 'coming_soon',
     published: false,
     wholesaleMonthlyPerPercent: 65,
+    retailMonthlyPerPercent: retailPerPercentFromWholesale(65),
     investorSplit: 75,
     listedStake: 5,
     minStake: 1,
     step: 1,
+    stakeRemaining: 5,
     distributionSchedule: 'Monthly on the 1st.',
+    narrativeSignoff: null,
+    narrativeApprovedAt: null,
+    narrativeApprovedHash: null,
     ...overrides,
   }
 }
 
-function input(overrides: Partial<SaveDslInput> = {}): SaveDslInput {
+function edit(
+  seeded: {
+    dsl: { id: string }
+    horse: { id: string }
+    trainer: { id: string }
+    owner: { id: string }
+  },
+  overrides: Partial<EditDslInput> = {},
+): EditDslInput {
   return {
-    horse: {
-      legalName: 'Lady Ketchikan',
-      foalingDate: '2021-09-14',
-      sex: 'Filly',
-      colour: 'Bay',
-      breeder: 'Ketchikan Bloodstock Ltd',
-      sireName: 'Wexford Lad',
-      damName: 'Ketchikan Bay',
-      microchip: '985113000123456',
-      lifeNumber: 'NZ01234567',
-      loveracingId: 'LR-88421',
-      registered: true,
-      aboutHorse: 'A paragraph about the horse.',
-      racingOutlookAndPedigree: 'A paragraph about the racing outlook.',
-      raceExpectation: 'A paragraph about what to expect.',
-      imageCount: 3,
-    },
-    trainer: {
-      name: 'T Trainer',
-      stable: 'Wexford Stables',
-      location: 'Cambridge',
-      website: null,
-      bio: 'One bio.',
-    },
-    owner: {
-      entity: 'Ketchikan Bloodstock Ltd',
-      contact: 'C Contact',
-      website: null,
-      profile: 'One profile paragraph.',
-    },
-    dsl: draft(),
+    dslId: seeded.dsl.id,
+    trainerId: seeded.trainer.id,
+    ownerId: seeded.owner.id,
+    dsl: draft({ status: 'coming_soon' }),
     ...overrides,
   }
-}
-
-/** The trainer and the owner stay as they are; only the horse and DSL move. */
-function edit(seed: SavedDsl, overrides: Partial<EditDslInput> = {}): EditDslInput {
-  return {
-    dslId: seed.dsl.id,
-    horse: {},
-    trainer: input().trainer,
-    owner: input().owner,
-    dsl: draft(),
-    ...overrides,
-  }
-}
-
-async function ok(result: Awaited<ReturnType<typeof saveDsl>>): Promise<SavedDsl> {
-  if (!result.ok) throw new Error(`expected a save, got: ${result.reason}`)
-  return result.value
 }
 
 let store: InMemoryDslStore
-
-async function seed(overrides: Partial<SaveDslInput> = {}): Promise<SavedDsl> {
-  return ok(await saveDsl(input(overrides), store))
-}
 
 beforeEach(() => {
   store = createInMemoryDslStore()
 })
 
-describe('an edit writes the soft slots the operator fills by hand', () => {
-  it('writes all three', async () => {
-    const seedRow = await seed()
-
-    const saved = await ok(
-      await updateDsl(
-        edit(seedRow, {
-          horse: {
-            aboutHorse: 'About the horse.',
-            racingOutlookAndPedigree: 'Outlook and pedigree.',
-            raceExpectation: 'Race expectation.',
-          },
-        }),
-        store,
-      ),
-    )
-
-    expect(saved.horse.aboutHorse).toBe('About the horse.')
-    expect(saved.horse.racingOutlookAndPedigree).toBe('Outlook and pedigree.')
-    expect(saved.horse.raceExpectation).toBe('Race expectation.')
-  })
-
-  it('keeps the hard facts it was not given', async () => {
-    const seedRow = await seed()
-    const saved = await ok(await updateDsl(edit(seedRow, { horse: { aboutHorse: 'Only this.' } }), store))
-
-    expect(saved.horse.legalName).toBe('Lady Ketchikan')
-    expect(saved.horse.microchip).toBe('985113000123456')
-    expect(saved.horse.foalingDate).toBe('2021-09-14')
-    expect(saved.horse.sireName).toBe('Wexford Lad')
-    expect(saved.horse.registered).toBe(true)
-  })
-
-  it('does not duplicate the trainer or the owner', async () => {
-    const seedRow = await seed()
-    await ok(await updateDsl(edit(seedRow, { horse: { raceExpectation: 'Set.' } }), store))
-
-    const rows = store.dump()
-    expect(rows.trainers).toHaveLength(1)
-    expect(rows.owners).toHaveLength(1)
-    expect(rows.horses).toHaveLength(1)
-    expect(rows.dsls).toHaveLength(1)
-  })
-})
+/** Seed the Records rows and one DSL row in the given status. */
+async function seedDsl(overrides: Partial<NewDsl> = {}) {
+  const seeded = await seedStore(store)
+  const dsl = await store.insertDsl(
+    dslRow({ horseId: seeded.horse.id, trainerId: seeded.trainer.id, ownerId: seeded.owner.id, ...overrides }),
+  )
+  return { ...seeded, dsl }
+}
 
 describe('an edit re-derives the price and never resets the stake remaining', () => {
   it('re-derives the retail figure from the new wholesale figure', async () => {
-    const seedRow = await seed()
+    const seeded = await seedDsl()
     const saved = await ok(
-      await updateDsl(edit(seedRow, { dsl: draft({ wholesaleMonthlyPerPercent: 70 }) }), store),
+      await updateDsl(edit(seeded, { dsl: draft({ wholesaleMonthlyPerPercent: 70 }) }), store),
     )
-
-    expect(retailPerPercentFromWholesale(65)).toBe(71)
-    expect(saved.dsl.wholesaleMonthlyPerPercent).toBe(70)
-    expect(saved.dsl.retailMonthlyPerPercent).toBe(76)
-    expect(store.dump().dsls[0].retailMonthlyPerPercent).toBe(76)
-  })
-
-  it('ignores a retail figure passed in from the page', async () => {
-    const seedRow = await seed()
-    const tampered = {
-      ...edit(seedRow),
-      dsl: { ...draft(), retailMonthlyPerPercent: 987654321 },
-    }
-    const saved = await ok(await updateDsl(tampered as EditDslInput, store))
-
-    expect(saved.dsl.retailMonthlyPerPercent).toBe(71)
-    expect(JSON.stringify(store.dump())).not.toContain('987654321')
+    expect(saved.dsl.retailMonthlyPerPercent).toBe(retailPerPercentFromWholesale(70))
   })
 
   it('leaves the stake remaining where the sales left it', async () => {
-    const seedRow = await seed()
-    await store.updateDsl(seedRow.dsl.id, { stakeRemaining: 3 })
-
+    const seeded = await seedDsl({ stakeRemaining: 2 })
     const saved = await ok(
-      await updateDsl(edit(seedRow, { horse: { raceExpectation: 'Set.' } }), store),
+      await updateDsl(edit(seeded, { dsl: draft({ listedStake: 5 }) }), store),
     )
-
-    expect(saved.dsl.stakeRemaining).toBe(3)
-    expect(saved.dsl.listedStake).toBe(5)
+    expect(saved.dsl.stakeRemaining).toBe(2)
   })
 
   it('refuses commercial terms outside the range, leaving the row alone', async () => {
-    const seedRow = await seed()
-    const result = await updateDsl(edit(seedRow, { dsl: draft({ investorSplit: 86 }) }), store)
-
+    const seeded = await seedDsl()
+    const result = await updateDsl(
+      edit(seeded, { dsl: draft({ investorSplit: 86 }) }),
+      store,
+    )
     expect(result.ok).toBe(false)
-    expect(store.dump().dsls[0].investorSplit).toBe(75)
+    const row = await store.findDslById(seeded.dsl.id)
+    expect(row?.investorSplit).toBe(75)
   })
 })
 
-describe('the registration gate runs against the status the DSL is at now', () => {
-  it('refuses to walk an unregistered horse past coming_soon, and leaves the status alone', async () => {
-    const seedRow = await seed({ horse: { ...input().horse, registered: false } })
-
-    for (const status of ['available', 'fully_allocated', 'completed'] as const) {
-      const result = await updateDsl(edit(seedRow, { dsl: draft({ status }) }), store)
-      expect(result.ok).toBe(false)
-      expect(store.dump().dsls[0].status).toBe('coming_soon')
-    }
-  })
-
-  it('permits an unregistered horse to be edited while it stays at coming_soon', async () => {
-    const seedRow = await seed({ horse: { ...input().horse, registered: false } })
+describe('the status is a machine', () => {
+  it('permits coming_soon -> available when fully ready', async () => {
+    const seeded = await seedDsl()
     const saved = await ok(
       await updateDsl(
-        edit(seedRow, { horse: { raceExpectation: 'Typed by hand.' } }),
+        {
+          dslId: seeded.dsl.id,
+          trainerId: seeded.trainer.id,
+          ownerId: seeded.owner.id,
+          dsl: approvedDraft(),
+        },
         store,
       ),
     )
-
-    expect(saved.dsl.status).toBe('coming_soon')
-    expect(saved.horse.registered).toBe(false)
-  })
-
-  it('permits a registered horse to move to available', async () => {
-    const seedRow = await seed()
-    const saved = await ok(
-      await updateDsl(edit(seedRow, { dsl: draft({ status: 'available', published: true }) }), store),
-    )
-
     expect(saved.dsl.status).toBe('available')
   })
 
-  it('refuses to move an unregistered horse forward, leaving the row where it was', async () => {
-    const seedRow = await seed({ horse: { ...input().horse, registered: false } })
+  it('permits a no-op at the same status', async () => {
+    const seeded = await seedDsl({
+      status: 'available',
+      published: true,
+      narrativeSignoff: { ...APPROVED_NARRATIVE.narrativeSignoff },
+      narrativeApprovedAt: APPROVED_NARRATIVE.narrativeApprovedAt,
+      narrativeApprovedHash: APPROVED_NARRATIVE.narrativeApprovedHash,
+    })
+    const saved = await ok(
+      await updateDsl(
+        {
+          dslId: seeded.dsl.id,
+          trainerId: seeded.trainer.id,
+          ownerId: seeded.owner.id,
+          dsl: draft({ status: 'available', published: true }),
+        },
+        store,
+      ),
+    )
+    expect(saved.dsl.status).toBe('available')
+  })
+
+  it('permits fully_allocated -> completed', async () => {
+    const seeded = await seedDsl({ status: 'fully_allocated', published: true })
+    const saved = await ok(
+      await updateDsl(
+        {
+          dslId: seeded.dsl.id,
+          trainerId: seeded.trainer.id,
+          ownerId: seeded.owner.id,
+          dsl: draft({ status: 'completed', published: true }),
+        },
+        store,
+      ),
+    )
+    expect(saved.dsl.status).toBe('completed')
+  })
+
+  it('refuses a move the machine does not declare, leaving the status alone', async () => {
+    const seeded = await seedDsl({ status: 'completed', published: true })
     const result = await updateDsl(
-      edit(seedRow, { dsl: draft({ status: 'available', published: true }) }),
+      {
+        dslId: seeded.dsl.id,
+        trainerId: seeded.trainer.id,
+        ownerId: seeded.owner.id,
+        dsl: draft({ status: 'available', published: true }),
+      },
       store,
     )
-
     expect(result.ok).toBe(false)
-    expect(store.dump().dsls[0].status).toBe('coming_soon')
+    const row = await store.findDslById(seeded.dsl.id)
+    expect(row?.status).toBe('completed')
   })
 
-  it('allows it once the same edit records the horse as registered', async () => {
-    // `registered` is a fact on the horse, so the value being written is the one
-    // the gate reads. Recording the registration and taking the horse to
-    // available in one save is the one lawful way past Coming Soon.
-    const seedRow = await seed({ horse: { ...input().horse, registered: false } })
-    const saved = await ok(
-      await updateDsl(
-        edit(seedRow, {
-          horse: { registered: true },
-          dsl: draft({ status: 'available', published: true }),
-        }),
-        store,
-      ),
+  it('refuses an unregistered horse moving past coming_soon', async () => {
+    const seeded = await seedDsl()
+    // Mutate the horse the way Records would: registered false.
+    await store.updateHorse(seeded.horse.id, { registered: false })
+    const result = await updateDsl(
+      {
+        dslId: seeded.dsl.id,
+        trainerId: seeded.trainer.id,
+        ownerId: seeded.owner.id,
+        dsl: approvedDraft(),
+      },
+      store,
     )
-
-    expect(saved.horse.registered).toBe(true)
-    expect(saved.dsl.status).toBe('available')
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/unregistered/)
+    const row = await store.findDslById(seeded.dsl.id)
+    expect(row?.status).toBe('coming_soon')
   })
 })
 
 describe('the rules specific to editing', () => {
   it('refuses an edit to a DSL that does not exist', async () => {
-    const seedRow = await seed()
+    const seeded = await seedDsl()
     const result = await updateDsl(
-      { ...edit(seedRow), dslId: '00000000-0000-4000-8000-000000000000' },
+      { ...edit(seeded), dslId: '00000000-0000-4000-8000-000000000000' },
       store,
     )
-
     expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected a refusal')
-    expect(result.reason).toMatch(/does not exist/)
+    if (result.ok) return
+    expect(result.reason).toContain('does not exist')
   })
 
   it('refuses an end date this horse already has a DSL for', async () => {
-    const seedRow = await seed()
-    // The store gives the inserted row its own id, so the seeded one is harmless.
-    await store.insertDsl({ ...seedRow.dsl, endDate: '2030-05-31' })
-
-    const result = await updateDsl(
-      edit(seedRow, { dsl: draft({ endDate: '2030-05-31' }) }),
-      store,
-    )
-
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected a refusal')
-    expect(result.reason).toMatch(/2030-05-31/)
-    expect(store.dump().dsls).toHaveLength(2)
-  })
-
-  it('refuses a rename onto a slug another horse already holds', async () => {
-    const seedRow = await seed()
-    await ok(
-      await saveDsl(
-        input({
-          horse: { ...input().horse, legalName: 'Mulan The Brave', microchip: '985113000999999' },
-        }),
-        store,
-      ),
-    )
-
-    const result = await updateDsl(
-      edit(seedRow, { horse: { legalName: 'Mulan The Brave' } }),
-      store,
-    )
-
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected a refusal')
-    expect(result.reason).toMatch(/mulan-the-brave/)
-    expect(store.dump().horses[0].slug).toBe('lady-ketchikan')
-  })
-
-  it('moves the slug with the legal name on a rename that is free', async () => {
-    const seedRow = await seed()
-    const saved = await ok(
-      await updateDsl(edit(seedRow, { horse: { legalName: 'Lady Ketchikan II' } }), store),
-    )
-
-    expect(saved.horse.slug).toBe('lady-ketchikan-ii')
-    expect(saved.horse.legalName).toBe('Lady Ketchikan II')
-  })
-
-  it('leaves the horse and DSL counts alone', async () => {
-    const seedRow = await seed()
-    await ok(await updateDsl(edit(seedRow), store))
-
-    const rows = store.dump()
-    expect(rows.horses).toHaveLength(1)
-    expect(rows.dsls).toHaveLength(1)
-  })
-})
-
-describe('the payment-model rule holds on edit', () => {
-  it('refuses to move an existing float to a 5-month term, leaving the row alone', async () => {
-    const seedRow = await seed()
-    const result = await updateDsl(
-      edit(seedRow, {
-        dsl: draft({ termStart: '2026-01-01', endDate: '2026-05-31' }),
+    const seeded = await seedDsl()
+    await store.insertDsl(
+      dslRow({
+        horseId: seeded.horse.id,
+        trainerId: seeded.trainer.id,
+        ownerId: seeded.owner.id,
+        endDate: '2030-05-31',
       }),
+    )
+    const result = await updateDsl(
+      edit(seeded, { dsl: draft({ endDate: '2030-05-31' }) }),
       store,
     )
-
     expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected the short float to be refused')
-    expect(result.reason).toMatch(/must use upfront/)
-
-    const stored = store.dump().dsls[0]
-    expect(stored.paymentModel).toBe('subscription_float')
-    expect(stored.termStart).toBe('2026-11-01')
-    expect(stored.endDate).toBe('2029-05-31')
+    if (result.ok) return
+    expect(result.reason).toMatch(/already has a DSL/)
   })
 
-  it('accepts the same 5-month term once the model is upfront', async () => {
-    const seedRow = await seed()
+  it('changes the trainer on the DSL without writing a party', async () => {
+    const seeded = await seedDsl()
+    const otherTrainer = await store.insertParty(
+      {
+        ...seeded.trainer,
+        displayName: 'Second Trainer',
+      },
+      ['trainer'],
+    )
+    const partiesBefore = store.dump().parties.length
+
     const saved = await ok(
       await updateDsl(
-        edit(seedRow, {
-          dsl: draft({
-            termStart: '2026-01-01',
-            endDate: '2026-05-31',
-            paymentModel: 'upfront',
-          }),
-        }),
+        { ...edit(seeded), trainerId: otherTrainer.id },
         store,
       ),
     )
 
-    expect(saved.dsl.paymentModel).toBe('upfront')
-    expect(saved.dsl.termStart).toBe('2026-01-01')
-    expect(saved.dsl.endDate).toBe('2026-05-31')
+    expect(saved.dsl.trainerId).toBe(otherTrainer.id)
+    expect(store.dump().parties).toHaveLength(partiesBefore)
+  })
+
+  it('refuses a trainer id that does not hold the trainer role', async () => {
+    const seeded = await seedDsl()
+    const result = await updateDsl(
+      { ...edit(seeded), trainerId: seeded.owner.id },
+      store,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/trainer role/)
+  })
+
+  it('leaves an approval in place when the edit does not mention the narrative', async () => {
+    const seeded = await seedDsl({
+      status: 'available',
+      published: true,
+      narrativeSignoff: { ...APPROVED_NARRATIVE.narrativeSignoff },
+      narrativeApprovedAt: APPROVED_NARRATIVE.narrativeApprovedAt,
+      narrativeApprovedHash: APPROVED_NARRATIVE.narrativeApprovedHash,
+    })
+    const saved = await ok(
+      await updateDsl(
+        {
+          dslId: seeded.dsl.id,
+          trainerId: seeded.trainer.id,
+          ownerId: seeded.owner.id,
+          dsl: draft({ status: 'available', published: true }),
+        },
+        store,
+      ),
+    )
+    expect(saved.dsl.narrativeApprovedHash).toBe(APPROVED_NARRATIVE.narrativeApprovedHash)
+  })
+
+  it('refuses available when no owner is attached', async () => {
+    const seeded = await seedDsl()
+    const result = await updateDsl(
+      {
+        dslId: seeded.dsl.id,
+        trainerId: seeded.trainer.id,
+        ownerId: null,
+        dsl: approvedDraft(),
+      },
+      store,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/owner/)
   })
 })

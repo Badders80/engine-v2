@@ -87,6 +87,31 @@ describe('registered horse keeps the full lifecycle', () => {
   })
 })
 
+describe('the status matrix, every from × to pair', () => {
+  const ALLOWED: Record<DslStatus, readonly DslStatus[]> = {
+    coming_soon: ['coming_soon', 'available'],
+    available: ['available', 'fully_allocated', 'coming_soon', 'completed'],
+    fully_allocated: ['fully_allocated', 'completed'],
+    completed: ['completed'],
+  }
+
+  for (const from of LIFECYCLE) {
+    for (const to of LIFECYCLE) {
+      const legal = ALLOWED[from].includes(to)
+      it(`${legal ? 'permits' : 'refuses'} ${from} -> ${to}`, () => {
+        expect(checkStatusTransition({ registered: true, from, to }).ok).toBe(legal)
+      })
+    }
+  }
+
+  it('permits only coming_soon or available as the initial status', () => {
+    for (const to of LIFECYCLE) {
+      const legal = to === 'coming_soon' || to === 'available'
+      expect(checkStatusTransition({ registered: true, from: null, to }).ok).toBe(legal)
+    }
+  })
+})
+
 describe('the gate is scoped to registration only', () => {
   it('ignores a published flag, so Coming Soon is reachable published or not', () => {
     // The published flag is the DSL's own boolean, not a gate input. A widened

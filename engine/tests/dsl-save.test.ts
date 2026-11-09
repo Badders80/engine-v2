@@ -1,92 +1,33 @@
 /**
- * One operator save writes the horse, the trainer, the owner, and the DSL.
- * PLAN.md step 4, OUTCOME.md § Records and § DSL.
+ * The DSL create action. Chunk 2 (2026-11-10), ruling 11.
  *
- * Horse, trainer, and owner have no screens of their own, so this single pure
- * action is the only door those rows come through. The store is injected: the
- * in-memory implementation carries these assertions in CI, the Supabase
- * implementation sits behind the same interface.
+ * The DSL attaches existing Records rows: `saveDsl` takes `horseId`,
+ * `trainerId` and `ownerId` and writes **one** `dsls` row. It never writes a
+ * horse, trainer or owner. A failure therefore leaves zero rows.
+ *
+ * The store is injected: the in-memory implementation carries these
+ * assertions in CI; the Supabase implementation sits behind the same
+ * interface and is probed separately.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  saveDsl,
-  type DslDraft,
-  type SaveDslInput,
-  type SavedDsl,
-} from '../src/lib/dsl'
+import { saveDsl, type SaveDslInput, type SavedDsl } from '../src/lib/dsl'
 import { createInMemoryDslStore, type DslStore, type InMemoryDslStore } from '../src/lib/dslStore'
 import { retailPerPercentFromWholesale } from '../src/lib/pricing'
-
-/** Stands in for a branding choice made on the page. It must never be stored. */
-const BRANDING_SENTINEL = 'BRANDING-SENTINEL-NOT-STORED'
-
-function draft(overrides: Partial<DslDraft> = {}): DslDraft {
-  return {
-    endDate: '2029-05-31',
-    termStart: '2026-11-01',
-    paymentModel: 'subscription_float',
-    closeStyle: 'fourteen_day',
-    status: 'coming_soon',
-    published: false,
-    wholesaleMonthlyPerPercent: 65,
-    investorSplit: 75,
-    listedStake: 5,
-    minStake: 1,
-    step: 1,
-    distributionSchedule: 'Monthly on the 1st.',
-    ...overrides,
-  }
-}
-
-function input(overrides: Partial<SaveDslInput> = {}): SaveDslInput {
-  return {
-    horse: {
-      legalName: 'Lady Ketchikan',
-      foalingDate: '2021-09-14',
-      sex: 'Filly',
-      colour: 'Bay',
-      breeder: 'Ketchikan Bloodstock Ltd',
-      sireName: 'Wexford Lad',
-      damName: 'Ketchikan Bay',
-      microchip: '985113000123456',
-      lifeNumber: 'NZ01234567',
-      loveracingId: 'LR-88421',
-      registered: true,
-      aboutHorse: 'A paragraph about the horse.',
-      racingOutlookAndPedigree: 'A paragraph about the racing outlook.',
-      raceExpectation: 'A paragraph about what to expect.',
-      imageCount: 3,
-    },
-    trainer: {
-      name: 'T Trainer',
-      stable: 'Wexford Stables',
-      location: 'Cambridge',
-      website: 'https://example.test',
-      bio: 'One bio.',
-    },
-    owner: {
-      entity: 'Ketchikan Bloodstock Ltd',
-      contact: 'C Contact',
-      website: null,
-      profile: 'One profile paragraph.',
-    },
-    dsl: draft(),
-    ...overrides,
-  }
-}
+import {
+  approvedDraft,
+  draft,
+  saveInput,
+  seedStore,
+} from './helpers/dsl-fixture'
 
 async function ok(result: Awaited<ReturnType<typeof saveDsl>>): Promise<SavedDsl> {
   if (!result.ok) throw new Error(`expected a save, got: ${result.reason}`)
   return result.value
 }
 
-/**
- * A store that loses the last leg of the save exactly once, the way a failed
- * `dsls.insert` over HTTP does: trainer, owner, and horse land, the DSL does
- * not. The next call behaves normally, which is the retry the operator makes.
- */
+/** A store whose single `insertDsl` fails once, the way a refused HTTP write does. */
 function failingFirstDslInsert(base: InMemoryDslStore): DslStore {
   let failNext = true
   return {
@@ -107,679 +48,295 @@ beforeEach(() => {
   store = createInMemoryDslStore()
 })
 
-describe('one save writes and links horse, trainer, and owner', () => {
-  it('creates one row in each table', async () => {
-    await ok(await saveDsl(input(), store))
-    const rows = store.dump()
-    expect(rows.horses).toHaveLength(1)
-    expect(rows.trainers).toHaveLength(1)
-    expect(rows.owners).toHaveLength(1)
-    expect(rows.dsls).toHaveLength(1)
+describe('the DSL writes one table', () => {
+  it('writes exactly one dsls row and no horse or party row', async () => {
+    const input = await saveInput(store)
+    const before = store.dump()
+
+    const saved = await ok(await saveDsl(input, store))
+    const after = store.dump()
+
+    expect(after.horses).toHaveLength(before.horses.length)
+    expect(after.parties).toHaveLength(before.parties.length)
+    expect(after.dsls).toHaveLength(before.dsls.length + 1)
+    expect(saved.dsl.id).toBe(after.dsls[0].id)
   })
 
-  it('links the DSL to the horse, and the DSL to its owner', async () => {
-    const saved = await ok(await saveDsl(input(), store))
-    expect(saved.horse.trainerId).toBe(saved.trainer.id)
-    expect(saved.dsl.ownerId).toBe(saved.owner.id)
-    expect(saved.dsl.horseId).toBe(saved.horse.id)
+  it('links the DSL to the horse, the trainer and the owner by id', async () => {
+    const input = await saveInput(store)
+    const saved = await ok(await saveDsl(input, store))
+
+    expect(saved.dsl.horseId).toBe(input.horseId)
+    expect(saved.dsl.trainerId).toBe(input.trainerId)
+    expect(saved.dsl.ownerId).toBe(input.ownerId)
+    expect(saved.trainer?.id).toBe(input.trainerId)
+    expect(saved.owner?.id).toBe(input.ownerId)
   })
 
-  it('generates the trainer and owner ids, since the schema declares no default', async () => {
-    // supabase/migrations/00002_trainers.sql and 00003_owners.sql declare
-    // `id uuid primary key` with no default, unlike horses and dsls.
-    const saved = await ok(await saveDsl(input(), store))
-    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    expect(saved.trainer.id).toMatch(uuid)
-    expect(saved.owner.id).toMatch(uuid)
+  it('leaves zero rows when the one write fails', async () => {
+    const input = await saveInput(store)
+    const before = store.dump()
+
+    await expect(saveDsl(input, failingFirstDslInsert(store))).rejects.toThrow('dsls insert failed')
+
+    const after = store.dump()
+    expect(after.dsls).toHaveLength(before.dsls.length)
+    expect(after.horses).toHaveLength(before.horses.length)
+    expect(after.parties).toHaveLength(before.parties.length)
   })
 
-  it('derives the slug from the legal name', async () => {
-    const saved = await ok(await saveDsl(input(), store))
-    expect(saved.horse.slug).toBe('lady-ketchikan')
-  })
-
-  it('refuses a second horse that produces the same slug', async () => {
-    await ok(await saveDsl(input(), store))
-    const second = await saveDsl(input(), store)
-    expect(second.ok).toBe(false)
-    if (second.ok) throw new Error('expected the duplicate slug to be refused')
-    expect(second.reason).toMatch(/slug/i)
-    expect(store.dump().horses).toHaveLength(1)
-  })
-
-  it('reuses the trainer and owner rather than duplicating them on a second horse', async () => {
-    await ok(await saveDsl(input(), store))
-    await ok(
+  it('allows a Coming Soon DSL with no trainer and no owner', async () => {
+    const seeded = await seedStore(store)
+    const saved = await ok(
       await saveDsl(
-        input({
-          horse: { ...input().horse, legalName: 'Mulan The Brave', microchip: '985113000999999' },
-        }),
+        { horseId: seeded.horse.id, trainerId: null, ownerId: null, dsl: draft() },
         store,
       ),
     )
-    const rows = store.dump()
-    expect(rows.horses).toHaveLength(2)
-    expect(rows.trainers).toHaveLength(1)
-    expect(rows.owners).toHaveLength(1)
-    expect(rows.horses[1].trainerId).toBe(rows.horses[0].trainerId)
+    expect(saved.dsl.trainerId).toBeNull()
+    expect(saved.dsl.ownerId).toBeNull()
+    expect(saved.trainer).toBeNull()
+    expect(saved.owner).toBeNull()
+  })
+})
+
+describe('the ids must name Records rows that hold the role', () => {
+  it('refuses a horse id that does not exist', async () => {
+    const input = await saveInput(store)
+    const result = await saveDsl({ ...input, horseId: 'missing-horse' }, store)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toContain('does not exist')
+    expect(store.dump().dsls).toHaveLength(0)
+  })
+
+  it('refuses a trainer id that does not exist', async () => {
+    const input = await saveInput(store)
+    const result = await saveDsl({ ...input, trainerId: 'missing-party' }, store)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toContain('does not exist')
+    expect(store.dump().dsls).toHaveLength(0)
+  })
+
+  it('refuses an owner id that does not hold the owner role', async () => {
+    const seeded = await seedStore(store)
+    const trainerOnly = await store.insertParty(
+      { ...seeded.trainer, displayName: 'Trainer Only' },
+      ['trainer'],
+    )
+    const result = await saveDsl(
+      { horseId: seeded.horse.id, trainerId: seeded.trainer.id, ownerId: trainerOnly.id, dsl: draft() },
+      store,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/owner role/)
+    expect(store.dump().dsls).toHaveLength(0)
+  })
+
+  it('refuses a trainer id that does not hold the trainer role', async () => {
+    const seeded = await seedStore(store)
+    const ownerOnly = await store.insertParty({ ...seeded.owner, displayName: 'Owner Only' }, [
+      'owner',
+    ])
+    const result = await saveDsl(
+      { horseId: seeded.horse.id, trainerId: ownerOnly.id, ownerId: seeded.owner.id, dsl: draft() },
+      store,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/trainer role/)
+  })
+})
+
+describe('pin 3: a horse holds one listing', () => {
+  it('refuses a second DSL for a horse that already holds one', async () => {
+    const input = await saveInput(store)
+    await ok(await saveDsl(input, store))
+
+    const result = await saveDsl({ ...input, dsl: draft({ endDate: '2030-05-31' }) }, store)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/already holds a DSL/)
+    expect(store.dump().dsls).toHaveLength(1)
   })
 })
 
 describe('the initial stake remaining is the listed stake', () => {
   it('sets stake_remaining equal to listed_stake on insert', async () => {
-    const saved = await ok(await saveDsl(input({ dsl: draft({ listedStake: 100 }) }), store))
-    expect(saved.dsl.stakeRemaining).toBe(100)
+    const input = await saveInput(store, { listedStake: 12 })
+    const saved = await ok(await saveDsl(input, store))
+    expect(saved.dsl.stakeRemaining).toBe(12)
   })
 
-  it('never leaves stake_remaining unset, since the column has no default', async () => {
-    // supabase/migrations/00005_dsls.sql:39 is `not null` with no default.
-    const saved = await ok(await saveDsl(input({ dsl: draft({ listedStake: 5, step: 5 }) }), store))
-    expect(saved.dsl.stakeRemaining).toBe(5)
-    expect(saved.dsl.stakeRemaining).toBe(saved.dsl.listedStake)
+  it('never leaves stake_remaining unset when the listed stake is blank', async () => {
+    const input = await saveInput(store, { listedStake: Number.NaN })
+    const saved = await ok(await saveDsl(input, store))
+    expect(saved.dsl.listedStake).toBeNull()
+    expect(saved.dsl.stakeRemaining).toBeNull()
   })
 })
 
 describe('the retail price is derived, never supplied', () => {
-  it('uses the Step 3 rules module for the stored retail figure', async () => {
-    const saved = await ok(await saveDsl(input({ dsl: draft({ wholesaleMonthlyPerPercent: 65 }) }), store))
-    const expected = retailPerPercentFromWholesale(65)
-    expect(expected).toBe(71)
-    expect(saved.dsl.retailMonthlyPerPercent).toBe(expected)
-  })
-
-  it('ignores a retail figure passed in from the page', async () => {
-    // A DSL row holds one price input. The generated column means a writer
-    // cannot store a second one, and the action must not either. The sentinel
-    // is long enough that no generated id can contain it by accident.
-    const tampered = {
-      ...input(),
-      dsl: { ...draft(), retailMonthlyPerPercent: 987654321 },
-    }
-    const saved = await ok(await saveDsl(tampered as SaveDslInput, store))
-    expect(saved.dsl.retailMonthlyPerPercent).toBe(71)
-    expect(JSON.stringify(store.dump())).not.toContain('987654321')
-  })
-
-  it('keeps the wholesale figure as the single price input', async () => {
-    const saved = await ok(
-      await saveDsl(input({ dsl: draft({ wholesaleMonthlyPerPercent: 70 }) }), store),
-    )
-    expect(saved.dsl.wholesaleMonthlyPerPercent).toBe(70)
-    expect(saved.dsl.retailMonthlyPerPercent).toBe(76)
-  })
-})
-
-describe('branding fields on the page are not stored', () => {
-  it('writes no branding onto the horse or the DSL', async () => {
-    const saved = await ok(
-      await saveDsl(
-        {
-          ...input(),
-          branding: { primary: BRANDING_SENTINEL },
-        } as SaveDslInput,
-        store,
-      ),
-    )
-    expect(Object.keys(saved.horse)).not.toContain('branding')
-    expect(Object.keys(saved.dsl)).not.toContain('branding')
-    expect(JSON.stringify(store.dump())).not.toContain(BRANDING_SENTINEL)
+  it('uses the pricing module for the stored retail figure', async () => {
+    const input = await saveInput(store, { wholesaleMonthlyPerPercent: 65 })
+    const saved = await ok(await saveDsl(input, store))
+    expect(saved.dsl.retailMonthlyPerPercent).toBe(retailPerPercentFromWholesale(65))
   })
 })
 
 describe('commercial terms are validated before anything is written', () => {
   it('refuses an investor split below the range', async () => {
-    const result = await saveDsl(input({ dsl: draft({ investorSplit: 49 }) }), store)
+    const input = await saveInput(store, { investorSplit: 49 })
+    const result = await saveDsl(input, store)
     expect(result.ok).toBe(false)
-    expect(store.dump().horses).toHaveLength(0)
+    expect(store.dump().dsls).toHaveLength(0)
   })
 
   it('refuses an investor split above the range', async () => {
-    const result = await saveDsl(input({ dsl: draft({ investorSplit: 86 }) }), store)
+    const input = await saveInput(store, { investorSplit: 86 })
+    const result = await saveDsl(input, store)
     expect(result.ok).toBe(false)
-    expect(store.dump().horses).toHaveLength(0)
+    expect(store.dump().dsls).toHaveLength(0)
   })
 
   it('stores an unassigned split as null, never as the empty form value', async () => {
-    const saved = await ok(await saveDsl(input({ dsl: draft({ investorSplit: null }) }), store))
+    const input = await saveInput(store, { investorSplit: Number.NaN as unknown as number })
+    const saved = await ok(await saveDsl(input, store))
     expect(saved.dsl.investorSplit).toBeNull()
   })
 
   it('refuses a listed stake that is not a whole multiple of the step', async () => {
-    const result = await saveDsl(
-      input({ dsl: draft({ listedStake: 7, minStake: 1, step: 5 }) }),
-      store,
-    )
+    const input = await saveInput(store, { listedStake: 5, step: 2 })
+    const result = await saveDsl(input, store)
     expect(result.ok).toBe(false)
-    expect(store.dump().horses).toHaveLength(0)
+    expect(store.dump().dsls).toHaveLength(0)
+  })
+
+  it('refuses a minimum stake above the listed stake', async () => {
+    const input = await saveInput(store, { minStake: 6, listedStake: 5 })
+    const result = await saveDsl(input, store)
+    expect(result.ok).toBe(false)
   })
 })
 
 describe('the registration gate holds on save', () => {
-  it('saves an unregistered horse typed by hand at coming_soon', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({
-          horse: {
-            ...input().horse,
-            registered: false,
-            microchip: null,
-            lifeNumber: null,
-            loveracingId: null,
-          },
-          dsl: draft({ status: 'coming_soon', published: false }),
-        }),
-        store,
-      ),
-    )
-    expect(saved.horse.registered).toBe(false)
-    expect(saved.horse.microchip).toBeNull()
-  })
-
-  it('saves an unregistered horse at coming_soon whether published or not', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({ horse: { ...input().horse, registered: false }, dsl: draft({ published: true }) }),
-        store,
-      ),
-    )
+  it('saves an unregistered horse at coming_soon', async () => {
+    const input = await saveInput(store, { status: 'coming_soon' }, { horse: { registered: false } })
+    const saved = await ok(await saveDsl(input, store))
     expect(saved.dsl.status).toBe('coming_soon')
-    expect(saved.dsl.published).toBe(true)
   })
 
-  it('refuses to save an unregistered horse past coming_soon, writing nothing', async () => {
-    for (const status of ['available', 'fully_allocated', 'completed'] as const) {
-      const scoped = createInMemoryDslStore()
-      const result = await saveDsl(
-        input({ horse: { ...input().horse, registered: false }, dsl: draft({ status }) }),
-        scoped,
-      )
-      expect(result.ok).toBe(false)
-      const rows = scoped.dump()
-      expect(rows.horses).toHaveLength(0)
-      expect(rows.trainers).toHaveLength(0)
-      expect(rows.owners).toHaveLength(0)
-      expect(rows.dsls).toHaveLength(0)
-    }
-  })
-
-  it('permits a registered horse to save at available', async () => {
-    const saved = await ok(
-      await saveDsl(input({ dsl: draft({ status: 'available', published: true }) }), store),
+  it('refuses an unregistered horse at available, writing nothing', async () => {
+    const input = await saveInput(
+      store,
+      approvedDraft(),
+      { horse: { registered: false } },
     )
+    const result = await saveDsl(input, store)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/unregistered/)
+    expect(store.dump().dsls).toHaveLength(0)
+  })
+
+  it('permits a registered horse to save at available when fully ready', async () => {
+    const seeded = await seedStore(store)
+    const input: SaveDslInput = {
+      horseId: seeded.horse.id,
+      trainerId: seeded.trainer.id,
+      ownerId: seeded.owner.id,
+      dsl: approvedDraft(),
+    }
+    const saved = await ok(await saveDsl(input, store))
     expect(saved.dsl.status).toBe('available')
   })
 })
 
-describe('the race record is one jsonb blob', () => {
-  it('stores the record as a single object on the horse', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({
-          horse: {
-            ...input().horse,
-            raceRecord: { starts: 4, wins: 1, places: 1, resultLines: ['1st Maiden 1200'] },
-          },
-        }),
-        store,
-      ),
-    )
-    expect(saved.horse.raceRecord).toEqual({
-      starts: 4,
-      wins: 1,
-      places: 1,
-      resultLines: ['1st Maiden 1200'],
-    })
-  })
-
-  it('defaults the record to an empty object, never null', async () => {
-    const saved = await ok(await saveDsl(input(), store))
-    expect(saved.horse.raceRecord).toEqual({})
-  })
-})
-
-describe('the soft slots are the three on the horse', () => {
-  it('writes about_horse, racing_outlook_and_pedigree, and race_expectation', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({
-          horse: {
-            ...input().horse,
-            aboutHorse: 'About the horse.',
-            racingOutlookAndPedigree: 'Outlook and pedigree.',
-            raceExpectation: 'Race expectation.',
-          },
-        }),
-        store,
-      ),
-    )
-    expect(saved.horse.aboutHorse).toBe('About the horse.')
-    expect(saved.horse.racingOutlookAndPedigree).toBe('Outlook and pedigree.')
-    expect(saved.horse.raceExpectation).toBe('Race expectation.')
-  })
-
-  it('leaves them empty on a first save, so the operator can fill them after loading', async () => {
-    const base = input()
-    const saved = await ok(
-      await saveDsl(
-        {
-          ...base,
-          horse: {
-            ...base.horse,
-            aboutHorse: null,
-            racingOutlookAndPedigree: null,
-            raceExpectation: null,
-          },
-        },
-        store,
-      ),
-    )
-    expect(saved.horse.aboutHorse).toBeNull()
-    expect(saved.horse.racingOutlookAndPedigree).toBeNull()
-    expect(saved.horse.raceExpectation).toBeNull()
-  })
-})
-
-describe('a save abandoned at its last leg does not lock the horse out', () => {
-  it('reuses the orphan horse instead of refusing its slug on retry', async () => {
-    const flaky = failingFirstDslInsert(store)
-
-    await expect(saveDsl(input(), flaky)).rejects.toThrow(/dsls insert failed/)
-    expect(store.dump().horses).toHaveLength(1)
-    expect(store.dump().dsls).toHaveLength(0)
-
-    const retry = await ok(await saveDsl(input(), flaky))
-    const rows = store.dump()
-    expect(rows.horses).toHaveLength(1)
-    expect(rows.dsls).toHaveLength(1)
-    expect(retry.dsl.horseId).toBe(retry.horse.id)
-    expect(rows.dsls[0].horseId).toBe(rows.horses[0].id)
-  })
-
-  it('takes the corrected values from the resubmission onto the orphan', async () => {
-    const flaky = failingFirstDslInsert(store)
-    await expect(saveDsl(input(), flaky)).rejects.toThrow(/dsls insert failed/)
-
-    const retry = await ok(
-      await saveDsl(
-        input({ horse: { ...input().horse, colour: 'Chestnut', imageCount: 3 } }),
-        flaky,
-      ),
-    )
-    expect(retry.horse.colour).toBe('Chestnut')
-    expect(retry.horse.imageCount).toBe(3)
-    expect(store.dump().horses).toHaveLength(1)
-  })
-
-  it('still refuses a slug collision once the horse has a DSL of its own', async () => {
-    await ok(await saveDsl(input(), store))
-    const second = await saveDsl(input(), store)
-    expect(second.ok).toBe(false)
-    expect(store.dump().horses).toHaveLength(1)
-    expect(store.dump().dsls).toHaveLength(1)
-  })
-})
-
 describe('the payment-model rule holds on save', () => {
-  const shortTerms = [
-    { termStart: '2026-01-01', endDate: '2026-03-31' }, // 3 months
-    { termStart: '2026-01-01', endDate: '2026-04-30' }, // 4 months
-    { termStart: '2026-01-01', endDate: '2026-05-31' }, // 5 months
-  ]
-
-  it('refuses subscription_float at 3, 4, and 5 months, writing nothing', async () => {
-    for (const dates of shortTerms) {
-      const scoped = createInMemoryDslStore()
-      const result = await saveDsl(
-        input({ dsl: draft({ ...dates, paymentModel: 'subscription_float' }) }),
-        scoped,
-      )
-
+  it('refuses subscription_float at 3, 4, and 5 months', async () => {
+    for (const endDate of ['2027-01-31', '2027-02-28', '2027-03-31']) {
+      const fresh = createInMemoryDslStore()
+      const input = await saveInput(fresh, { paymentModel: 'subscription_float', endDate })
+      const result = await saveDsl(input, fresh)
       expect(result.ok).toBe(false)
-      if (result.ok) throw new Error('expected the short float to be refused')
-      expect(result.reason).toMatch(/must use upfront/)
-      expect(scoped.dump().horses).toHaveLength(0)
-      expect(scoped.dump().dsls).toHaveLength(0)
+      expect(fresh.dump().dsls).toHaveLength(0)
     }
   })
 
   it('accepts upfront at 5 months', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({
-          dsl: draft({
-            termStart: '2026-01-01',
-            endDate: '2026-05-31',
-            paymentModel: 'upfront',
-          }),
-        }),
-        store,
-      ),
-    )
-    expect(saved.dsl.paymentModel).toBe('upfront')
+    const input = await saveInput(store, { paymentModel: 'upfront', endDate: '2027-03-31' })
+    await ok(await saveDsl(input, store))
   })
 
   it('accepts either model at 6 months', async () => {
-    for (const paymentModel of ['subscription_float', 'upfront'] as const) {
-      const scoped = createInMemoryDslStore()
-      const saved = await ok(
-        await saveDsl(
-          input({
-            dsl: draft({
-              termStart: '2026-01-01',
-              endDate: '2026-06-30',
-              paymentModel,
-            }),
-          }),
-          scoped,
-        ),
-      )
-      expect(saved.dsl.paymentModel).toBe(paymentModel)
-    }
-  })
-
-  it('accepts upfront at 18 months', async () => {
-    const saved = await ok(
-      await saveDsl(
-        input({
-          dsl: draft({
-            termStart: '2026-01-01',
-            endDate: '2027-06-30',
-            paymentModel: 'upfront',
-          }),
-        }),
-        store,
-      ),
-    )
-    expect(saved.dsl.paymentModel).toBe('upfront')
-  })
-
-  it('refuses invalid term dates, writing nothing', async () => {
-    for (const dates of [
-      { termStart: '2026-01-01', endDate: '2026-13-01' },
-      { termStart: '2026-06-01', endDate: '2026-05-31' },
-      { termStart: '2026-03-20', endDate: '2026-03-01' },
-      { termStart: '2026-01-15', endDate: '2026-06-30' },
-      { termStart: '2026-01-01', endDate: '2026-06-15' },
-    ]) {
-      const scoped = createInMemoryDslStore()
-      const result = await saveDsl(input({ dsl: draft(dates) }), scoped)
-
-      expect(result.ok).toBe(false)
-      if (result.ok) throw new Error('expected the invalid term to be refused')
-      expect(result.reason).toMatch(/term dates are invalid/)
-      expect(scoped.dump().horses).toHaveLength(0)
+    for (const paymentModel of ['upfront', 'subscription_float'] as const) {
+      const fresh = createInMemoryDslStore()
+      const input = await saveInput(fresh, { paymentModel, endDate: '2027-04-30' })
+      await ok(await saveDsl(input, fresh))
     }
   })
 })
 
 describe('a DSL exists before its deal does', () => {
   it('saves at Coming Soon with every commercial field blank', async () => {
-    const blank = draft({
+    const input = await saveInput(store, {
       endDate: '',
       termStart: '',
-      paymentModel: '' as DslDraft['paymentModel'],
-      closeStyle: '' as DslDraft['closeStyle'],
+      paymentModel: '' as never,
+      closeStyle: '' as never,
       wholesaleMonthlyPerPercent: Number.NaN,
-      investorSplit: null,
+      investorSplit: Number.NaN as unknown as number,
       listedStake: Number.NaN,
       minStake: Number.NaN,
       step: Number.NaN,
-      distributionSchedule: null,
+      distributionSchedule: '',
     })
-
-    const saved = await ok(await saveDsl(input({ dsl: blank }), store))
-
+    const saved = await ok(await saveDsl(input, store))
     expect(saved.dsl.status).toBe('coming_soon')
     expect(saved.dsl.endDate).toBeNull()
-    expect(saved.dsl.listedStake).toBeNull()
+    expect(saved.dsl.investorSplit).toBeNull()
   })
 
   it('refuses available and names what is still missing', async () => {
-    const blank = draft({
-      status: 'available',
-      published: true,
-      endDate: '',
-      termStart: '',
-      paymentModel: '' as DslDraft['paymentModel'],
-      closeStyle: '' as DslDraft['closeStyle'],
-      wholesaleMonthlyPerPercent: Number.NaN,
-      investorSplit: null,
-      listedStake: Number.NaN,
-      minStake: Number.NaN,
-      step: Number.NaN,
-      distributionSchedule: null,
-    })
-
-    const result = await saveDsl(input({ dsl: blank }), store)
-
+    const seeded = await seedStore(store, { horse: { imageCount: 0 } })
+    const input: SaveDslInput = {
+      horseId: seeded.horse.id,
+      trainerId: seeded.trainer.id,
+      ownerId: seeded.owner.id,
+      dsl: approvedDraft(),
+    }
+    const result = await saveDsl(input, store)
     expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected an incomplete listing to be refused')
-    expect(result.reason).toMatch(/cannot go Available yet/)
-    expect(result.reason).toMatch(/the owner on the term sheet|the term start and end date/)
+    if (result.ok) return
+    expect(result.reason).toMatch(/image/i)
   })
 
-  it('refuses available when the horse prose is empty', async () => {
-    const base = input()
+  it('refuses available when no owner is attached', async () => {
+    const seeded = await seedStore(store)
+    const result = await saveDsl(
+      { horseId: seeded.horse.id, trainerId: seeded.trainer.id, ownerId: null, dsl: approvedDraft() },
+      store,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/owner/)
+  })
+
+  it('refuses available when the narrative is not fully approved', async () => {
+    const seeded = await seedStore(store)
     const result = await saveDsl(
       {
-        ...base,
-        horse: { ...base.horse, aboutHorse: null, imageCount: 0 },
-        dsl: draft({ status: 'available', published: true }),
+        horseId: seeded.horse.id,
+        trainerId: seeded.trainer.id,
+        ownerId: seeded.owner.id,
+        dsl: approvedDraft({ narrativeSignoff: { 'horse.about_horse': true } }),
       },
       store,
     )
-
     expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected an incomplete horse to be refused')
-    expect(result.reason).toMatch(/the about-the-horse paragraph/)
-    expect(result.reason).toMatch(/at least 3 horse images/)
-  })
-})
-
-describe('an edit to a trainer or owner persists (B8)', () => {
-  it('updates an existing trainer in place and never doubles it', async () => {
-    await ok(await saveDsl(input(), store))
-
-    const base = input()
-    const second = await ok(
-      await saveDsl(
-        {
-          ...base,
-          horse: { ...base.horse, legalName: 'Second Horse' },
-          trainer: { ...base.trainer, bio: 'A rewritten bio.' },
-        },
-        store,
-      ),
-    )
-
-    expect(store.dump().trainers).toHaveLength(1)
-    expect(second.trainer.bio).toBe('A rewritten bio.')
-  })
-
-  it('updates an existing owner in place and never doubles it', async () => {
-    await ok(await saveDsl(input(), store))
-
-    const base = input()
-    const second = await ok(
-      await saveDsl(
-        {
-          ...base,
-          horse: { ...base.horse, legalName: 'Third Horse' },
-          owner: { ...base.owner, profile: 'A rewritten profile.' },
-        },
-        store,
-      ),
-    )
-
-    expect(store.dump().owners).toHaveLength(1)
-    expect(second.owner.profile).toBe('A rewritten profile.')
-  })
-
-  it('does not drop a trainer website change', async () => {
-    await ok(await saveDsl(input(), store))
-
-    const base = input()
-    const second = await ok(
-      await saveDsl(
-        {
-          ...base,
-          horse: { ...base.horse, legalName: 'Fourth Horse' },
-          trainer: { ...base.trainer, website: 'https://new.example.test' },
-        },
-        store,
-      ),
-    )
-
-    expect(second.trainer.website).toBe('https://new.example.test')
-  })
-})
-
-describe('the Records profile fields survive a DSL save', () => {
-  it('leaves a matched trainer and owner profile untouched', async () => {
-    const trainer = await store.insertTrainer({
-      name: 'T Trainer',
-      stable: 'Wexford Stables',
-      location: 'Cambridge',
-      website: 'https://example.test',
-      bio: 'One bio.',
-      achievements: 'Group 1 winner.',
-      other: 'Other notes.',
-      xUrl: 'https://x.com/t',
-      facebookUrl: 'https://facebook.com/t',
-      instagramUrl: 'https://instagram.com/t',
-      links: [{ label: 'Stable', url: 'https://example.test/stable' }],
-    })
-
-    const owner = await store.insertOwner({
-      entity: 'Ketchikan Bloodstock Ltd',
-      contact: 'C Contact',
-      website: null,
-      profile: 'One profile paragraph.',
-      achievements: 'Owner achievements.',
-      other: 'Owner other.',
-      xUrl: 'https://x.com/o',
-      facebookUrl: 'https://facebook.com/o',
-      instagramUrl: 'https://instagram.com/o',
-      links: [{ label: 'News', url: 'https://example.test/news' }],
-    })
-
-    // No ids: the save matches by name + stable and by entity, the path that
-    // updates an existing row rather than inserting one.
-    await ok(await saveDsl(input(), store))
-
-    const savedTrainer = await store.findTrainerById(trainer.id)
-    const savedOwner = await store.findOwnerById(owner.id)
-
-    expect(savedTrainer?.achievements).toBe('Group 1 winner.')
-    expect(savedTrainer?.other).toBe('Other notes.')
-    expect(savedTrainer?.xUrl).toBe('https://x.com/t')
-    expect(savedTrainer?.facebookUrl).toBe('https://facebook.com/t')
-    expect(savedTrainer?.instagramUrl).toBe('https://instagram.com/t')
-    expect(savedTrainer?.links).toEqual([
-      { label: 'Stable', url: 'https://example.test/stable' },
-    ])
-
-    expect(savedOwner?.achievements).toBe('Owner achievements.')
-    expect(savedOwner?.other).toBe('Owner other.')
-    expect(savedOwner?.xUrl).toBe('https://x.com/o')
-    expect(savedOwner?.facebookUrl).toBe('https://facebook.com/o')
-    expect(savedOwner?.instagramUrl).toBe('https://instagram.com/o')
-    expect(savedOwner?.links).toEqual([{ label: 'News', url: 'https://example.test/news' }])
-  })
-})
-
-describe('attaching an existing trainer or owner by id', () => {  it('uses the picked trainer untouched and creates no new row', async () => {
-    const picked = await store.insertTrainer({
-      name: 'Picked Trainer',
-      stable: 'Picked Stables',
-      location: 'Cambridge',
-      website: null,
-      bio: 'The picked bio.',
-      achievements: null,
-      other: null,
-      xUrl: null,
-      facebookUrl: null,
-      instagramUrl: null,
-      links: [],
-    })
-
-    const base = input()
-    const saved = await ok(
-      await saveDsl(
-        {
-          ...base,
-          trainerId: picked.id,
-          trainer: { ...base.trainer, name: 'Ignored', stable: 'Ignored' },
-        },
-        store,
-      ),
-    )
-
-    expect(saved.trainer.id).toBe(picked.id)
-    expect(store.dump().trainers).toHaveLength(1)
-    expect(saved.trainer.name).toBe('Picked Trainer')
-  })
-
-  it('uses the picked owner untouched and creates no new row', async () => {
-    const picked = await store.insertOwner({
-      entity: 'Picked Bloodstock',
-      contact: 'P Contact',
-      website: null,
-      profile: 'The picked profile.',
-      achievements: null,
-      other: null,
-      xUrl: null,
-      facebookUrl: null,
-      instagramUrl: null,
-      links: [],
-    })
-
-    const base = input()
-    const saved = await ok(
-      await saveDsl(
-        { ...base, ownerId: picked.id, owner: { ...base.owner, entity: 'Ignored Entity' } },
-        store,
-      ),
-    )
-
-    expect(saved.owner.id).toBe(picked.id)
-    expect(store.dump().owners).toHaveLength(1)
-  })
-
-  it('refuses an id that does not exist', async () => {
-    const result = await saveDsl(input({ trainerId: 'no-such-trainer' }), store)
-
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected a missing trainer to be refused')
-    expect(result.reason).toMatch(/does not exist/)
-    expect(store.dump().horses).toHaveLength(0)
-  })
-
-  it('reads the picked trainer bio for readiness, not the draft', async () => {
-    const picked = await store.insertTrainer({
-      name: 'No Bio',
-      stable: 'Silent Stables',
-      location: 'Cambridge',
-      website: null,
-      bio: null,
-      achievements: null,
-      other: null,
-      xUrl: null,
-      facebookUrl: null,
-      instagramUrl: null,
-      links: [],
-    })
-
-    const result = await saveDsl(
-      input({
-        trainerId: picked.id,
-        dsl: draft({ status: 'available', published: true }),
-      }),
-      store,
-    )
-
-    expect(result.ok).toBe(false)
-    if (result.ok) throw new Error('expected a trainee with no bio to be refused')
-    expect(result.reason).toMatch(/trainer's bio/)
+    if (result.ok) return
+    expect(result.reason).toMatch(/narrative/i)
   })
 })

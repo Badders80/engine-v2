@@ -1,23 +1,18 @@
 'use server'
 
 /**
- * Create and edit for the three static records. DSL engine decision 2026-11-07.
+ * Create and edit for the records. Chunk 2, rulings 10 and 11.
  *
- * These are the only places a horse, trainer or owner is authored now. The DSL
- * form attaches an existing row by id; it no longer invents one, which is what
- * made the old natural-key lookup drop edits and orphan rows when a stable or
- * entity was renamed.
- *
- * Horses get their own create path (U12, 2026-11-09): horse-only, with an
- * optional current trainer and no owner — an owner is a party to a deal and
- * attaches to the DSL.
+ * Records own entities: a horse, and a party profile with roles. The DSL
+ * attaches ids and writes `dsls` only. A horse no longer stores a trainer:
+ * the link lives on the DSL and the Records pages derive it.
  */
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { slugFromLegalName } from '@/lib/dsl'
-import type { LinkEntry } from '@/lib/dslStore'
+import type { LinkEntry, PartyRole } from '@/lib/dslStore'
 
 import { recordStore } from './store'
 
@@ -95,6 +90,117 @@ function profileFields(form: FormData): Result<ProfileFields> {
   }
 }
 
+function roles(form: FormData): Result<PartyRole[]> {
+  const picked: PartyRole[] = []
+  if (checked(form, 'roleTrainer')) picked.push('trainer')
+  if (checked(form, 'roleOwner')) picked.push('owner')
+
+  if (picked.length === 0) {
+    return { ok: false, reason: 'tick at least one role' }
+  }
+  return { ok: true, value: picked }
+}
+
+function partyFields(form: FormData): Result<{
+  displayName: string
+  company: string | null
+  contact: string | null
+  location: string | null
+  website: string | null
+  bio: string | null
+  achievements: string | null
+  other: string | null
+  xUrl: string | null
+  facebookUrl: string | null
+  instagramUrl: string | null
+  links: LinkEntry[]
+}> {
+  const displayName = value(form, 'displayName')
+  if (displayName === '') return { ok: false, reason: 'a profile needs a name or entity' }
+
+  const profile = profileFields(form)
+  if (!profile.ok) return profile
+
+  return {
+    ok: true,
+    value: {
+      displayName,
+      company: optional(form, 'company'),
+      contact: optional(form, 'contact'),
+      location: optional(form, 'location'),
+      website: optional(form, 'website'),
+      bio: optional(form, 'bio'),
+      ...profile.value,
+    },
+  }
+}
+
+/** `/trainers` or `/owners`, the role-filtered view the operator came from. */
+function section(form: FormData): 'trainer' | 'owner' {
+  return value(form, 'from') === 'owner' ? 'owner' : 'trainer'
+}
+
+function fail(back: string, reason: string): never {
+  redirect(`${back}?error=${encodeURIComponent(reason)}`)
+}
+
+export async function createPartyAction(form: FormData): Promise<void> {
+  const from = section(form)
+  const back = `/${from}s/new`
+
+  const fields = partyFields(form)
+  if (!fields.ok) fail(back, fields.reason)
+
+  const picked = roles(form)
+  if (!picked.ok) fail(back, picked.reason)
+
+  const created = await recordStore().insertParty(fields.value, picked.value)
+
+  revalidatePath(`/${from}s`)
+  redirect(`/${from}s/${created.id}`)
+}
+
+export async function updatePartyAction(form: FormData): Promise<void> {
+  const from = section(form)
+  const id = value(form, 'id')
+  const back = `/${from}s/${id}/edit`
+
+  if (id === '') fail(`/${from}s`, 'no profile was named')
+
+  const fields = partyFields(form)
+  if (!fields.ok) fail(back, fields.reason)
+
+  const picked = roles(form)
+  if (!picked.ok) fail(back, picked.reason)
+
+  const store = recordStore()
+  const current = await store.findPartyById(id)
+  if (current === null) fail(`/${from}s`, 'that profile does not exist')
+
+  // A role is a relationship a live deal depends on. Untick it only once no
+  // DSL still points at this party in that role (ruling 22). The SQL trigger
+  // `party_roles_removal_guard` enforces the same rule.
+  const removed = current.roles.filter((role) => !picked.value.includes(role))
+  if (removed.length > 0) {
+    const live = (await store.listDsls()).some(
+      (dsl) =>
+        dsl.status !== 'completed' &&
+        ((removed.includes('trainer') && dsl.trainerId === id) ||
+          (removed.includes('owner') && dsl.ownerId === id)),
+    )
+    if (live) {
+      fail(back, 'a live DSL depends on this role, so it cannot be unticked')
+    }
+  }
+
+  await store.updateParty(id, fields.value)
+  await store.setPartyRoles(id, picked.value)
+
+  revalidatePath(`/${from}s`)
+  revalidatePath(`/${from}s/${id}`)
+  redirect(`/${from}s/${id}`)
+}
+
 /** The race record is one jsonb blob, entered as JSON. */
 function raceRecord(form: FormData): Result<Record<string, unknown>> {
   const raw = value(form, 'raceRecord')
@@ -111,106 +217,9 @@ function raceRecord(form: FormData): Result<Record<string, unknown>> {
   }
 }
 
-function fail(back: string, reason: string): never {
-  redirect(`${back}?error=${encodeURIComponent(reason)}`)
-}
-
 /**
- * A company/stable can run more than one trainer. The form submits one
- * `trainerNames` field per name; the row keeps a single name string joined
- * with ` & `, because a horse attaches to one trainer and the PDS prints
- * `trainer.name`.
- */
-function trainerName(form: FormData): Result<string> {
-  const names = form
-    .getAll('trainerNames')
-    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-    .filter((entry) => entry !== '')
-
-  if (names.length === 0) return { ok: false, reason: 'a trainer needs at least one name' }
-  return { ok: true, value: names.join(' & ') }
-}
-
-export async function createTrainerAction(form: FormData): Promise<void> {
-  const profile = profileFields(form)
-  if (!profile.ok) fail('/trainers/new', profile.reason)
-
-  const name = trainerName(form)
-  if (!name.ok) fail('/trainers/new', name.reason)
-
-  const created = await recordStore().insertTrainer({
-    name: name.value,
-    stable: value(form, 'stable'),
-    location: value(form, 'location'),
-    website: optional(form, 'website'),
-    bio: optional(form, 'bio'),
-    ...profile.value,
-  })
-
-  revalidatePath('/trainers')
-  redirect(`/trainers/${created.id}`)
-}
-
-export async function updateTrainerAction(form: FormData): Promise<void> {
-  const id = value(form, 'id')
-  const profile = profileFields(form)
-  if (!profile.ok) fail(`/trainers/${id}`, profile.reason)
-
-  const name = trainerName(form)
-  if (!name.ok) fail(`/trainers/${id}`, name.reason)
-
-  await recordStore().updateTrainer(id, {
-    name: name.value,
-    stable: value(form, 'stable'),
-    location: value(form, 'location'),
-    website: optional(form, 'website'),
-    bio: optional(form, 'bio'),
-    ...profile.value,
-  })
-
-  revalidatePath('/trainers')
-  revalidatePath(`/trainers/${id}`)
-  redirect(`/trainers/${id}`)
-}
-
-export async function createOwnerAction(form: FormData): Promise<void> {
-  const profile = profileFields(form)
-  if (!profile.ok) fail('/owners/new', profile.reason)
-
-  const created = await recordStore().insertOwner({
-    entity: value(form, 'entity'),
-    contact: value(form, 'contact'),
-    website: optional(form, 'website'),
-    profile: optional(form, 'profile'),
-    ...profile.value,
-  })
-
-  revalidatePath('/owners')
-  redirect(`/owners/${created.id}`)
-}
-
-export async function updateOwnerAction(form: FormData): Promise<void> {
-  const id = value(form, 'id')
-  const profile = profileFields(form)
-  if (!profile.ok) fail(`/owners/${id}`, profile.reason)
-
-  await recordStore().updateOwner(id, {
-    entity: value(form, 'entity'),
-    contact: value(form, 'contact'),
-    website: optional(form, 'website'),
-    profile: optional(form, 'profile'),
-    ...profile.value,
-  })
-
-  revalidatePath('/owners')
-  revalidatePath(`/owners/${id}`)
-  redirect(`/owners/${id}`)
-}
-
-/**
- * Horse-only create (U12). No owner and no DSL: a horse is a record, and a DSL
- * is a separate deal assembled later. The optional trainer is picked from the
- * existing rows; it is never typed here.
+ * Horse-only create (U12). No owner and no DSL: a horse is a record. The
+ * trainer is a link on the deal, so it is absent here (R1).
  */
 export async function createHorseAction(form: FormData): Promise<void> {
   const back = '/horses/new'
@@ -244,16 +253,11 @@ export async function createHorseAction(form: FormData): Promise<void> {
       ? null
       : typedBarnName
 
-  const trainerId = optional(form, 'trainerId')
   const store = recordStore()
 
   const clash = await store.findHorseBySlug(slug)
   if (clash !== null) {
     fail(back, `a horse with the slug '${slug}' already exists`)
-  }
-
-  if (trainerId !== null && (await store.findTrainerById(trainerId)) === null) {
-    fail(back, `trainer ${trainerId} does not exist`)
   }
 
   const created = await store.insertHorse({
@@ -275,7 +279,6 @@ export async function createHorseAction(form: FormData): Promise<void> {
     raceExpectation: null,
     imageCount: 0,
     raceRecord: record.value,
-    trainerId,
   })
 
   revalidatePath('/horses')
@@ -283,9 +286,9 @@ export async function createHorseAction(form: FormData): Promise<void> {
 }
 
 /**
- * Edit a horse (1c). The slug is deliberately absent: it is the official name,
- * and a rename is a migration, not an edit (`HORSE-IDENTITY-NAMING-LAW.md` §7).
- * The trainer is authored here, per ruling 15 — the DSL reads it read-only.
+ * Edit a horse (1c, R1). The slug is deliberately absent: it is the official
+ * name, and a rename is a migration, not an edit. No trainer field: the link
+ * lives on the DSL (ruling 10, ruling 15).
  */
 export async function updateHorseAction(form: FormData): Promise<void> {
   const id = value(form, 'id')
@@ -321,11 +324,6 @@ export async function updateHorseAction(form: FormData): Promise<void> {
       ? null
       : typedBarnName
 
-  const trainerId = optional(form, 'trainerId')
-  if (trainerId !== null && (await store.findTrainerById(trainerId)) === null) {
-    fail(back, `trainer ${trainerId} does not exist`)
-  }
-
   await store.updateHorse(id, {
     legalName,
     barnName,
@@ -340,7 +338,6 @@ export async function updateHorseAction(form: FormData): Promise<void> {
     loveracingId: optional(form, 'loveracingId'),
     registered: checked(form, 'registered'),
     raceRecord: record.value,
-    trainerId,
   })
 
   revalidatePath('/horses')

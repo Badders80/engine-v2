@@ -62,13 +62,21 @@ function IndexSection({
 
 export default async function Page() {
   const store = recordStore()
-  const [horses, trainers, owners] = await Promise.all([
+  const [horses, dsls, parties, trainers, owners] = await Promise.all([
     store.listHorses(),
-    store.listTrainers(),
-    store.listOwners(),
+    store.listDsls(),
+    store.listParties(),
+    store.listPartiesByRole('trainer'),
+    store.listPartiesByRole('owner'),
   ])
 
-  const trainerNames = new Map(trainers.map((trainer) => [trainer.id, trainer.name]))
+  const partyName = new Map(parties.map((party) => [party.id, party.displayName]))
+  const trainerByHorse = new Map<string, string>()
+  for (const dsl of dsls) {
+    if (dsl.trainerId !== null) {
+      trainerByHorse.set(dsl.horseId, partyName.get(dsl.trainerId) ?? 'Trainer not found')
+    }
+  }
 
   return (
     <main className="grid gap-8">
@@ -89,30 +97,27 @@ export default async function Page() {
           rows={horses.map((horse) => ({
             id: horse.id,
             primary: horse.legalName,
-            secondary:
-              horse.trainerId === null
-                ? horse.slug
-                : (trainerNames.get(horse.trainerId) ?? horse.slug),
+            secondary: trainerByHorse.get(horse.id) ?? horse.slug,
           }))}
         />
         <IndexSection
           title="Trainers"
           href="/trainers"
           newHref="/trainers/new"
-          rows={trainers.map((trainer) => ({
-            id: trainer.id,
-            primary: trainer.name,
-            secondary: trainer.stable,
+          rows={trainers.map((party) => ({
+            id: party.id,
+            primary: party.displayName,
+            secondary: party.company ?? '—',
           }))}
         />
         <IndexSection
           title="Owners"
           href="/owners"
           newHref="/owners/new"
-          rows={owners.map((owner) => ({
-            id: owner.id,
-            primary: owner.entity,
-            secondary: owner.contact,
+          rows={owners.map((party) => ({
+            id: party.id,
+            primary: party.displayName,
+            secondary: party.contact ?? '—',
           }))}
         />
       </div>

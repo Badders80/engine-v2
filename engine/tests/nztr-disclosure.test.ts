@@ -49,8 +49,8 @@ function input(overrides: Partial<LegalPackInput['dsl']> = {}): LegalPackInput {
       racingOutlookAndPedigree: 'Outlook and pedigree.',
       raceExpectation: 'Race expectation.',
     },
-    trainer: { name: 'T Trainer', location: 'Cambridge', bio: 'One bio.' },
-    owner: { entity: 'Ketchikan Bloodstock Ltd' },
+    trainer: { displayName: 'T Trainer', location: 'Cambridge', bio: 'One bio.' },
+    owner: { displayName: 'Ketchikan Bloodstock Ltd' },
     sale: { stake: 1, executedDate: '2026-10-20' },
   }
 }

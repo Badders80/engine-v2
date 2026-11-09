@@ -1,24 +1,16 @@
 'use server'
 
 /**
- * The only write path on the engine. PLAN.md step 4.
+ * The only write path on the engine. PLAN.md step 4; chunk 2, ruling 11.
  *
  * The page is a wrapper: everything that decides anything lives in
  * `@/lib/dsl`, which is pure and tested. This file reads the form into that
- * shape and hands the result back to the page.
+ * shape and hands the result back to the page. The DSL attaches existing ids
+ * and writes `dsls` only.
  *
- * Two rules hold here:
- *
- * - Every `redirect()` sits outside a `try`. Next's redirect works by throwing,
- *   so a redirect inside the catch would be swallowed and turn into a second
- *   redirect.
- * - No branding field is read. The branding controls on the page carry no name
- *   attribute, so they are never submitted and can never reach the database.
- *
- * The image upload is the second write path, and the only one that touches the
- * public bucket. It exists because `00008_dsl_availability_trigger.sql` refuses
- * `status = 'available'` below three images, so without it no listing could ever
- * be published as available.
+ * Every `redirect()` sits outside a `try`: Next's redirect works by throwing,
+ * so a redirect inside the catch would be swallowed and turn into a second
+ * redirect.
  */
 
 import { revalidatePath } from 'next/cache'
@@ -26,15 +18,12 @@ import { redirect } from 'next/navigation'
 
 import {
   DSL_STATUSES,
+  checkStatusTransition,
   saveDsl,
   updateDsl,
   type DslDraft,
   type DslStatus,
-  type HorseDraft,
-  type OwnerDraft,
   type Result,
-  type SaveDslInput,
-  type TrainerDraft,
 } from '@/lib/dsl'
 import type { DslRow, HorseRow } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
@@ -66,66 +55,26 @@ function checked(form: FormData, key: string): boolean {
   return form.get(key) !== null
 }
 
-/** One object, stored whole on the horse. Not a column per run. */
-function raceRecord(form: FormData): Result<Record<string, unknown>> {
-  const raw = value(form, 'raceRecord')
-  if (raw === '') return { ok: true, value: {} }
-
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { ok: false, reason: 'the race record has to be one json object' }
-    }
-    return { ok: true, value: parsed as Record<string, unknown> }
-  } catch {
-    return { ok: false, reason: 'the race record is not valid json' }
-  }
+type DslFormInput = {
+  horseId: string
+  trainerId: string | null
+  ownerId: string | null
+  dsl: DslDraft
 }
 
 function toInput(
   form: FormData,
   fallback: { status: DslStatus; published: boolean },
-): Result<SaveDslInput> {
-  const record = raceRecord(form)
-  if (!record.ok) return record
+): Result<DslFormInput> {
+  const horseId = value(form, 'horseId')
+  if (horseId === '') {
+    return { ok: false, reason: 'choose the horse this DSL is for' }
+  }
 
   const status = value(form, 'status')
   const nextStatus = status === '' ? fallback.status : status
   if (!(DSL_STATUSES as readonly string[]).includes(nextStatus)) {
     return { ok: false, reason: `'${nextStatus}' is not one of the four DSL statuses` }
-  }
-
-  const horse: HorseDraft = {
-    legalName: value(form, 'legalName'),
-    foalingDate: value(form, 'foalingDate'),
-    sex: value(form, 'sex'),
-    colour: value(form, 'colour'),
-    breeder: optional(form, 'breeder'),
-    sireName: value(form, 'sireName'),
-    damName: value(form, 'damName'),
-    microchip: optional(form, 'microchip'),
-    lifeNumber: optional(form, 'lifeNumber'),
-    loveracingId: optional(form, 'loveracingId'),
-    registered: checked(form, 'registered'),
-    aboutHorse: optional(form, 'aboutHorse'),
-    racingOutlookAndPedigree: optional(form, 'racingOutlookAndPedigree'),
-    raceExpectation: optional(form, 'raceExpectation'),
-    raceRecord: record.value,
-  }
-
-  const trainer: TrainerDraft = {
-    name: value(form, 'trainerName'),
-    stable: value(form, 'trainerStable'),
-    location: value(form, 'trainerLocation'),
-    website: optional(form, 'trainerWebsite'),
-    bio: optional(form, 'trainerBio'),
-  }
-
-  const owner: OwnerDraft = {
-    entity: value(form, 'ownerEntity'),
-    contact: value(form, 'ownerContact'),
-    website: optional(form, 'ownerWebsite'),
-    profile: optional(form, 'ownerProfile'),
   }
 
   const dsl: DslDraft = {
@@ -146,21 +95,17 @@ function toInput(
   return {
     ok: true,
     value: {
-      horse,
+      horseId,
       trainerId: optional(form, 'trainerId'),
-      trainer,
       ownerId: optional(form, 'ownerId'),
-      owner,
       dsl,
     },
   }
 }
 
 /**
- * A missing environment or a dead connection comes back as a reason, not a crash.
- *
- * This unwraps a `Result` and never wraps one: the run hands back the result it
- * already has, and only a thrown error is turned into one.
+ * A missing environment or a dead connection comes back as a reason, not a
+ * crash. This unwraps a `Result` and never wraps one.
  */
 async function attempt<T>(run: () => Promise<Result<T>>): Promise<Result<T>> {
   try {
@@ -202,11 +147,8 @@ export async function updateDslAction(form: FormData): Promise<void> {
     updateDsl(
       {
         dslId,
-        horse: input.value.horse,
         trainerId: input.value.trainerId,
-        trainer: input.value.trainer,
         ownerId: input.value.ownerId,
-        owner: input.value.owner,
         dsl: input.value.dsl,
       },
       store(),
@@ -253,9 +195,6 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
       contentType: file.type,
     })
 
-    // B7: the bucket is the fact, the stored count is a claim. Recount from the
-    // listing rather than incrementing, so a replaced image and a stray object
-    // both land on the number that is actually there.
     const images = await listPublicImages({ slug: horse.slug })
     return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
   })
@@ -268,10 +207,6 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
 
 /**
  * Remove one horse image and close the gap it leaves.
- *
- * `deletePublicImage` renumbers the later images so the folder still runs
- * `01..NN`, then the stored count is read back from the bucket rather than
- * decremented.
  */
 export async function deleteHorseImageAction(form: FormData): Promise<void> {
   const dslId = value(form, 'dslId')
@@ -301,10 +236,6 @@ export async function deleteHorseImageAction(form: FormData): Promise<void> {
 
 /**
  * Recount a horse's images from the bucket and store the result.
- *
- * `image_count` can drift from the bucket only by being written outside this
- * app — a manual R2 upload, or a row that predates the recount-on-upload. The
- * operator needs a control for that which is not "upload something and hope".
  */
 export async function recountHorseImagesAction(form: FormData): Promise<void> {
   const dslId = value(form, 'dslId')
@@ -331,7 +262,7 @@ export async function recountHorseImagesAction(form: FormData): Promise<void> {
  *
  * Readiness is recomputed here rather than trusted from the form, so a DSL
  * that lost a field since the last save cannot go live on a stale tick. The
- * Postgres trigger is the backstop; this is the message the operator reads.
+ * status machine runs first, then the Postgres trigger is the backstop.
  */
 export async function publishDslAction(form: FormData): Promise<void> {
   const dslId = value(form, 'dslId')
@@ -342,10 +273,22 @@ export async function publishDslAction(form: FormData): Promise<void> {
     if (!view.ok) return { ok: false, reason: view.reason }
     if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
 
+    const transition = checkStatusTransition({
+      registered: view.horse.registered,
+      from: view.dsl.status,
+      to: 'available',
+    })
+    if (!transition.ok) return transition
+
     const readiness = checkDslReadiness({
       dsl: view.dsl,
       horse: view.horse,
       trainer: view.trainer,
+      narrative: {
+        signoff: view.dsl.narrativeSignoff,
+        approvedAt: view.dsl.narrativeApprovedAt,
+        approvedHash: view.dsl.narrativeApprovedHash,
+      },
     })
     if (!readiness.ok) {
       return { ok: false, reason: readinessReason(readiness) ?? 'this DSL is not ready' }
@@ -369,10 +312,19 @@ export async function unpublishDslAction(form: FormData): Promise<void> {
   const dslId = value(form, 'dslId')
   const back = `/dsl/${dslId}`
 
-  const taken = await attempt<DslRow>(async () => ({
-    ok: true,
-    value: await store().updateDsl(dslId, { published: false, status: 'coming_soon' }),
-  }))
+  const taken = await attempt<DslRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    // Only an Available listing moves back to Coming Soon. A sold-out or
+    // completed term keeps its status when it leaves the market.
+    const status = view.dsl.status === 'available' ? 'coming_soon' : view.dsl.status
+    return {
+      ok: true,
+      value: await store().updateDsl(dslId, { published: false, status }),
+    }
+  })
 
   if (!taken.ok) redirect(`${back}?error=${encodeURIComponent(taken.reason)}`)
 

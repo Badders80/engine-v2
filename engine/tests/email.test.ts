@@ -39,10 +39,13 @@ import {
 } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore, type InMemoryPurchaseStore } from '../src/lib/purchaseStore'
 import type { StripeGateway } from '../src/lib/stripe'
+import type { DslStore } from '../src/lib/dslStore'
+import { approvedDraft, seedStore as seedDslRecords } from './helpers/dsl-fixture'
 
-function sampleSaveInput(): SaveDslInput {
-  return {
+function sampleSaveInput(store: DslStore): Promise<SaveDslInput> {
+  return seedDslRecords(store, {
     horse: {
+      slug: 'lady-ketchikan',
       legalName: 'Lady Ketchikan',
       foalingDate: '2022-09-14',
       sex: 'Mare',
@@ -50,44 +53,26 @@ function sampleSaveInput(): SaveDslInput {
       breeder: 'Trelawney Stud',
       sireName: 'Savabeel',
       damName: 'Ketchikan',
-      microchip: '985125000123456',
-      lifeNumber: 'NZ-2022-LK',
-      loveracingId: '12345',
-      registered: true,
-      aboutHorse: 'Athletic bay mare progressing well in work.',
-      racingOutlookAndPedigree: 'By Savabeel out of a stakes-producing dam line.',
-      raceExpectation: 'Targeting spring maiden and rating bands.',
-      imageCount: 3,
-      raceRecord: { starts: 2, wins: 1 },
     },
-    trainer: {
-      name: 'Lance O’Sullivan',
-      stable: 'Wexford Stables',
-      location: 'Matamata',
-      website: 'https://wexfordstables.co.nz',
-      bio: 'Multiple premiership-winning Matamata training partnership.',
-    },
-    owner: {
-      entity: 'Ketchikan Bloodstock Ltd',
-      contact: 'David Ellis',
-      website: null,
-      profile: 'Longstanding New Zealand thoroughbred breeders.',
-    },
-    dsl: {
+  }).then(({ horse, trainer, owner }) => ({
+    horseId: horse.id,
+    trainerId: trainer.id,
+    ownerId: owner.id,
+    dsl: approvedDraft({
       termStart: '2026-11-01',
       endDate: '2027-10-31',
       paymentModel: 'subscription_float',
       closeStyle: 'fourteen_day',
       status: 'available',
       published: true,
-      wholesaleMonthlyPerPercent: 65, // retail 71, 5-month float = 355 per 1%
+      wholesaleMonthlyPerPercent: 65,
       investorSplit: 70,
       listedStake: 20,
       minStake: 2.5,
       step: 2.5,
       distributionSchedule: 'Quarterly within 14 days of NZTR settlement',
-    },
-  }
+    }),
+  }))
 }
 
 async function seedStore(): Promise<{
@@ -96,7 +81,7 @@ async function seedStore(): Promise<{
   accountId: string
 }> {
   const store = createInMemoryPurchaseStore()
-  const saved = await saveDsl(sampleSaveInput(), store)
+  const saved = await saveDsl(await sampleSaveInput(store), store)
   if (!saved.ok) throw new Error(saved.reason)
 
   const account = await store.insertAccount({

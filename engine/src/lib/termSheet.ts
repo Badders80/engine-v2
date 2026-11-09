@@ -22,7 +22,7 @@ import {
   upfrontTotal,
 } from './pricing'
 
-import type { DslRow, HorseRow, OwnerRow, TrainerRow } from './dslStore'
+import type { DslRow, HorseRow, PartyRow } from './dslStore'
 
 /** The blank marker. Never a default value. */
 export const BLANK = '[not filled in yet]'
@@ -129,8 +129,8 @@ function closeStyleLabel(dsl: DslRow): string {
 export type TermSheetInput = {
   dsl: DslRow
   horse: HorseRow
-  trainer: TrainerRow | null
-  owner: OwnerRow | null
+  trainer: PartyRow | null
+  owner: PartyRow | null
 }
 
 export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
@@ -143,15 +143,15 @@ export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
         { label: 'Horse', value: text(horse.legalName) },
         { label: 'Microchip / ID', value: text(horse.microchip) },
         { label: 'Life number', value: text(horse.lifeNumber) },
-        { label: 'Owner', value: text(owner?.entity ?? null) },
+        { label: 'Owner', value: text(owner?.displayName ?? null) },
         {
           label: 'Trainer',
           value:
             trainer === null
               ? BLANK
               : trainer.location === null || trainer.location === ''
-                ? text(trainer.name)
-                : `${trainer.name} (${trainer.location})`,
+                ? text(trainer.displayName)
+                : `${trainer.displayName} (${trainer.location})`,
         },
       ],
     },

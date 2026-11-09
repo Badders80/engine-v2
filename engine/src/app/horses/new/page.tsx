@@ -4,16 +4,14 @@ import { loadLoveracingPage } from '@/lib/loveracingFetch'
 
 import { Button, ErrorSlot } from '../../_components/forms'
 import { createHorseAction } from '../../records/actions'
-import { recordStore } from '../../records/store'
 import { HorseForm } from '../_components/HorseForm'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Add a horse (U12). Horse only: identity, registration, the loveracing load,
- * and an optional current trainer picked from the existing rows. No owner — an
- * owner is a party to a deal and attaches to the DSL. Confirm lands on the new
- * profile; no DSL is created.
+ * Add a horse (U12). Horse only: identity, registration and the loveracing
+ * load. No trainer and no owner — both are links on the deal and attach to the
+ * DSL (R1). Confirm lands on the new profile; no DSL is created.
  *
  * The fields themselves live in `HorseForm`, shared with the edit page so the
  * two can never drift.
@@ -27,7 +25,6 @@ export default async function Page({
   const link = (params.loveracing ?? '').trim()
   const loaded = link === '' ? null : await loadLoveracingPage(link)
 
-  const trainers = await recordStore().listTrainers()
   const horse = loaded !== null && loaded.ok ? loaded.value.horse : null
   const raceRecordJson =
     loaded !== null && loaded.ok ? JSON.stringify(loaded.value.raceRecord, null, 2) : '{}'
@@ -78,7 +75,6 @@ export default async function Page({
 
       <HorseForm
         action={createHorseAction}
-        trainers={trainers}
         horse={horse}
         raceRecordJson={raceRecordJson}
         submitLabel="Save horse"

@@ -32,10 +32,25 @@ function HeroImage({ slug, imageCount }: { slug: string; imageCount: number }) {
   )
 }
 
+/**
+ * The trainer shown here is derived through the horse's DSLs. Records never
+ * author the link (R1, ruling 10).
+ */
 export default async function Page() {
   const store = recordStore()
-  const [horses, trainers] = await Promise.all([store.listHorses(), store.listTrainers()])
-  const trainerNames = new Map(trainers.map((trainer) => [trainer.id, trainer.name]))
+  const [horses, dsls, parties] = await Promise.all([
+    store.listHorses(),
+    store.listDsls(),
+    store.listParties(),
+  ])
+
+  const partyName = new Map(parties.map((party) => [party.id, party.displayName]))
+  const trainerByHorse = new Map<string, string>()
+  for (const dsl of dsls) {
+    if (dsl.trainerId !== null) {
+      trainerByHorse.set(dsl.horseId, partyName.get(dsl.trainerId) ?? 'Trainer not found')
+    }
+  }
 
   return (
     <main className="grid gap-6">
@@ -74,9 +89,7 @@ export default async function Page() {
               </div>
 
               <p className="truncate text-caption text-muted">
-                {horse.trainerId === null
-                  ? 'No trainer assigned'
-                  : (trainerNames.get(horse.trainerId) ?? 'Trainer not found')}
+                {trainerByHorse.get(horse.id) ?? 'No trainer assigned'}
               </p>
             </div>
           </Link>

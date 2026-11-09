@@ -1,19 +1,19 @@
 /**
- * The Supabase-backed DslStore. PLAN.md step 4.
+ * The Supabase-backed DslStore. Chunk 2, ruling 10.
  *
  * The operator surface is server-side only. Every table is deny-by-default
- * under RLS: no migration in `supabase/migrations` creates a policy, so the
- * anon key can read nothing and write nothing. This client therefore uses the
- * service role key, which is read from the environment on the server and is
- * never sent to a browser.
+ * under RLS: no migration creates a public write policy, so this client uses
+ * the service role key, which is read from the environment on the server and
+ * is never sent to a browser.
  *
- * Two column facts are load bearing here:
+ * Column facts that are load bearing here:
  *
- * - `retail_monthly_per_percent` and `wholesale_monthly_total` are generated
- *   columns. They are read back and never written, so a writer cannot store a
- *   second price.
- * - `trainers` and `owners` declare `id uuid primary key` with no default, so
- *   those two ids are generated here.
+ * - `retail_monthly_per_percent` is a generated column. It is read back and
+ *   never written, so a writer cannot store a second price.
+ * - `wholesale_monthly_total` is generated too, and no admin surface quotes
+ *   it (H4a). It is deliberately absent from the row type and this mapper.
+ * - `parties.id` has a default, so the database generates it; the role rows
+ *   are written alongside it.
  *
  * A field left undefined is left out of the statement altogether, so Postgres
  * applies its own default rather than a null this module invented.
@@ -23,6 +23,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import {
   DSL_STATUS_VALUES,
+  PARTY_ROLES,
   type DslRow,
   type DslStatus,
   type DslStore,
@@ -30,10 +31,9 @@ import {
   type LinkEntry,
   type NewDsl,
   type NewHorse,
-  type NewOwner,
-  type NewTrainer,
-  type OwnerRow,
-  type TrainerRow,
+  type NewParty,
+  type PartyRole,
+  type PartyRow,
 } from './dslStore'
 
 export const SUPABASE_URL_ENV = 'SUPABASE_URL'
@@ -89,6 +89,11 @@ function blob(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
+function blobOrNull(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
 /** `links` is a jsonb array of { label, url }; anything else reads as empty. */
 function linkEntries(value: unknown): LinkEntry[] {
   if (!Array.isArray(value)) return []
@@ -102,9 +107,19 @@ function linkEntries(value: unknown): LinkEntry[] {
   })
 }
 
+/** A nested `party_roles(role)` result, in the order the database returns it. */
+function partyRoles(value: unknown): PartyRole[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((entry) => {
+    const role = str(record(entry).role)
+    return (PARTY_ROLES as readonly string[]).includes(role) ? [role as PartyRole] : []
+  })
+}
+
 /**
- * The status column is an enum in the database, so a value outside the four is a
- * fault worth naming rather than a value to quietly round to Coming Soon.
+ * The status column is an enum in the database, so a value outside the four is
+ * a fault worth naming rather than a value to quietly round to Coming Soon.
  */
 function dslStatus(value: unknown): DslStatus {
   const raw = str(value)
@@ -114,13 +129,14 @@ function dslStatus(value: unknown): DslStatus {
   return raw as DslStatus
 }
 
-function toTrainer(value: unknown): TrainerRow {
+function toParty(value: unknown): PartyRow {
   const row = record(value)
   return {
     id: str(row.id),
-    name: str(row.name),
-    stable: str(row.stable),
-    location: str(row.location),
+    displayName: str(row.display_name),
+    company: strOrNull(row.company),
+    contact: strOrNull(row.contact),
+    location: strOrNull(row.location),
     website: strOrNull(row.website),
     bio: strOrNull(row.bio),
     achievements: strOrNull(row.achievements),
@@ -129,23 +145,7 @@ function toTrainer(value: unknown): TrainerRow {
     facebookUrl: strOrNull(row.facebook_url),
     instagramUrl: strOrNull(row.instagram_url),
     links: linkEntries(row.links),
-  }
-}
-
-function toOwner(value: unknown): OwnerRow {
-  const row = record(value)
-  return {
-    id: str(row.id),
-    entity: str(row.entity),
-    contact: str(row.contact),
-    website: strOrNull(row.website),
-    profile: strOrNull(row.profile),
-    achievements: strOrNull(row.achievements),
-    other: strOrNull(row.other),
-    xUrl: strOrNull(row.x_url),
-    facebookUrl: strOrNull(row.facebook_url),
-    instagramUrl: strOrNull(row.instagram_url),
-    links: linkEntries(row.links),
+    roles: partyRoles(row.party_roles),
   }
 }
 
@@ -171,7 +171,6 @@ function toHorse(value: unknown): HorseRow {
     raceExpectation: strOrNull(row.race_expectation),
     imageCount: num(row.image_count),
     raceRecord: blob(row.race_record),
-    trainerId: strOrNull(row.trainer_id),
   }
 }
 
@@ -180,22 +179,27 @@ function toDsl(value: unknown): DslRow {
   return {
     id: str(row.id),
     horseId: str(row.horse_id),
+    trainerId: strOrNull(row.trainer_id),
     ownerId: strOrNull(row.owner_id),
-    endDate: str(row.end_date),
-    termStart: str(row.term_start),
-    paymentModel: str(row.payment_model) as DslRow['paymentModel'],
-    closeStyle: str(row.close_style) as DslRow['closeStyle'],
+    endDate: strOrNull(row.end_date),
+    termStart: strOrNull(row.term_start),
+    paymentModel: strOrNull(row.payment_model) as DslRow['paymentModel'],
+    closeStyle: strOrNull(row.close_style) as DslRow['closeStyle'],
     status: dslStatus(row.status),
     published: flag(row.published),
-    wholesaleMonthlyPerPercent: num(row.wholesale_monthly_per_percent),
-    retailMonthlyPerPercent: num(row.retail_monthly_per_percent),
-    wholesaleMonthlyTotal: num(row.wholesale_monthly_total),
+    wholesaleMonthlyPerPercent: numOrNull(row.wholesale_monthly_per_percent),
+    retailMonthlyPerPercent: numOrNull(row.retail_monthly_per_percent),
     investorSplit: numOrNull(row.investor_split),
-    listedStake: num(row.listed_stake),
-    minStake: num(row.min_stake),
-    step: num(row.step),
-    stakeRemaining: num(row.stake_remaining),
+    listedStake: numOrNull(row.listed_stake),
+    minStake: numOrNull(row.min_stake),
+    step: numOrNull(row.step),
+    stakeRemaining: numOrNull(row.stake_remaining),
     distributionSchedule: strOrNull(row.distribution_schedule),
+    narrativeSignoff: blobOrNull(
+      row.narrative_signoff,
+    ) as Record<string, boolean> | null,
+    narrativeApprovedAt: strOrNull(row.narrative_approved_at),
+    narrativeApprovedHash: strOrNull(row.narrative_approved_hash),
   }
 }
 
@@ -206,28 +210,14 @@ function defined<T extends Record<string, unknown>>(columns: T): T {
   ) as T
 }
 
-function trainerColumns(row: NewTrainer | Partial<NewTrainer>) {
+function partyColumns(row: NewParty | Partial<NewParty>) {
   return defined({
-    name: row.name,
-    stable: row.stable,
+    display_name: row.displayName,
+    company: row.company,
+    contact: row.contact,
     location: row.location,
     website: row.website,
     bio: row.bio,
-    achievements: row.achievements,
-    other: row.other,
-    x_url: row.xUrl,
-    facebook_url: row.facebookUrl,
-    instagram_url: row.instagramUrl,
-    links: row.links,
-  })
-}
-
-function ownerColumns(row: NewOwner | Partial<NewOwner>) {
-  return defined({
-    entity: row.entity,
-    contact: row.contact,
-    website: row.website,
-    profile: row.profile,
     achievements: row.achievements,
     other: row.other,
     x_url: row.xUrl,
@@ -257,17 +247,17 @@ function horseColumns(row: Partial<NewHorse>) {
     race_expectation: row.raceExpectation,
     image_count: row.imageCount,
     race_record: row.raceRecord,
-    trainer_id: row.trainerId,
   })
 }
 
 /**
- * The two generated columns are absent on purpose: `retail_monthly_per_percent`
- * and `wholesale_monthly_total` are computed by the database.
+ * `retail_monthly_per_percent` and `wholesale_monthly_total` are generated by
+ * the database and are absent on purpose.
  */
 function dslColumns(row: Partial<NewDsl>) {
   return defined({
     horse_id: row.horseId,
+    trainer_id: row.trainerId,
     owner_id: row.ownerId,
     end_date: row.endDate,
     term_start: row.termStart,
@@ -282,126 +272,122 @@ function dslColumns(row: Partial<NewDsl>) {
     step: row.step,
     stake_remaining: row.stakeRemaining,
     distribution_schedule: row.distributionSchedule,
+    narrative_signoff: row.narrativeSignoff,
+    narrative_approved_at: row.narrativeApprovedAt,
+    narrative_approved_hash: row.narrativeApprovedHash,
   })
 }
 
-function newId(): string {
-  return globalThis.crypto.randomUUID()
-}
+const PARTY_SELECT = '*, party_roles(role)'
 
 export function createSupabaseDslStore(client: SupabaseClient): DslStore {
   function fail(table: string, message: string): never {
     throw new Error(`${table}: ${message}`)
   }
 
+  async function findPartyById(id: string): Promise<PartyRow | null> {
+    const { data, error } = await client
+      .from('parties')
+      .select(PARTY_SELECT)
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error) fail('parties', error.message)
+    return data === null ? null : toParty(data)
+  }
+
   return {
-    async findTrainer(match) {
-      const { data, error } = await client
-        .from('trainers')
-        .select('*')
-        .eq('name', match.name)
-        .eq('stable', match.stable)
-        .limit(1)
-        .maybeSingle()
+    findPartyById,
 
-      if (error) fail('trainers', error.message)
-      return data === null ? null : toTrainer(data)
+    async listParties() {
+      const { data, error } = await client
+        .from('parties')
+        .select(PARTY_SELECT)
+        .order('display_name', { ascending: true })
+
+      if (error) fail('parties', error.message)
+      return (data ?? []).map(toParty)
     },
 
-    async insertTrainer(row) {
+    async listPartiesByRole(role) {
+      const { data: roleRows, error: roleError } = await client
+        .from('party_roles')
+        .select('party_id')
+        .eq('role', role)
+
+      if (roleError) fail('party_roles', roleError.message)
+      const ids = (roleRows ?? []).map((row) => str(record(row).party_id))
+      if (ids.length === 0) return []
+
       const { data, error } = await client
-        .from('trainers')
-        .insert({ id: newId(), ...trainerColumns(row) })
-        .select('*')
+        .from('parties')
+        .select(PARTY_SELECT)
+        .in('id', ids)
+        .order('display_name', { ascending: true })
+
+      if (error) fail('parties', error.message)
+      return (data ?? []).map(toParty)
+    },
+
+    async insertParty(row, roles) {
+      const { data, error } = await client
+        .from('parties')
+        .insert(partyColumns(row))
+        .select('id')
         .single()
 
-      if (error) fail('trainers', error.message)
-      return toTrainer(data)
+      if (error) fail('parties', error.message)
+      const id = str(record(data).id)
+
+      if (roles.length > 0) {
+        const { error: rolesError } = await client
+          .from('party_roles')
+          .insert(roles.map((role) => ({ party_id: id, role })))
+
+        if (rolesError) fail('party_roles', rolesError.message)
+      }
+
+      const created = await findPartyById(id)
+      if (created === null) fail('parties', `party ${id} vanished after insert`)
+      return created
     },
 
-    async findTrainerById(id) {
-      const { data, error } = await client
-        .from('trainers')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
+    async updateParty(id, patch) {
+      const { error } = await client.from('parties').update(partyColumns(patch)).eq('id', id)
+      if (error) fail('parties', error.message)
 
-      if (error) fail('trainers', error.message)
-      return data === null ? null : toTrainer(data)
+      const updated = await findPartyById(id)
+      if (updated === null) fail('parties', `party ${id} does not exist`)
+      return updated
     },
 
-    async listTrainers() {
-      const { data, error } = await client
-        .from('trainers')
-        .select('*')
-        .order('name', { ascending: true })
+    async setPartyRoles(id, roles) {
+      const current = await findPartyById(id)
+      if (current === null) fail('parties', `party ${id} does not exist`)
 
-      if (error) fail('trainers', error.message)
-      return (data ?? []).map(toTrainer)
-    },
+      const wanted = [...new Set(roles)]
+      const removed = current.roles.filter((role) => !wanted.includes(role))
+      const added = wanted.filter((role) => !current.roles.includes(role))
 
-    async updateTrainer(id, patch) {
-      const { data, error } = await client
-        .from('trainers')
-        .update(trainerColumns(patch))
-        .eq('id', id)
-        .select('*')
-        .single()
+      if (removed.length > 0) {
+        const { error } = await client
+          .from('party_roles')
+          .delete()
+          .eq('party_id', id)
+          .in('role', removed)
+        if (error) fail('party_roles', error.message)
+      }
 
-      if (error) fail('trainers', error.message)
-      return toTrainer(data)
-    },
+      if (added.length > 0) {
+        const { error } = await client
+          .from('party_roles')
+          .insert(added.map((role) => ({ party_id: id, role })))
+        if (error) fail('party_roles', error.message)
+      }
 
-    async findOwner(match) {
-      const { data, error } = await client
-        .from('owners')
-        .select('*')
-        .eq('entity', match.entity)
-        .limit(1)
-        .maybeSingle()
-
-      if (error) fail('owners', error.message)
-      return data === null ? null : toOwner(data)
-    },
-
-    async insertOwner(row) {
-      const { data, error } = await client
-        .from('owners')
-        .insert({ id: newId(), ...ownerColumns(row) })
-        .select('*')
-        .single()
-
-      if (error) fail('owners', error.message)
-      return toOwner(data)
-    },
-
-    async findOwnerById(id) {
-      const { data, error } = await client.from('owners').select('*').eq('id', id).maybeSingle()
-
-      if (error) fail('owners', error.message)
-      return data === null ? null : toOwner(data)
-    },
-
-    async listOwners() {
-      const { data, error } = await client
-        .from('owners')
-        .select('*')
-        .order('entity', { ascending: true })
-
-      if (error) fail('owners', error.message)
-      return (data ?? []).map(toOwner)
-    },
-
-    async updateOwner(id, patch) {
-      const { data, error } = await client
-        .from('owners')
-        .update(ownerColumns(patch))
-        .eq('id', id)
-        .select('*')
-        .single()
-
-      if (error) fail('owners', error.message)
-      return toOwner(data)
+      const updated = await findPartyById(id)
+      if (updated === null) fail('parties', `party ${id} does not exist`)
+      return updated
     },
 
     async listHorses() {

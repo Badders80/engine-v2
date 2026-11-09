@@ -7,7 +7,7 @@ import { HorseForm } from '../../_components/HorseForm'
 
 export const dynamic = 'force-dynamic'
 
-/** Edit a horse (1c). The trainer and barn name are authored here, per ruling 15. */
+/** Edit a horse (1c). Identity and barn name only; the trainer is a DSL link (R1). */
 export default async function Page({
   params,
   searchParams,
@@ -20,8 +20,6 @@ export default async function Page({
 
   const horse = await store.findHorseById(id)
   if (horse === null) notFound()
-
-  const trainers = await store.listTrainers()
 
   return (
     <main className="grid gap-8">
@@ -39,7 +37,6 @@ export default async function Page({
 
       <HorseForm
         action={updateHorseAction}
-        trainers={trainers}
         horse={horse}
         horseId={horse.id}
         raceRecordJson={JSON.stringify(horse.raceRecord, null, 2)}

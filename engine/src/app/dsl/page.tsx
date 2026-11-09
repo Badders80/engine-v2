@@ -6,8 +6,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   const store = recordStore()
-  const [dsls, horses] = await Promise.all([store.listDsls(), store.listHorses()])
+  const [dsls, horses, owners] = await Promise.all([
+    store.listDsls(),
+    store.listHorses(),
+    store.listPartiesByRole('owner'),
+  ])
   const horseName = new Map(horses.map((horse) => [horse.id, horse.legalName]))
+  const ownerName = new Map(owners.map((owner) => [owner.id, owner.displayName]))
 
   return (
     <main>
@@ -25,10 +30,11 @@ export default async function Page() {
         <thead>
           <tr className="border-b border-line">
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Horse</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">Listed</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">Terms</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Price</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Investor</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Return %</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Expiry</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
             <th className="py-3" />
           </tr>
         </thead>
@@ -36,12 +42,19 @@ export default async function Page() {
           {dsls.map((dsl) => (
             <tr key={dsl.id} className="border-b border-line">
               <td className="py-3">{horseName.get(dsl.horseId) ?? '—'}</td>
-              <td className="py-3">{dsl.status}</td>
-              <td className="py-3">{dsl.published ? 'yes' : 'no'}</td>
               <td className="py-3 font-figure">
-                {dsl.listedStake === null ? 'not set' : `${dsl.listedStake}%`}
+                {dsl.retailMonthlyPerPercent === null
+                  ? 'not priced'
+                  : `$${dsl.retailMonthlyPerPercent}`}
+              </td>
+              <td className="py-3">
+                {dsl.ownerId === null ? '—' : (ownerName.get(dsl.ownerId) ?? '—')}
+              </td>
+              <td className="py-3 font-figure">
+                {dsl.investorSplit === null ? '—' : `${dsl.investorSplit}%`}
               </td>
               <td className="py-3 font-figure">{dsl.endDate ?? '—'}</td>
+              <td className="py-3">{dsl.status.replaceAll('_', ' ')}</td>
               <td className="py-3">
                 <Link href={`/dsl/${dsl.id}`}>Open</Link>
               </td>

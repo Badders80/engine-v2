@@ -150,16 +150,14 @@ describe('the ids must name Records rows that hold the role', () => {
   })
 })
 
-describe('pin 3: a horse holds one listing', () => {
-  it('refuses a second DSL for a horse that already holds one', async () => {
+describe('a horse may hold several terms', () => {
+  it('allows a second DSL for the same horse at a different expiry', async () => {
     const input = await saveInput(store)
     await ok(await saveDsl(input, store))
 
     const result = await saveDsl({ ...input, dsl: draft({ endDate: '2030-05-31' }) }, store)
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.reason).toMatch(/already holds a DSL/)
-    expect(store.dump().dsls).toHaveLength(1)
+    expect(result.ok).toBe(true)
+    expect(store.dump().dsls).toHaveLength(2)
   })
 })
 

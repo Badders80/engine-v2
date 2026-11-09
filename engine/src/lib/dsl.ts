@@ -335,19 +335,13 @@ function readinessFor(args: {
  * write, at the end.
  *
  * Pin 1: `stake_remaining` starts at the listed stake.
- * Pin 3: a horse that already holds a DSL is refused.
+ * A horse may hold several DSLs across different expiries (ruling 23); the
+ * 100%-listed cap is the operator's manual check for now.
  */
 export async function saveDsl(input: SaveDslInput, store: DslStore): Promise<Result<SavedDsl>> {
   const horse = await store.findHorseById(input.horseId)
   if (horse === null) {
     return { ok: false, reason: `horse ${input.horseId} does not exist` }
-  }
-
-  if ((await store.countDslsByHorse(horse.id)) > 0) {
-    return {
-      ok: false,
-      reason: `horse ${horse.id} already holds a DSL; a second deal is a second term, not a second listing`,
-    }
   }
 
   const transition = checkStatusTransition({

@@ -6,13 +6,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   const store = recordStore()
-  const [dsls, horses, owners] = await Promise.all([
-    store.listDsls(),
-    store.listHorses(),
-    store.listPartiesByRole('owner'),
-  ])
+  const [dsls, horses] = await Promise.all([store.listDsls(), store.listHorses()])
   const horseName = new Map(horses.map((horse) => [horse.id, horse.legalName]))
-  const ownerName = new Map(owners.map((owner) => [owner.id, owner.displayName]))
 
   return (
     <main>
@@ -47,9 +42,9 @@ export default async function Page() {
                   ? 'not priced'
                   : `$${dsl.retailMonthlyPerPercent}`}
               </td>
-              <td className="py-3">
-                {dsl.ownerId === null ? '—' : (ownerName.get(dsl.ownerId) ?? '—')}
-              </td>
+              {/* The investor is the buyer. No sale exists at listing time; the
+                  ledger joins the buyer in chunk 4. */}
+              <td className="py-3 text-muted">—</td>
               <td className="py-3 font-figure">
                 {dsl.investorSplit === null ? '—' : `${dsl.investorSplit}%`}
               </td>

@@ -297,7 +297,7 @@ describe('a DSL exists before its deal does', () => {
     expect(saved.dsl.investorSplit).toBeNull()
   })
 
-  it('refuses available and names what is still missing', async () => {
+  it('does not refuse available for missing images', async () => {
     const seeded = await seedStore(store, { horse: { imageCount: 0 } })
     const input: SaveDslInput = {
       horseId: seeded.horse.id,
@@ -306,9 +306,7 @@ describe('a DSL exists before its deal does', () => {
       dsl: approvedDraft(),
     }
     const result = await saveDsl(input, store)
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.reason).toMatch(/image/i)
+    expect(result.ok).toBe(true)
   })
 
   it('refuses available when no owner is attached', async () => {

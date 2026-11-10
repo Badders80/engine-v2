@@ -5,6 +5,11 @@ import type { DslRow } from '@/lib/dslStore'
 import { imageKeys, publicImageUrl } from '@/lib/storage'
 
 import { SummaryRow } from '../../_components/forms'
+import {
+  deleteHorseImageAction,
+  recountHorseImagesAction,
+  uploadHorseImageAction,
+} from '../../dsl/actions'
 import { updateSoftContentAction } from '../../records/actions'
 import { recordStore } from '../../records/store'
 
@@ -185,10 +190,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           </span>
         </div>
 
+        <p className="mb-3 text-body text-low">
+          Images never block a listing. The public card shows a placeholder until one is uploaded.
+        </p>
+
         {images.length === 0 ? (
           <p className="text-body text-low">
             {horse.imageCount === 0
-              ? 'No images yet. Upload them from the DSL page.'
+              ? 'No images yet.'
               : 'The public image host is not configured in this environment.'}
           </p>
         ) : (
@@ -203,10 +212,40 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                   height={180}
                   className="h-full w-full object-cover"
                 />
+                <form action={deleteHorseImageAction} className="p-2">
+                  <input type="hidden" name="horseId" value={horse.id} />
+                  <input type="hidden" name="back" value={`/horses/${horse.id}`} />
+                  <input type="hidden" name="imageNumber" value={image.number} />
+                  <button type="submit">Remove {image.number}</button>
+                </form>
               </li>
             ))}
           </ol>
         )}
+
+        <form action={uploadHorseImageAction} className="mt-3 grid max-w-md gap-2">
+          <input type="hidden" name="horseId" value={horse.id} />
+          <input type="hidden" name="back" value={`/horses/${horse.id}`} />
+          <label htmlFor="imageNumber">
+            Image number (blank adds {horse.imageCount + 1}; an existing number replaces it)
+          </label>
+          <input
+            id="imageNumber"
+            name="imageNumber"
+            type="number"
+            min="1"
+            placeholder={String(horse.imageCount + 1)}
+          />
+          <label htmlFor="image">Image</label>
+          <input id="image" name="image" type="file" accept="image/*" required />
+          <button type="submit">Upload to {horse.slug}</button>
+        </form>
+
+        <form action={recountHorseImagesAction} className="mt-2">
+          <input type="hidden" name="horseId" value={horse.id} />
+          <input type="hidden" name="back" value={`/horses/${horse.id}`} />
+          <button type="submit">Recount from the bucket</button>
+        </form>
       </section>
 
       <section className="rounded-md border border-line bg-panel p-5">

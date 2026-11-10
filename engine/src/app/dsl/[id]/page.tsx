@@ -19,17 +19,14 @@ import { notFound } from 'next/navigation'
 import { missingNarrativeSlots, resolveNarrative } from '@/lib/narrative'
 import { staleOverrideSlots } from '@/lib/narrativeHash'
 import { checkDslReadiness, readinessReason } from '@/lib/readiness'
-import { imageKeys, MIN_IMAGES_FOR_AVAILABLE, publicImageUrl } from '@/lib/storage'
+import { imageKeys, publicImageUrl } from '@/lib/storage'
 import { buildTermSheet } from '@/lib/termSheet'
 
 import {
   approveNarrativeAction,
-  deleteHorseImageAction,
   dismissNarrativeWarningAction,
   publishDslAction,
-  recountHorseImagesAction,
   unpublishDslAction,
-  uploadHorseImageAction,
 } from '../actions'
 import { loadDslView } from '../data'
 
@@ -192,9 +189,9 @@ export default async function Page({
 
       <h2>Images</h2>
       <p>
-        {horse.imageCount} in the bucket, numbered {horse.slug}/01 upward. Image 01 is the hero,
-        and the public site shows the first eight. Available needs {MIN_IMAGES_FOR_AVAILABLE}.
-        Images are public: KYC and proof of address never come through here.
+        {horse.imageCount} in the bucket. Images are authored on the horse&apos;s Records page and
+        flow through here; they never block a listing. KYC and proof of address never come through
+        here. <Link href={`/horses/${horse.id}`}>Manage images on the horse profile</Link>.
       </p>
       {images.length > 0 && (
         <ol>
@@ -208,35 +205,10 @@ export default async function Page({
                 alt={`${horse.legalName} image ${String(image.imageNumber)}`}
                 width={160}
               />
-              <form action={deleteHorseImageAction}>
-                <input type="hidden" name="dslId" value={dsl.id} />
-                <input type="hidden" name="imageNumber" value={image.imageNumber} />
-                <button type="submit">Remove image {image.imageNumber}</button>
-              </form>
             </li>
           ))}
         </ol>
       )}
-      <form action={uploadHorseImageAction}>
-        <input type="hidden" name="dslId" value={dsl.id} />
-        <label htmlFor="imageNumber">
-          Image number (leave blank to add {horse.imageCount + 1}; an existing number replaces it)
-        </label>
-        <input
-          id="imageNumber"
-          name="imageNumber"
-          type="number"
-          min="1"
-          placeholder={String(horse.imageCount + 1)}
-        />
-        <label htmlFor="image">Image</label>
-        <input id="image" name="image" type="file" accept="image/*" required />
-        <button type="submit">Upload to {horse.slug}</button>
-      </form>
-      <form action={recountHorseImagesAction}>
-        <input type="hidden" name="dslId" value={dsl.id} />
-        <button type="submit">Recount from the bucket</button>
-      </form>
     </main>
   )
 }

@@ -219,6 +219,36 @@ export async function updateDslAction(form: FormData): Promise<void> {
 }
 
 /**
+ * The horse an image action works on: by `horseId` from Records, or by the
+ * DSL's horse for the read-only DSL page.
+ */
+async function imageTarget(
+  form: FormData,
+): Promise<Result<{ horse: HorseRow; back: string }>> {
+  const horseId = value(form, 'horseId')
+  if (horseId !== '') {
+    const horse = await store().findHorseById(horseId)
+    if (horse === null) return { ok: false, reason: `horse ${horseId} does not exist` }
+    return { ok: true, value: { horse, back: value(form, 'back') || `/horses/${horseId}` } }
+  }
+
+  const dslId = value(form, 'dslId')
+  const view = await loadDslView(dslId)
+  if (!view.ok) return { ok: false, reason: view.reason }
+  if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+  return { ok: true, value: { horse: view.horse, back: value(form, 'back') || `/dsl/${dslId}` } }
+}
+
+function imageBack(form: FormData): string {
+  const back = value(form, 'back')
+  if (back !== '') return back
+  const dslId = value(form, 'dslId')
+  if (dslId !== '') return `/dsl/${dslId}`
+  const horseId = value(form, 'horseId')
+  return horseId === '' ? '/' : `/horses/${horseId}`
+}
+
+/**
  * Upload one horse image and advance the stored count.
  *
  * Images are numbered `01` upward with no gap and no extension, so the next
@@ -228,8 +258,7 @@ export async function updateDslAction(form: FormData): Promise<void> {
  * is refused before anything is written.
  */
 export async function uploadHorseImageAction(form: FormData): Promise<void> {
-  const dslId = value(form, 'dslId')
-  const back = `/dsl/${dslId}`
+  const back = imageBack(form)
 
   const file = form.get('image')
   if (!(file instanceof File) || file.size === 0) {
@@ -237,11 +266,10 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
   }
 
   const uploaded = await attempt<HorseRow>(async () => {
-    const view = await loadDslView(dslId)
-    if (!view.ok) return { ok: false, reason: view.reason }
-    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+    const target = await imageTarget(form)
+    if (!target.ok) return { ok: false, reason: target.reason }
 
-    const { horse } = view
+    const { horse } = target.value
     const requested = Number(value(form, 'imageNumber'))
     const imageNumber =
       Number.isInteger(requested) && requested >= 1 ? requested : horse.imageCount + 1
@@ -267,8 +295,7 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
  * Remove one horse image and close the gap it leaves.
  */
 export async function deleteHorseImageAction(form: FormData): Promise<void> {
-  const dslId = value(form, 'dslId')
-  const back = `/dsl/${dslId}`
+  const back = imageBack(form)
   const imageNumber = Number(value(form, 'imageNumber'))
 
   if (!Number.isInteger(imageNumber) || imageNumber < 1) {
@@ -276,11 +303,10 @@ export async function deleteHorseImageAction(form: FormData): Promise<void> {
   }
 
   const deleted = await attempt<HorseRow>(async () => {
-    const view = await loadDslView(dslId)
-    if (!view.ok) return { ok: false, reason: view.reason }
-    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+    const target = await imageTarget(form)
+    if (!target.ok) return { ok: false, reason: target.reason }
 
-    const { horse } = view
+    const { horse } = target.value
     await deletePublicImage({ slug: horse.slug, imageNumber })
     const images = await listPublicImages({ slug: horse.slug })
     return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
@@ -296,15 +322,13 @@ export async function deleteHorseImageAction(form: FormData): Promise<void> {
  * Recount a horse's images from the bucket and store the result.
  */
 export async function recountHorseImagesAction(form: FormData): Promise<void> {
-  const dslId = value(form, 'dslId')
-  const back = `/dsl/${dslId}`
+  const back = imageBack(form)
 
   const recounted = await attempt<HorseRow>(async () => {
-    const view = await loadDslView(dslId)
-    if (!view.ok) return { ok: false, reason: view.reason }
-    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+    const target = await imageTarget(form)
+    if (!target.ok) return { ok: false, reason: target.reason }
 
-    const { horse } = view
+    const { horse } = target.value
     const images = await listPublicImages({ slug: horse.slug })
     return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
   })

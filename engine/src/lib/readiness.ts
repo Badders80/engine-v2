@@ -72,8 +72,6 @@ export type ReadinessResult =
   | { ok: true }
   | { ok: false; missing: readonly string[] }
 
-const MINIMUM_IMAGES = 3
-
 function present(value: string | null | undefined): boolean {
   return value !== null && value !== undefined && value.trim() !== ''
 }
@@ -119,9 +117,6 @@ export function checkDslReadiness(input: ReadinessInput): ReadinessResult {
   }
 
   if (!horse.registered) missing.push('a registered horse')
-  if (horse.imageCount < MINIMUM_IMAGES) {
-    missing.push(`at least ${MINIMUM_IMAGES} horse images`)
-  }
 
   // The four soft slots are judged on what the deal will actually print: a
   // deal-local override counts, and an untouched slot reads through live.

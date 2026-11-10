@@ -132,10 +132,10 @@ describe('the content the legal pack needs', () => {
     expect(missingOf(checkDslReadiness(input))).toContain('a registered horse')
   })
 
-  it('refuses fewer than three images', () => {
+  it('does not block on images', () => {
     const input = ready()
-    input.horse!.imageCount = 2
-    expect(missingOf(checkDslReadiness(input))).toContain('at least 3 horse images')
+    input.horse!.imageCount = 0
+    expect(checkDslReadiness(input)).toEqual({ ok: true })
   })
 
   it('refuses each empty soft paragraph', () => {

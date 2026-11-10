@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { saveDsl, type DslDraft } from '../src/lib/dsl'
+import { saveDsl, updateDsl, type DslDraft } from '../src/lib/dsl'
 import { createInMemoryEmailSender } from '../src/lib/email'
 import {
   capTableFor,
@@ -541,6 +541,26 @@ describe('Chunk 4 — U19 close guard and U20 invariant', () => {
       store,
     )
     expect(again.ok).toBe(false)
+  })
+
+  it('refuses an edit to a closed draft', async () => {
+    const { store, dsl } = await setup({ status: 'coming_soon', published: false })
+    await closeListing(
+      { dslId: dsl.id, reason: 'draft abandoned', closedBy: 'operator' },
+      store,
+    )
+
+    const edit = await updateDsl(
+      {
+        dslId: dsl.id,
+        trainerId: dsl.trainerId,
+        ownerId: dsl.ownerId,
+        dsl: approvedDraft({ status: 'coming_soon', published: false }),
+      },
+      store,
+    )
+    expect(edit.ok).toBe(false)
+    if (!edit.ok) expect(edit.reason).toMatch(/closed/)
   })
 
   it('sweeps a stale hold, then closes with a reason and a closer', async () => {

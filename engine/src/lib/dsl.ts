@@ -442,6 +442,11 @@ export async function updateDsl(
   if (currentDsl === null) {
     return { ok: false, reason: `DSL ${input.dslId} does not exist` }
   }
+  // R-DSL-05: a closed row is immutable. Resume an archived draft by creating
+  // a new one; the dateless index ignores closed rows (00028).
+  if (currentDsl.closedAt !== null && currentDsl.closedAt !== undefined) {
+    return { ok: false, reason: 'this DSL is closed and cannot be edited' }
+  }
 
   const horse = await store.findHorseById(currentDsl.horseId)
   if (horse === null) {

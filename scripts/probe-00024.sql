@@ -1,4 +1,5 @@
 -- probe-00024.sql
+-- expect: 27
 -- Phase A acceptance probes for 00024_ledger.sql. Local stack only.
 --
 -- Runs inside one transaction and rolls back, so it leaves no rows behind.

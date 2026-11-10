@@ -1,4 +1,5 @@
 -- probe-00028.sql
+-- expect: 3
 -- Acceptance probes for 00028_dateless_draft_index.sql. Local stack only.
 -- One transaction, rolled back.
 --

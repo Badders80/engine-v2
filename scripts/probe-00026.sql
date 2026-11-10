@@ -1,4 +1,5 @@
 -- probe-00026.sql
+-- expect: 7
 -- Acceptance probes for 00026_checkout_resolution.sql. Local stack only.
 --
 -- One transaction, rolled back. The fixture is synthetic and labelled.

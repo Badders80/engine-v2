@@ -1,4 +1,5 @@
 -- probe-00027.sql
+-- expect: 2
 -- Acceptance probes for 00027_close_draft.sql. Local stack only.
 -- One transaction, rolled back.
 --

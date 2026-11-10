@@ -10,7 +10,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXPECTED_SCHEMA="00028"   # bump in the same commit as the migration
+EXPECTED_SCHEMA="00029"   # bump in the same commit as the migration
 ALLOW_HOST="${ALLOW_DB_HOST:-}"
 
 fail() { printf 'FAIL %s\n' "$1" >&2; exit 1; }
@@ -79,15 +79,21 @@ while IFS= read -r file; do probes+=("$file"); done < <(
 )
 [ "${#probes[@]}" -gt 0 ] || fail "no probe files found in scripts/"
 probe_args=()
-for file in "${probes[@]}"; do probe_args+=( -f "$file" ); done
+for file in "${probes[@]}"; do
+  # A probe that does not declare its expected row count is not runnable:
+  # an empty or truncated body would otherwise pass silently.
+  grep -Eq '^-- expect: [0-9]+$' "$file" || \
+    fail "$(basename "$file") has no '-- expect: N' declaration"
+  probe_args+=( -f "$file" )
+done
 
 psql "$DB_URL" -v ON_ERROR_STOP=1 -q \
   -c "select pg_advisory_lock(hashtext('verify-db'))" \
   "${probe_args[@]}" \
   -c "select pg_advisory_unlock(hashtext('verify-db'))"
 
-# 6. The TS/SQL narrative parity check, unchanged.
+# 6. The TS/SQL narrative parity check, on the same database.
 echo "== check-db =="
-bash "$ROOT/scripts/check-db.sh"
+CHECK_DB_URL="$DB_URL" bash "$ROOT/scripts/check-db.sh"
 
 echo "verify-db: PASS"

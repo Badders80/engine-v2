@@ -1,4 +1,6 @@
 -- 00024_ledger.sql
+-- Rules: R-SALE-01..06, R-ALLOC-01, R-ALLOC-03, R-TERM-01, R-TERM-02, R-UNIT-01.
+--
 -- Chunk 4, Phase A. The ledger reads a frozen snapshot; the sale is written
 -- once, atomically, and can never be edited or removed.
 --

@@ -10,3 +10,13 @@ check:
 check-db:
 	bash scripts/check-db.sh
 alias db := check-db
+
+# The SQL gate. Runs every scripts/probe-*.sql against the local stack, then
+# the narrative parity check. Refuses a non-local database, asserts the schema
+# version, and takes an advisory lock so two runs cannot collide.
+#
+# Not part of `check` or `pnpm verify`: CI runs it as its own job with
+# `supabase start`; locally it is best-effort.
+verify-db:
+	bash scripts/verify-db.sh
+alias vdb := verify-db

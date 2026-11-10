@@ -435,7 +435,7 @@ begin
     values ('U19 close is refused while a held paid_unfulfilled exists', false, 'the close succeeded');
   exception when others then
     insert into probe_results (check_name, passed, detail)
-    values ('U19 close is refused while a held paid_unfulfilled exists', sqlerrm like '%paid_unfulfilled%', sqlerrm);
+    values ('U19 close is refused while a held paid_unfulfilled exists', sqlerrm like '%unresolved%', sqlerrm);
   end;
 end
 $$;
@@ -520,5 +520,13 @@ select n, check_name, case when passed then 'PASS' else 'FAIL' end as result, de
   from probe_results order by n;
 
 select count(*) filter (where not passed) as failures from probe_results;
+
+do $$
+begin
+  if (select count(*) from probe_results where not passed) > 0 then
+    raise exception 'probe-00024 failures: %',
+      (select string_agg(check_name, '; ' order by n) from probe_results where not passed);
+  end if;
+end $$;
 
 rollback;

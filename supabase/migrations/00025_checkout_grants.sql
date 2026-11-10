@@ -1,4 +1,6 @@
 -- 00025_checkout_grants.sql
+-- Rules: R-SALE-02 (one atomic write), R-SALE-05 (close guard), R-ALLOC-02 (no oversell).
+--
 -- Chunk 4, Phase B. One pre-existing grant gap, found by driving the real
 -- purchase path against the local stack.
 --

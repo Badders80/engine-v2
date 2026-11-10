@@ -17,7 +17,7 @@ import { paymentModelAllowed, termMonthsBetween } from '../term'
 import type { CloseStyle, PaymentModel } from '../dslStore'
 
 /** The pack version printed on every document. One constant, bumped by hand. */
-export const LEGAL_PACK_VERSION = '1.0.0'
+export const LEGAL_PACK_VERSION = '1.0.1'
 
 export type LegalPackInput = {
   account: { fullName: string }
@@ -57,7 +57,11 @@ export type LegalPackInput = {
 }
 
 /** The two tokens whose value is a selected block, not a scalar. */
-export const BLOCK_KEYS = ['pds.costs_summary_block', 'pds.close_style_block'] as const
+export const BLOCK_KEYS = [
+  'pds.costs_summary_block',
+  'pds.close_style_block',
+  'sa.break_clause_block',
+] as const
 export type BlockKey = (typeof BLOCK_KEYS)[number]
 
 export const SCALAR_KEYS = [

@@ -22,6 +22,7 @@ import {
   loadLegalCorpus,
   selectCloseFile,
   selectCostsFile,
+  selectSaBreakFile,
   sha256,
   type LegalCorpus,
 } from './templates'
@@ -136,11 +137,13 @@ export function compileLegalPack(input: LegalPackInput, corpus?: LegalCorpus): L
 
   const costsBlock = render(loaded.blocks[selectCostsFile(effective.dsl.paymentModel)], scalars)
   const closeBlock = render(loaded.blocks[selectCloseFile(effective.dsl.closeStyle)], scalars)
+  const saBreakBlock = render(loaded.blocks[selectSaBreakFile(effective.dsl.closeStyle)], scalars)
 
   const values: Record<string, string> = {
     ...scalars,
     'pds.costs_summary_block': costsBlock,
     'pds.close_style_block': closeBlock,
+    'sa.break_clause_block': saBreakBlock,
   }
 
   const pds = render(loaded.pds, values)

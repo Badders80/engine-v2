@@ -1,5 +1,5 @@
 /**
- * The legal corpus: two templates, four block files, one loader.
+ * The legal corpus: two templates, six block files, one loader.
  * PLAN.md step 7.
  *
  * The loader reads the six files from disk, hashes each one, and refuses a
@@ -35,9 +35,13 @@ export const BLOCK_FILES = {
     fourteen_day: 'blocks/pds-close-style.fourteen-day.md',
     three_x_remaining: 'blocks/pds-close-style.three-x-remaining.md',
   },
+  'sa.break_clause_block': {
+    fourteen_day: 'blocks/sa-break-clause.fourteen-day.md',
+    three_x_remaining: 'blocks/sa-break-clause.three-x-remaining.md',
+  },
 } as const
 
-/** The six legal-prose files, relative to `engine/src/templates/`. */
+/** The eight legal-prose files, relative to `engine/src/templates/`. */
 export const CORPUS_FILES = [
   TEMPLATE_FILES.pds,
   TEMPLATE_FILES.sa,
@@ -45,6 +49,8 @@ export const CORPUS_FILES = [
   BLOCK_FILES['pds.costs_summary_block'].upfront,
   BLOCK_FILES['pds.close_style_block'].fourteen_day,
   BLOCK_FILES['pds.close_style_block'].three_x_remaining,
+  BLOCK_FILES['sa.break_clause_block'].fourteen_day,
+  BLOCK_FILES['sa.break_clause_block'].three_x_remaining,
 ] as const
 
 export type LegalCorpus = {
@@ -147,6 +153,14 @@ export function selectCostsFile(paymentModel: PaymentModel): string {
 /** The exit-paragraph block for the close style. An unknown branch is a defect. */
 export function selectCloseFile(closeStyle: CloseStyle): string {
   const branch = BLOCK_FILES['pds.close_style_block']
+  if (closeStyle === 'fourteen_day') return branch.fourteen_day
+  if (closeStyle === 'three_x_remaining') return branch.three_x_remaining
+  throw new Error(`unknown close style: ${String(closeStyle)}`)
+}
+
+/** The SA break-clause block for the close style. An unknown branch is a defect. */
+export function selectSaBreakFile(closeStyle: CloseStyle): string {
+  const branch = BLOCK_FILES['sa.break_clause_block']
   if (closeStyle === 'fourteen_day') return branch.fourteen_day
   if (closeStyle === 'three_x_remaining') return branch.three_x_remaining
   throw new Error(`unknown close style: ${String(closeStyle)}`)

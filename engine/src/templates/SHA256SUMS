@@ -1,6 +1,8 @@
 87aec93f2ca5314cfd3f0e5de8687a2b5ed70822ed6a0f873517507fb26d119e  engine/src/templates/PDS.template.md
-ec36c087409157a2d5427d2feccc3e312feafda8073526c05af62be81494deb5  engine/src/templates/SA.template.md
+b7a2fe763c37f2c0f43d8ca20ffddb3349b72bf7d5c22ff022313ba948081c23  engine/src/templates/SA.template.md
+1e29bdc4a292b19605a8b1a1fbdb363585f3f0ccfd8187fa0564979c694689a3  engine/src/templates/blocks/pds-close-style.fourteen-day.md
+e5dfd812fd2f2f09855bb42c1afe2767d8c3b1908feeb7ce9294c006816b74db  engine/src/templates/blocks/pds-close-style.three-x-remaining.md
 ac693a7b56e81b1a60deb8b0eec7881f1d1844b5fa9290182a71a1d38e92d05d  engine/src/templates/blocks/pds-costs-summary.float.md
 7f9c562741f6b71295df375cff14772d9ffa385da1affa3a1cb131557f3e7997  engine/src/templates/blocks/pds-costs-summary.upfront.md
-f62e7f97d02250cfe2155634f5d86afd8768100124fcc894b2d32ca6f1747809  engine/src/templates/blocks/pds-close-style.fourteen-day.md
-176595d81562d0d9a8c39d2e4f6a195c8073108330eca6ade5a9f40b94edd457  engine/src/templates/blocks/pds-close-style.three-x-remaining.md
+35c2a725cbf2620909dd63479f92955dd67b075d08d3a7c14176555dee24a3ed  engine/src/templates/blocks/sa-break-clause.fourteen-day.md
+3aa2f6ec5d410956530c2655125147898778a5f0c6526b69f446969ab5de00a2  engine/src/templates/blocks/sa-break-clause.three-x-remaining.md

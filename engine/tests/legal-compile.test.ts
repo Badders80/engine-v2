@@ -203,6 +203,37 @@ describe('required values fail loudly', () => {
   })
 })
 
+describe('the SA states the break clause', () => {
+  it('prints the 14-day branch with no buyout', () => {
+    const pack = compileLegalPack(input({ dsl: { closeStyle: 'fourteen_day' } }))
+    expect(pack.sa.markdown).toContain('Break clause — 14-day notice.')
+    expect(pack.sa.markdown).toContain('There is no buyout.')
+    expect(pack.sa.markdown).not.toContain('Break clause — 3× buyout.')
+  })
+
+  it('prints the 3× branch with the buyout', () => {
+    const pack = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
+    expect(pack.sa.markdown).toContain('Break clause — 3× buyout.')
+    expect(pack.sa.markdown).toContain('3× the pro-rata unused lease fee')
+    expect(pack.sa.markdown).not.toContain('There is no buyout.')
+  })
+
+  it('prints both payment-model settlements in each branch', () => {
+    for (const closeStyle of ['fourteen_day', 'three_x_remaining'] as const) {
+      const pack = compileLegalPack(input({ dsl: { closeStyle } }))
+      expect(pack.sa.markdown).toContain('**Upfront Leases:**')
+      expect(pack.sa.markdown).toContain('**Monthly Leases:**')
+    }
+  })
+
+  it('keeps the PDS and SA aligned on the selected style', () => {
+    const fourteen = compileLegalPack(input({ dsl: { closeStyle: 'fourteen_day' } }))
+    expect(fourteen.pds.markdown).toContain('Lessor 14-Day Break')
+    const buyout = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
+    expect(buyout.pds.markdown).toContain('Early Sale / Buyout')
+  })
+})
+
 describe('the output is deterministic', () => {
   const first = compileLegalPack(input())
 
@@ -223,7 +254,7 @@ describe('the output is deterministic', () => {
     expect(first.sa.hash).toBe(sha256(first.sa.markdown))
   })
 
-  it('returns a hash for each of the six prose files', () => {
-    expect(Object.keys(first.templateHashes)).toHaveLength(6)
+  it('returns a hash for each of the eight prose files', () => {
+    expect(Object.keys(first.templateHashes)).toHaveLength(8)
   })
 })

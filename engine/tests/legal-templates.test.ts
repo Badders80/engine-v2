@@ -1,7 +1,7 @@
 /**
  * The legal corpus and its token contract. PLAN.md step 7.
  *
- * The two templates are the document authority. The four block files hold the
+ * The two templates are the document authority. The six block files hold the
  * branch text. Every legal sentence lives under `engine/src/templates/`, and
  * every `{{token}}` in that corpus resolves from one declared key list.
  */
@@ -16,6 +16,7 @@ import {
   loadLegalCorpus,
   selectCloseFile,
   selectCostsFile,
+  selectSaBreakFile,
   sha256,
   tokensIn,
 } from '../src/lib/legal/templates'
@@ -26,12 +27,12 @@ const PREVIEW = new URL('../src/app/dsl/[id]/legal/page.tsx', import.meta.url)
 
 const corpus = loadLegalCorpus()
 
-describe('the six legal prose files exist and load', () => {
-  it('loads the two templates and the four block files', () => {
-    expect(CORPUS_FILES).toHaveLength(6)
+describe('the eight legal prose files exist and load', () => {
+  it('loads the two templates and the six block files', () => {
+    expect(CORPUS_FILES).toHaveLength(8)
     expect(corpus.pds.length).toBeGreaterThan(1000)
     expect(corpus.sa.length).toBeGreaterThan(1000)
-    expect(Object.keys(corpus.blocks)).toHaveLength(6)
+    expect(Object.keys(corpus.blocks)).toHaveLength(8)
   })
 
   it('selects every branch to a file that exists in the corpus', () => {
@@ -45,11 +46,19 @@ describe('the six legal prose files exist and load', () => {
     expect(selectCloseFile('three_x_remaining')).toBe(
       BLOCK_FILES['pds.close_style_block'].three_x_remaining,
     )
+    expect(selectSaBreakFile('fourteen_day')).toBe(
+      BLOCK_FILES['sa.break_clause_block'].fourteen_day,
+    )
+    expect(selectSaBreakFile('three_x_remaining')).toBe(
+      BLOCK_FILES['sa.break_clause_block'].three_x_remaining,
+    )
     for (const file of [
       selectCostsFile('subscription_float'),
       selectCostsFile('upfront'),
       selectCloseFile('fourteen_day'),
       selectCloseFile('three_x_remaining'),
+      selectSaBreakFile('fourteen_day'),
+      selectSaBreakFile('three_x_remaining'),
     ]) {
       expect(corpus.blocks[file]).toBeTypeOf('string')
     }
@@ -59,6 +68,7 @@ describe('the six legal prose files exist and load', () => {
     // The cast stands for a form value that reached the compiler unchecked.
     expect(() => selectCostsFile('monthly' as never)).toThrow(/unknown payment model/)
     expect(() => selectCloseFile('thirty_day' as never)).toThrow(/unknown close style/)
+    expect(() => selectSaBreakFile('thirty_day' as never)).toThrow(/unknown close style/)
   })
 })
 
@@ -71,7 +81,7 @@ describe('the pinned hashes match the prose on disk', () => {
       .split('\n')
       .filter((line) => line.trim() !== '')
 
-    expect(manifest).toHaveLength(6)
+    expect(manifest).toHaveLength(8)
 
     for (const line of manifest) {
       const match = /^([0-9a-f]{64})\s+(.+)$/.exec(line)
@@ -101,8 +111,12 @@ describe('the token contract holds over the whole corpus', () => {
     expect(orphans).toEqual([])
   })
 
-  it('declares the two block tokens and no third', () => {
-    expect([...BLOCK_KEYS]).toEqual(['pds.costs_summary_block', 'pds.close_style_block'])
+  it('declares the three block tokens and no fourth', () => {
+    expect([...BLOCK_KEYS]).toEqual([
+      'pds.costs_summary_block',
+      'pds.close_style_block',
+      'sa.break_clause_block',
+    ])
   })
 
   it('balances the braces in every file', () => {

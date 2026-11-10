@@ -38,6 +38,8 @@ FILES=(
   "$BLOCKS/pds-costs-summary.upfront.md"
   "$BLOCKS/pds-close-style.fourteen-day.md"
   "$BLOCKS/pds-close-style.three-x-remaining.md"
+  "$BLOCKS/sa-break-clause.fourteen-day.md"
+  "$BLOCKS/sa-break-clause.three-x-remaining.md"
 )
 
 # 1. Every prose file is present. A missing one is a compile failure at runtime.
@@ -45,11 +47,11 @@ missing=0
 for file in "${FILES[@]}"; do
   [ -f "$file" ] || { bad "missing legal prose file: ${file#"$ROOT"/}"; missing=1; }
 done
-[ "$missing" -eq 0 ] && ok "six legal prose files present"
+[ "$missing" -eq 0 ] && ok "eight legal prose files present"
 
-# 2. The six hashes are pinned and match. An edit is deliberate or it is drift.
+# 2. The eight hashes are pinned and match. An edit is deliberate or it is drift.
 if (cd "$ROOT" && sha256sum -c engine/src/templates/SHA256SUMS >/dev/null 2>&1); then
-  ok "SHA256SUMS verifies for all six files"
+  ok "SHA256SUMS verifies for all eight files"
 else
   bad "SHA256SUMS does not match the prose on disk"
 fi
@@ -134,6 +136,7 @@ EXPECTED=(
   'owner.entity_name'
   'pds.close_style_block'
   'pds.costs_summary_block'
+  'sa.break_clause_block'
   'pricing.float_per_percent_nzd'
   'pricing.monthly_lease_payment_unit_nzd'
   'pricing.upfront_per_percent_nzd'

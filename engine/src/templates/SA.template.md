@@ -101,10 +101,8 @@ This syndicate is a leasehold interest, not equity ownership. Leaseholders hold 
 
 ## 15. Early Termination & Refunds
 If the horse is retired or the lease ends early, the syndicate winds down. Once all trailing expenses and care costs are settled with the owner:
-- **Upfront Leases:** You receive a pro-rata refund of the lease fee for any full months remaining.
-- **Monthly Leases:** Monthly billing stops, and any unused prepaid payments and deposit reserve are refunded.
 
-All refunds are calculated strictly in full calendar months. No day-count apportionments apply.
+{{sa.break_clause_block}}
 
 ---
 

@@ -10,7 +10,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXPECTED_SCHEMA="00027"   # bump in the same commit as the migration
+EXPECTED_SCHEMA="00028"   # bump in the same commit as the migration
 ALLOW_HOST="${ALLOW_DB_HOST:-}"
 
 fail() { printf 'FAIL %s\n' "$1" >&2; exit 1; }

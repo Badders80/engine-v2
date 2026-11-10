@@ -2,9 +2,9 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** say **`go chunk 3`** — open `/home/evo/sandbox/v2/dsl-sidequest/STATE.md`
-§ Chunk 3 and start at **U4 (the term sheet)**, then U7, U11, U14 and U10. No
-migration: the sign-off columns landed in `00021`.
+**Next action:** walk chunk 3 on 3001 (`/dsl/new` → Review), then say
+**`go chunk 4`** — open `/home/evo/sandbox/v2/dsl-sidequest/STATE.md` § Chunk 4:
+the ledger (U15) and the append-only `sales` trigger (`00023`).
 
 ## State — 2026-11-10
 
@@ -35,17 +35,22 @@ migration: the sign-off columns landed in `00021`.
   parties; the status matrix lives in TS and the `00021` trigger; one `dsls`
   write; four readiness guards; narrative sign-off columns; horse authoring
   loses the trainer; admin stops quoting the wholesale total.
-- **Gate:** `pnpm verify` green 2026-11-10 at `e1f12f9` — **345 engine / 54
-  website**, both builds.
+- **Chunk 3 — deal assembly** (`73f65bb`, merged `3dfdac6`, audit PASS):
+  four-step wizard ending in the term-sheet Review; expiry-only date with
+  derived Duration; three deal-local narrative overrides with one shared
+  resolver; one-time override warning; `00022` (override columns, meta, role
+  check, one-dateless-draft index, expiry-only Available gate); DRAFT banner.
+- **Gate:** `pnpm verify` green 2026-11-10 on the merged branch — **370 engine /
+  54 website**, both builds; `just check-db` 6/6.
 - **Target database:** new hosted Supabase `evolution-engine`
-  (`rkcptsghxovoeaycabah`, Sydney). 21 migrations replayed (`00001`–`00021`),
-  schema parity **326/326** manifest lines identical local ↔ hosted, migration
+  (`rkcptsghxovoeaycabah`, Sydney). 22 migrations replayed (`00001`–`00022`),
+  schema parity **335/335** manifest lines identical local ↔ hosted, migration
   history recorded —
   `supabase db push --dry-run` says *up to date*. `engine/.env.local` points at it.
   The old project `ejdenhlpvtldiljxawtd` stays untouched with the public site.
 - **Data:** 1 party (trainer role), 1 horse — Mulan The Brave (NZ), registered —
   0 DSLs, 0 sales. The local 54422 stack is scratch only.
-- **Chunks 3–4 are LOCKED** (2026-11-10): deal assembly, ledger (`00022`).
+- **Chunk 4 is LOCKED** (2026-11-10): ledger, H6 append-only (`00023`).
   Contents are in `STATE.md` and change only by ruling.
 - **Plan of record:** `/home/evo/sandbox/v2/dsl-sidequest/` — `STATE.md` (position),
   `PLAN.md` (what), `EXECUTION-DOD-2026-11-09.md` (how we run: gate, decision
@@ -55,6 +60,7 @@ migration: the sign-off columns landed in `00021`.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-10 | DSL 3 — deal assembly | engine_v2/website | `73f65bb` / merge `3dfdac6` | done |
 | 2026-11-10 | DSL 2 — profiles/roles + hardening | engine_v2/website | `e1f12f9` | done |
 | 2026-11-10 | DSL 1d — profile polish (names, links, handles, edit routes, dev cache) | engine_v2/website | `d387225` | done |
 | 2026-11-09 | DSL 1c — horse edit + trainer | engine_v2/website | `82a702d` | done |
@@ -65,7 +71,7 @@ migration: the sign-off columns landed in `00021`.
 
 ## Blocked
 
-- **Chunk 3** — waits on the founder's `go`.
+- **Chunk 4** — waits on the founder's `go`.
 - **Backups** — the free tier has none and this is now the target authority:
   Pro plan or a scheduled `pg_dump`. Founder's call.
 - **Sale fixture** — `sales` is empty and chunk 4's proof walks one. Create it

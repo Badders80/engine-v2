@@ -27,7 +27,9 @@ export default async function Page() {
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Horse</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Price</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Investor</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">Return %</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">
+              Investor return %
+            </th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Expiry</th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
             <th className="py-3" />

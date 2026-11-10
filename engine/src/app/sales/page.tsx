@@ -121,9 +121,15 @@ export default async function Page({
       {sections.map(({ dsl, rows, cap, exceptions }) => {
         const identityHolds = capTableIdentityHolds(cap)
         const canClose =
-          dsl.status !== 'completed' &&
-          (dsl.status === 'available' || dsl.status === 'fully_allocated') &&
+          dsl.closedAt === null &&
+          (dsl.status === 'coming_soon' ||
+            dsl.status === 'available' ||
+            dsl.status === 'fully_allocated') &&
           exceptions.length === 0
+        const statusLabel =
+          dsl.closedAt !== null && rows.length === 0
+            ? 'archived'
+            : dsl.status.replaceAll('_', ' ')
 
         return (
           <section key={dsl.id} className="mb-12 border-t border-line pt-6">
@@ -138,7 +144,7 @@ export default async function Page({
               </div>
               <div className="text-right">
                 <p className="text-caption uppercase tracking-caption text-muted">
-                  {dsl.status.replaceAll('_', ' ')}
+                  {statusLabel}
                   {dsl.published ? ' · published' : ''}
                 </p>
                 <p className="font-figure text-caption text-muted">

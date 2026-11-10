@@ -523,6 +523,26 @@ describe('Chunk 4 — U19 close guard and U20 invariant', () => {
     expect(second.ok).toBe(false)
   })
 
+  it('closes an abandoned coming_soon draft', async () => {
+    const { store, dsl } = await setup({ status: 'coming_soon', published: false })
+
+    const closed = await closeListing(
+      { dslId: dsl.id, reason: 'draft abandoned', closedBy: 'operator' },
+      store,
+    )
+    expect(closed.ok).toBe(true)
+    if (!closed.ok) return
+    expect(closed.value.status).toBe('coming_soon')
+    expect(closed.value.closedAt).not.toBeNull()
+    expect(closed.value.closedReason).toBe('draft abandoned')
+
+    const again = await closeListing(
+      { dslId: dsl.id, reason: 'again', closedBy: 'operator' },
+      store,
+    )
+    expect(again.ok).toBe(false)
+  })
+
   it('sweeps a stale hold, then closes with a reason and a closer', async () => {
     const { store, dsl } = await setup()
     await store.reserveCheckoutSession({

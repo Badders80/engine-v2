@@ -558,9 +558,13 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       if (dsl.closedAt !== null && dsl.closedAt !== undefined) {
         throw new Error(`dsl ${dslId} is already closed`)
       }
-      if (dsl.status !== 'available' && dsl.status !== 'fully_allocated') {
+      if (
+        dsl.status !== 'coming_soon' &&
+        dsl.status !== 'available' &&
+        dsl.status !== 'fully_allocated'
+      ) {
         throw new Error(
-          `dsl ${dslId} is ${dsl.status} and cannot be closed; only an available or fully allocated listing closes`,
+          `dsl ${dslId} is ${dsl.status} and cannot be closed; a draft, available or fully allocated listing closes`,
         )
       }
 
@@ -582,8 +586,17 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
         const held = blocking.filter((row) => row.stakeReturnedAt === null).length
         const returned = blocking.length - held
         throw new Error(
-          `dsl ${dslId} cannot be closed: ${held} held and ${returned} returned open or paid_unfulfilled checkout(s) exist`,
+          `dsl ${dslId} cannot be closed: ${held} held and ${returned} returned unresolved checkout(s) exist`,
         )
+      }
+
+      // A draft closes in place; it gains no terminal status.
+      if (dsl.status === 'coming_soon') {
+        return base.updateDsl(dslId, {
+          closedAt: nowIso(),
+          closedReason: reason,
+          closedBy,
+        })
       }
 
       return base.updateDsl(dslId, {

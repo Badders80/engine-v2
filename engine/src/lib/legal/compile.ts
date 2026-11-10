@@ -16,6 +16,8 @@ import {
   resolveScalars,
   type LegalPackInput,
 } from './tokens'
+import { resolveNarrative } from '../narrative'
+
 import {
   loadLegalCorpus,
   selectCloseFile,
@@ -111,14 +113,29 @@ function assertNoBannedProse(document: string, name: string): void {
  * combination may surface.
  */
 export function compileLegalPack(input: LegalPackInput, corpus?: LegalCorpus): LegalPack {
-  validateInput(input)
+  // The four soft slots resolve through the one resolver: a deal-local override
+  // wins, an untouched slot reads through from Records live. The documents
+  // never read the raw columns directly.
+  const resolved = resolveNarrative(input.horse, input.dsl, input.trainer)
+  const effective: LegalPackInput = {
+    ...input,
+    horse: {
+      ...input.horse,
+      aboutHorse: resolved['horse.about_horse'].text,
+      racingOutlookAndPedigree: resolved['horse.racing_outlook_and_pedigree'].text,
+      raceExpectation: resolved['horse.race_expectation'].text,
+    },
+    trainer: { ...input.trainer, bio: resolved['trainer.bio'].text },
+  }
+
+  validateInput(effective)
 
   const loaded = corpus ?? loadLegalCorpus()
 
-  const scalars = resolveScalars(input)
+  const scalars = resolveScalars(effective)
 
-  const costsBlock = render(loaded.blocks[selectCostsFile(input.dsl.paymentModel)], scalars)
-  const closeBlock = render(loaded.blocks[selectCloseFile(input.dsl.closeStyle)], scalars)
+  const costsBlock = render(loaded.blocks[selectCostsFile(effective.dsl.paymentModel)], scalars)
+  const closeBlock = render(loaded.blocks[selectCloseFile(effective.dsl.closeStyle)], scalars)
 
   const values: Record<string, string> = {
     ...scalars,

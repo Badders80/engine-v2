@@ -52,6 +52,37 @@ export function retailPerPercentFromWholesale(wholesaleMonthlyPerPercent: number
   return Math.ceil(wholesaleMonthlyPerPercent * MARGIN_MULTIPLIER * FEE_MULTIPLIER)
 }
 
+/**
+ * The whole-dollar wholesale rate that reproduces a given retail rate, or null.
+ *
+ * Chunk 3's two-way price: the operator may type the retail rate, but the
+ * stored figure is wholesale. Only a whole-dollar wholesale that ceiling-rounds
+ * to exactly the typed retail rate is accepted, so the deal never carries a
+ * hidden fractional wholesale rate. `null` means "no whole-dollar wholesale
+ * reproduces this retail figure" and the form refuses it.
+ */
+export function wholesaleFromRetail(retailMonthlyPerPercent: number): number | null {
+  if (
+    !Number.isFinite(retailMonthlyPerPercent) ||
+    !Number.isInteger(retailMonthlyPerPercent) ||
+    retailMonthlyPerPercent <= 0
+  ) {
+    return null
+  }
+
+  const guess = Math.floor(
+    retailMonthlyPerPercent / (MARGIN_MULTIPLIER * FEE_MULTIPLIER),
+  )
+
+  for (let wholesale = Math.max(1, guess - 3); wholesale <= guess + 3; wholesale += 1) {
+    if (retailPerPercentFromWholesale(wholesale) === retailMonthlyPerPercent) {
+      return wholesale
+    }
+  }
+
+  return null
+}
+
 /** Monthly amount for a stake: the per-1% rate times the stake percent. */
 export function totalForStake(retailPerPercent: number, stake: number): number {
   return retailPerPercent * stake

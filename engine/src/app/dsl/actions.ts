@@ -25,10 +25,18 @@ import {
   type DslStatus,
   type Result,
 } from '@/lib/dsl'
-import type { DslRow, HorseRow } from '@/lib/dslStore'
+import type { DslRow, HorseRow, NarrativeOverrideMeta } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
+import {
+  carryDismissals,
+  fullSignoff,
+  missingNarrativeSlots,
+  resolveNarrative,
+} from '@/lib/narrative'
+import { narrativeHash, sourceHash, staleOverrideSlots } from '@/lib/narrativeHash'
 import { checkDslReadiness, readinessReason } from '@/lib/readiness'
 import { deletePublicImage, listPublicImages, uploadPublicImage } from '@/lib/storage'
+import { lastDayOfMonthKey } from '@/lib/term'
 
 import { loadDslView } from './data'
 
@@ -55,6 +63,16 @@ function checked(form: FormData, key: string): boolean {
   return form.get(key) !== null
 }
 
+/**
+ * The expiry, from the wizard's month input or the legacy date input. Chunk 3
+ * asks for a month only and stores its last day; the expiry is fixed.
+ */
+function endDateFrom(form: FormData): string {
+  const month = value(form, 'expiryMonth')
+  if (month !== '') return lastDayOfMonthKey(month) ?? ''
+  return value(form, 'endDate')
+}
+
 type DslFormInput = {
   horseId: string
   trainerId: string | null
@@ -78,7 +96,7 @@ function toInput(
   }
 
   const dsl: DslDraft = {
-    endDate: value(form, 'endDate'),
+    endDate: endDateFrom(form),
     termStart: value(form, 'termStart'),
     paymentModel: value(form, 'paymentModel') as DslDraft['paymentModel'],
     closeStyle: value(form, 'closeStyle') as DslDraft['closeStyle'],
@@ -90,6 +108,9 @@ function toInput(
     minStake: decimal(form, 'minStake'),
     step: decimal(form, 'step'),
     distributionSchedule: optional(form, 'distributionSchedule'),
+    narrativeAboutHorse: optional(form, 'narrativeAboutHorse'),
+    narrativeRacingOutlook: optional(form, 'narrativeRacingOutlook'),
+    narrativeRaceExpectation: optional(form, 'narrativeRaceExpectation'),
   }
 
   return {
@@ -115,13 +136,44 @@ async function attempt<T>(run: () => Promise<Result<T>>): Promise<Result<T>> {
   }
 }
 
+/**
+ * The source hash per overridden slot, captured at edit time (U5). The
+ * dismissed hash is deliberately cleared: an operator who changes the override
+ * starts a fresh warning cycle rather than inheriting an old dismissal.
+ */
+function narrativeMetaFrom(
+  dsl: DslDraft,
+  horse: HorseRow | null,
+): NarrativeOverrideMeta | null {
+  const meta: NarrativeOverrideMeta = {}
+
+  if (dsl.narrativeAboutHorse !== null && dsl.narrativeAboutHorse !== undefined) {
+    meta['horse.about_horse'] = { sourceHash: sourceHash(horse?.aboutHorse) }
+  }
+  if (dsl.narrativeRacingOutlook !== null && dsl.narrativeRacingOutlook !== undefined) {
+    meta['horse.racing_outlook_and_pedigree'] = {
+      sourceHash: sourceHash(horse?.racingOutlookAndPedigree),
+    }
+  }
+  if (dsl.narrativeRaceExpectation !== null && dsl.narrativeRaceExpectation !== undefined) {
+    meta['horse.race_expectation'] = { sourceHash: sourceHash(horse?.raceExpectation) }
+  }
+
+  return Object.keys(meta).length === 0 ? null : meta
+}
+
 export async function createDslAction(form: FormData): Promise<void> {
   // A new DSL is always a draft. Going live is a deliberate act, on the term
   // sheet, after the operator has looked at it.
   const input = toInput(form, { status: 'coming_soon', published: false })
   if (!input.ok) redirect(`/dsl/new?error=${encodeURIComponent(input.reason)}`)
 
-  const saved = await attempt(() => saveDsl(input.value, store()))
+  const saved = await attempt(async () => {
+    const dslStore = store()
+    const horse = await dslStore.findHorseById(input.value.horseId)
+    input.value.dsl.narrativeOverrideMeta = narrativeMetaFrom(input.value.dsl, horse)
+    return saveDsl(input.value, dslStore)
+  })
   if (!saved.ok) redirect(`/dsl/new?error=${encodeURIComponent(saved.reason)}`)
 
   revalidatePath('/dsl')
@@ -142,6 +194,12 @@ export async function updateDslAction(form: FormData): Promise<void> {
     published: current.dsl.published,
   })
   if (!input.ok) redirect(`${back}?error=${encodeURIComponent(input.reason)}`)
+
+  input.value.dsl.narrativeOverrideMeta = carryDismissals(
+    narrativeMetaFrom(input.value.dsl, current.horse),
+    current.dsl,
+    input.value.dsl,
+  )
 
   const saved = await attempt(() =>
     updateDsl(
@@ -330,5 +388,91 @@ export async function unpublishDslAction(form: FormData): Promise<void> {
 
   revalidatePath(back)
   revalidatePath('/dsl')
+  redirect(back)
+}
+
+/**
+ * Approve the narrative. U6.
+ *
+ * The approval pins the four *resolved* texts, canonicalised. It is refused
+ * while any of the four is empty: an approval of a document with a blank
+ * paragraph is not an approval. The hash never covers the raw Records values,
+ * so an overridden slot that shadows a later Records edit does not invalidate
+ * an approval it never depended on.
+ */
+export async function approveNarrativeAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const approved = await attempt<DslRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const resolved = resolveNarrative(view.horse, view.dsl, view.trainer)
+    const missing = missingNarrativeSlots(resolved)
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        reason: `cannot approve: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} empty`,
+      }
+    }
+
+    return {
+      ok: true,
+      value: await store().updateDsl(dslId, {
+        narrativeSignoff: fullSignoff(),
+        narrativeApprovedAt: new Date().toISOString(),
+        narrativeApprovedHash: narrativeHash(resolved),
+      }),
+    }
+  })
+
+  if (!approved.ok) redirect(`${back}?error=${encodeURIComponent(approved.reason)}`)
+
+  revalidatePath(back)
+  revalidatePath('/dsl')
+  redirect(back)
+}
+
+/**
+ * Dismiss the override warning. U5.
+ *
+ * The banner names the slots whose Records source moved. Dismiss stores the
+ * current source hash for those slots, so the same change does not warn twice.
+ * It is informational: nothing is blocked and no text is rewritten.
+ */
+export async function dismissNarrativeWarningAction(form: FormData): Promise<void> {
+  const dslId = value(form, 'dslId')
+  const back = `/dsl/${dslId}`
+
+  const dismissed = await attempt<DslRow>(async () => {
+    const view = await loadDslView(dslId)
+    if (!view.ok) return { ok: false, reason: view.reason }
+    if (!view.found) return { ok: false, reason: `the DSL ${dslId} does not exist` }
+
+    const stale = staleOverrideSlots(view.horse, view.dsl)
+    if (stale.length === 0) return { ok: true, value: view.dsl }
+
+    const meta: NarrativeOverrideMeta = { ...(view.dsl.narrativeOverrideMeta ?? {}) }
+    const records: Record<string, string | null> = {
+      'horse.about_horse': view.horse.aboutHorse,
+      'horse.racing_outlook_and_pedigree': view.horse.racingOutlookAndPedigree,
+      'horse.race_expectation': view.horse.raceExpectation,
+    }
+
+    for (const slot of stale) {
+      meta[slot] = {
+        ...meta[slot],
+        dismissedHash: sourceHash(records[slot]),
+      }
+    }
+
+    return { ok: true, value: await store().updateDsl(dslId, { narrativeOverrideMeta: meta }) }
+  })
+
+  if (!dismissed.ok) redirect(`${back}?error=${encodeURIComponent(dismissed.reason)}`)
+
+  revalidatePath(back)
   redirect(back)
 }

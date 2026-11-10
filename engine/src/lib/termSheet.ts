@@ -13,7 +13,8 @@
  * phrase in V2, and the refund promise is deliberately silent on timing.
  */
 
-import { termMonthsBetween } from './term'
+import { resolveNarrative, type ResolvedNarrative } from './narrative'
+import { durationFromCurrentMonth, termMonthsBetween } from './term'
 import {
   EVOLUTION_MARGIN_PCT,
   PLATFORM_FEE_PCT,
@@ -131,10 +132,19 @@ export type TermSheetInput = {
   horse: HorseRow
   trainer: PartyRow | null
   owner: PartyRow | null
+  /** The resolved soft content, when the caller already has it. */
+  narrative?: ResolvedNarrative | null
 }
 
 export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
   const { dsl, horse, trainer, owner } = input
+
+  // The resolver is the single source of the four soft slots: an overridden
+  // slot shows the deal-local text, an untouched slot reads through live.
+  const resolved =
+    input.narrative ?? resolveNarrative(horse, dsl, trainer)
+
+  const duration = durationFromCurrentMonth(dsl.endDate)
 
   return [
     {
@@ -153,6 +163,13 @@ export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
                 ? text(trainer.displayName)
                 : `${trainer.displayName} (${trainer.location})`,
         },
+        { label: 'About the horse', value: text(resolved['horse.about_horse'].text) },
+        {
+          label: 'Racing outlook and pedigree',
+          value: text(resolved['horse.racing_outlook_and_pedigree'].text),
+        },
+        { label: 'Race expectation', value: text(resolved['horse.race_expectation'].text) },
+        { label: 'Trainer bio', value: text(resolved['trainer.bio'].text) },
       ],
     },
     {
@@ -182,7 +199,18 @@ export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
               ? BLANK
               : `${money(dsl.retailMonthlyPerPercent)} / month per 1%`,
         },
-        { label: 'Lease term', value: termLine(dsl) },
+        // A chunk-3 draft stores no start; the sale stamps it (chunk 4). The
+        // lease-term line therefore appears only on a dated row, and Expiry +
+        // Duration always carry the term a draft actually has.
+        ...(dsl.termStart === null ? [] : [{ label: 'Lease term', value: termLine(dsl) }]),
+        { label: 'Expiry', value: termDateLabel(dsl.endDate) },
+        {
+          label: 'Duration',
+          value:
+            duration === null
+              ? BLANK
+              : `${duration} month${duration === 1 ? '' : 's'} (current month to expiry)`,
+        },
       ],
     },
     {

@@ -5,6 +5,7 @@ import type { DslRow } from '@/lib/dslStore'
 import { imageKeys, publicImageUrl } from '@/lib/storage'
 
 import { SummaryRow } from '../../_components/forms'
+import { updateSoftContentAction } from '../../records/actions'
 import { recordStore } from '../../records/store'
 
 export const dynamic = 'force-dynamic'
@@ -124,6 +125,57 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           )}
         </section>
       </div>
+
+      <section className="rounded-md border border-line bg-panel p-5">
+        <h3 className="mb-3">Soft content</h3>
+        <p className="mb-3 text-caption text-low">
+          Records owns this text. A deal may override the three horse paragraphs locally; the
+          trainer bio always resolves from the party.
+        </p>
+
+        <form action={updateSoftContentAction} className="grid gap-3">
+          <input type="hidden" name="id" value={horse.id} />
+          <label className="grid gap-1">
+            <span className="text-caption uppercase tracking-caption text-muted">
+              About the horse
+            </span>
+            <textarea name="aboutHorse" rows={4} defaultValue={horse.aboutHorse ?? ''} />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-caption uppercase tracking-caption text-muted">
+              Racing outlook and pedigree
+            </span>
+            <textarea
+              name="racingOutlookAndPedigree"
+              rows={4}
+              defaultValue={horse.racingOutlookAndPedigree ?? ''}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="text-caption uppercase tracking-caption text-muted">
+              Race expectation
+            </span>
+            <textarea name="raceExpectation" rows={4} defaultValue={horse.raceExpectation ?? ''} />
+          </label>
+          <button type="submit" className="justify-self-start">
+            Save soft content
+          </button>
+        </form>
+
+        <div className="mt-4 border-t border-line pt-3">
+          <h4 className="mb-1">Trainer bio</h4>
+          {trainer === null ? (
+            <p className="text-body text-low">No trainer assigned.</p>
+          ) : (
+            <>
+              <p className="whitespace-pre-wrap text-body">{trainer.bio ?? '—'}</p>
+              <Link href={`/trainers/${trainer.id}/edit`} className="text-caption text-muted">
+                Edit the trainer bio
+              </Link>
+            </>
+          )}
+        </div>
+      </section>
 
       <section className="rounded-md border border-line bg-panel p-5">
         <div className="mb-3 flex items-baseline justify-between gap-3">

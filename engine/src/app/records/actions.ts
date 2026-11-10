@@ -344,3 +344,29 @@ export async function updateHorseAction(form: FormData): Promise<void> {
   revalidatePath(`/horses/${id}`)
   redirect(`/horses/${id}`)
 }
+
+/**
+ * Soft content, edited in place on the horse profile (chunk 3, U14).
+ *
+ * Records owns the three base paragraphs. A deal may override them locally,
+ * but nothing here writes a deal: this is the Records source only.
+ */
+export async function updateSoftContentAction(form: FormData): Promise<void> {
+  const id = value(form, 'id')
+  if (id === '') fail('/horses', 'no horse was named')
+
+  const back = `/horses/${id}`
+  const store = recordStore()
+
+  const horse = await store.findHorseById(id)
+  if (horse === null) fail('/horses', 'that horse no longer exists')
+
+  await store.updateHorse(id, {
+    aboutHorse: optional(form, 'aboutHorse'),
+    racingOutlookAndPedigree: optional(form, 'racingOutlookAndPedigree'),
+    raceExpectation: optional(form, 'raceExpectation'),
+  })
+
+  revalidatePath(back)
+  redirect(back)
+}

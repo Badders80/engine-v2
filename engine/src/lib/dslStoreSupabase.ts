@@ -200,6 +200,12 @@ function toDsl(value: unknown): DslRow {
     ) as Record<string, boolean> | null,
     narrativeApprovedAt: strOrNull(row.narrative_approved_at),
     narrativeApprovedHash: strOrNull(row.narrative_approved_hash),
+    narrativeAboutHorse: strOrNull(row.narrative_about_horse),
+    narrativeRacingOutlook: strOrNull(row.narrative_racing_outlook),
+    narrativeRaceExpectation: strOrNull(row.narrative_race_expectation),
+    narrativeOverrideMeta: blobOrNull(
+      row.narrative_override_meta,
+    ) as DslRow['narrativeOverrideMeta'],
   }
 }
 
@@ -275,6 +281,10 @@ function dslColumns(row: Partial<NewDsl>) {
     narrative_signoff: row.narrativeSignoff,
     narrative_approved_at: row.narrativeApprovedAt,
     narrative_approved_hash: row.narrativeApprovedHash,
+    narrative_about_horse: row.narrativeAboutHorse,
+    narrative_racing_outlook: row.narrativeRacingOutlook,
+    narrative_race_expectation: row.narrativeRaceExpectation,
+    narrative_override_meta: row.narrativeOverrideMeta,
   })
 }
 

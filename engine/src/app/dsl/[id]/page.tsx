@@ -16,12 +16,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { missingNarrativeSlots, resolveNarrative } from '@/lib/narrative'
+import { staleOverrideSlots } from '@/lib/narrativeHash'
 import { checkDslReadiness, readinessReason } from '@/lib/readiness'
 import { imageKeys, MIN_IMAGES_FOR_AVAILABLE, publicImageUrl } from '@/lib/storage'
 import { buildTermSheet } from '@/lib/termSheet'
 
 import {
+  approveNarrativeAction,
   deleteHorseImageAction,
+  dismissNarrativeWarningAction,
   publishDslAction,
   recountHorseImagesAction,
   unpublishDslAction,
@@ -55,7 +59,10 @@ export default async function Page({
   if (!view.found) notFound()
 
   const { dsl, horse, trainer, owner } = view
-  const sections = buildTermSheet({ dsl, horse, trainer, owner })
+  const resolved = resolveNarrative(horse, dsl, trainer)
+  const sections = buildTermSheet({ dsl, horse, trainer, owner, narrative: resolved })
+  const staleSlots = staleOverrideSlots(horse, dsl)
+  const emptySlots = missingNarrativeSlots(resolved)
   const readiness = checkDslReadiness({
     dsl,
     horse,
@@ -87,6 +94,55 @@ export default async function Page({
         <Link href={`/dsl/${dsl.id}/legal`}>PDS / SA preview</Link> ·{' '}
         <Link href="/dsl">All listings</Link>
       </p>
+
+      {staleSlots.length > 0 ? (
+        <div
+          role="status"
+          className="mt-4 rounded-sm border border-line-strong bg-panel px-4 py-3 text-body"
+        >
+          <p>
+            Records changed since this deal overrode:{' '}
+            {staleSlots.map((slot) => slot.replaceAll('_', ' ')).join('; ')}. The deal keeps its
+            own text; this is informational.
+          </p>
+          <form action={dismissNarrativeWarningAction}>
+            <input type="hidden" name="dslId" value={dsl.id} />
+            <button type="submit">Dismiss</button>
+          </form>
+        </div>
+      ) : null}
+
+      <h2>Narrative</h2>
+      {dsl.narrativeApprovedHash === null ? (
+        <p className="text-body text-low">Not approved.</p>
+      ) : (
+        <p className="text-body text-low">
+          Approved {dsl.narrativeApprovedAt ?? ''} · SHA-256 {dsl.narrativeApprovedHash}
+        </p>
+      )}
+      <ul className="my-2 grid gap-1 text-caption text-low">
+        {(Object.keys(resolved) as (keyof typeof resolved)[]).map((slot) => (
+          <li key={slot}>
+            {slot.replaceAll('_', ' ')}:{' '}
+            {resolved[slot].text === null
+              ? 'empty'
+              : resolved[slot].overridden
+                ? 'deal-local override'
+                : 'from Records'}
+          </li>
+        ))}
+      </ul>
+      <form action={approveNarrativeAction}>
+        <input type="hidden" name="dslId" value={dsl.id} />
+        <button type="submit" disabled={emptySlots.length > 0}>
+          Approve narrative
+        </button>
+      </form>
+      {emptySlots.length > 0 ? (
+        <p className="mt-1 text-caption text-low">
+          Approval is refused while a slot is empty: {emptySlots.join(', ')}.
+        </p>
+      ) : null}
 
       <h2>Publication</h2>
       {error !== undefined && <p role="alert">{error}</p>}

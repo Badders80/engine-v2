@@ -291,9 +291,11 @@ export function DslWizard({
           minStake.trim() === '' ||
           stepSize.trim() === ''
         ? 2
-        : endDate === null || distributionSchedule.trim() === ''
-          ? 3
-          : 4
+        : endDate === null
+          ? 2
+          : distributionSchedule.trim() === ''
+            ? 3
+            : 4
 
   function saveAndReview() {
     // Leaving step 4 opens the popup; nothing is written until Confirm.
@@ -535,7 +537,7 @@ export function DslWizard({
       {/* Step 2 — Commercials */}
       <div hidden={step !== 2}>
         <FieldGroup legend="Commercials" description="One price, two ways. Retail stays a whole dollar, rounded up.">
-          <div className="grid items-start gap-3 sm:grid-cols-2">
+          <div className="grid items-start gap-3 sm:grid-cols-3">
             <Field label="Wholesale cost per 1%, per month" htmlFor="wholesale" error={priceError}>
               <input
                 id="wholesale"
@@ -564,6 +566,24 @@ export function DslWizard({
                 onChange={(event) => changeRetail(event.target.value)}
               />
             </Field>
+
+            {defaults.endDate !== null && defaults.endDate !== undefined && mode === 'edit' ? (
+              <Field label="Expiry" htmlFor="expiryFixed">
+                <input id="expiryFixed" type="text" value={defaults.endDate} readOnly />
+                <input type="hidden" name="expiryMonth" value={expiryMonth} />
+              </Field>
+            ) : (
+              <Field label="Expiry month" htmlFor="expiryMonth">
+                <input
+                  id="expiryMonth"
+                  name="expiryMonth"
+                  type="month"
+                  value={expiryMonth}
+                  onChange={(event) => setExpiryMonth(event.target.value)}
+                  required
+                />
+              </Field>
+            )}
           </div>
 
           <dl className="grid gap-1 rounded-sm border border-line bg-panel p-4 text-body">
@@ -637,25 +657,7 @@ export function DslWizard({
 
       {/* Step 3 — Terms */}
       <div hidden={step !== 3}>
-        <FieldGroup legend="Terms" description="The expiry is the only date. The start is stamped by the sale.">
-          {defaults.endDate !== null && defaults.endDate !== undefined && mode === 'edit' ? (
-            <Field label="Expiry" htmlFor="expiryFixed">
-              <input id="expiryFixed" type="text" value={defaults.endDate} readOnly />
-              <input type="hidden" name="expiryMonth" value={expiryMonth} />
-            </Field>
-          ) : (
-            <Field label="Expiry month" htmlFor="expiryMonth">
-              <input
-                id="expiryMonth"
-                name="expiryMonth"
-                type="month"
-                value={expiryMonth}
-                onChange={(event) => setExpiryMonth(event.target.value)}
-                required
-              />
-            </Field>
-          )}
-
+        <FieldGroup legend="Terms" description="The expiry is set on Commercials. The start is stamped by the sale.">
           <p className="text-body">
             Duration: {duration === null ? '—' : `${duration} months`}
             <span className="text-caption text-low"> (current month to expiry, never stored)</span>

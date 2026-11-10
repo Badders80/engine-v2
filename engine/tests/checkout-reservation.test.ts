@@ -84,7 +84,7 @@ function bindingRow(
     email: 'tui@example.co.nz',
     horseLegalName: 'Reservation Belle',
     stake,
-    amountNzd: Math.round(stake * 71 * 100) / 100,
+    amountNzd: Math.round(stake * 71 * 5 * 100) / 100,
     executedDate: '2026-11-07',
     pdsMarkdown: '# PDS',
     saMarkdown: '# SA',
@@ -223,7 +223,7 @@ describe('B6 — the webhook backstop', () => {
     }
   }
 
-  it('decrements atomically when the hold lapsed before the money arrived', async () => {
+  it('writes no sale when the hold lapsed before the money arrived', async () => {
     const store = createInMemoryPurchaseStore()
     const { dsl, account } = await seed(store)
 
@@ -239,10 +239,14 @@ describe('B6 — the webhook backstop', () => {
       store,
     )
     expect(res.ok).toBe(true)
-    if (!res.ok || res.value.action !== 'sale_written') return
+    if (!res.ok) return
 
-    expect(res.value.sale.stake).toBe(5)
-    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(5)
+    // A released or expired hold is not stock: the money is flagged for the
+    // founder and the stake stays on sale.
+    expect(res.value.action).toBe('refused')
+    expect(store.dump().sales).toHaveLength(0)
+    expect((await store.findCheckoutSessionById(row.id))?.status).toBe('paid_unfulfilled')
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
   })
 
   it('refuses the sale and keeps the money flagged when the backstop has no stock', async () => {
@@ -283,7 +287,7 @@ describe('B6 — the webhook backstop', () => {
     expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(0)
 
     const res = await recordWebhookEvent(
-      await paidEventFor('cs_last_stake', row.id, 71_000),
+      await paidEventFor('cs_last_stake', row.id, 355_000),
       store,
     )
     expect(res.ok).toBe(true)

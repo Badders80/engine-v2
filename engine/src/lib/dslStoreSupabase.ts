@@ -206,6 +206,9 @@ function toDsl(value: unknown): DslRow {
     narrativeOverrideMeta: blobOrNull(
       row.narrative_override_meta,
     ) as DslRow['narrativeOverrideMeta'],
+    closedAt: strOrNull(row.closed_at),
+    closedReason: strOrNull(row.closed_reason),
+    closedBy: strOrNull(row.closed_by),
   }
 }
 

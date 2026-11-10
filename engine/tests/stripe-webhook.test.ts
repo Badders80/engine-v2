@@ -268,7 +268,9 @@ describe('Step 8a — recordWebhookEvent', () => {
       store,
       emailSender,
     )
-    expect(refused.ok).toBe(false)
+    expect(refused.ok).toBe(true)
+    if (!refused.ok) return
+    expect(refused.value.action).toBe('refused')
     expect(store.dump().sales).toHaveLength(0)
     expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
     expect(emailSender.sent.map((sent) => sent.kind)).toContain('founder_our_fault_failure')

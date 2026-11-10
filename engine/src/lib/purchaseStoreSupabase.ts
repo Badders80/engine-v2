@@ -16,8 +16,9 @@ import {
   type CheckoutStatus,
   type KycStatus,
   type NewAccount,
-  type NewSale,
   type PurchaseStore,
+  type RecordSaleResult,
+  type SaleRecordOutcome,
   type SaleRow,
 } from './purchaseStore'
 
@@ -37,6 +38,20 @@ function strOrNull(value: unknown): string | null {
 
 function num(value: unknown): number {
   return typeof value === 'number' ? value : Number(value ?? 0)
+}
+
+function numOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function paymentModelAtSale(value: unknown): SaleRow['paymentModelAtSale'] {
+  return value === 'upfront' || value === 'subscription_float' ? value : null
+}
+
+function closeStyleAtSale(value: unknown): SaleRow['closeStyle'] {
+  return value === 'fourteen_day' || value === 'three_x_remaining' ? value : null
 }
 
 function kycStatus(value: unknown): KycStatus {
@@ -77,6 +92,21 @@ function toSale(value: unknown): SaleRow {
     saMarkdown: str(row.sa_markdown),
     pdsHash: str(row.pds_hash),
     saHash: str(row.sa_hash),
+    wholesaleMonthlyPerPercent: numOrNull(row.wholesale_monthly_per_percent),
+    retailMonthlyPerPercent: numOrNull(row.retail_monthly_per_percent),
+    investorSplit: numOrNull(row.investor_split),
+    listedStake: numOrNull(row.listed_stake),
+    minStake: numOrNull(row.min_stake),
+    step: numOrNull(row.step),
+    endDate: strOrNull(row.end_date),
+    paymentModelAtSale: paymentModelAtSale(row.payment_model_at_sale),
+    closeStyle: closeStyleAtSale(row.close_style),
+    distributionSchedule: strOrNull(row.distribution_schedule),
+    termStart: strOrNull(row.term_start),
+    termEnd: strOrNull(row.term_end),
+    termMonths: numOrNull(row.term_months),
+    trainerId: strOrNull(row.trainer_id),
+    ownerId: strOrNull(row.owner_id),
     createdAt: str(row.created_at),
   }
 }
@@ -110,6 +140,7 @@ function toCheckoutSession(value: unknown): CheckoutSessionRow {
     expiresAt: str(row.expires_at),
     createdAt: str(row.created_at),
     closedAt: strOrNull(row.closed_at),
+    stakeReturnedAt: strOrNull(row.stake_returned_at),
   }
 }
 
@@ -119,26 +150,6 @@ function accountColumns(row: NewAccount) {
     full_name: row.fullName,
     email: row.email,
     ...(row.kycStatus !== undefined ? { kyc_status: row.kycStatus } : {}),
-  }
-}
-
-function saleColumns(row: NewSale) {
-  return {
-    dsl_id: row.dslId,
-    user_id: row.userId,
-    printed_name: row.printedName,
-    email: row.email,
-    stake: row.stake,
-    amount: row.amount,
-    stripe_session_id: row.stripeSessionId,
-    stripe_identity_id: row.stripeIdentityId,
-    checkout_session_id: row.checkoutSessionId,
-    stripe_amount_total: row.stripeAmountTotal,
-    stripe_currency: row.stripeCurrency,
-    pds_markdown: row.pdsMarkdown,
-    sa_markdown: row.saMarkdown,
-    pds_hash: row.pdsHash,
-    sa_hash: row.saHash,
   }
 }
 
@@ -210,19 +221,29 @@ export function createSupabasePurchaseStore(
       return (data ?? []).map(toSale)
     },
 
-    async insertSale(row) {
-      const { data, error } = await client
-        .from('sales')
-        .insert(saleColumns(row))
-        .select('*')
-        .single()
-      if (error) fail('sales', error.message)
-      return toSale(data)
+    recordSaleAtomically(input) {
+      return recordSaleAtomically(client, input)
     },
 
-    async deleteSaleById(id) {
-      const { error } = await client.from('sales').delete().eq('id', id)
-      if (error) fail('sales', error.message)
+    async closeDsl(dslId, reason, closedBy) {
+      const { error } = await client.rpc('close_dsl', {
+        p_dsl_id: dslId,
+        p_reason: reason,
+        p_closed_by: closedBy,
+      })
+      if (error) fail('close_dsl', error.message)
+      const dsl = await base.findDslById(dslId)
+      if (dsl === null) fail('dsls', `dsl ${dslId} vanished after close`)
+      return dsl
+    },
+
+    async listCheckoutSessions() {
+      const { data, error } = await client
+        .from('checkout_sessions')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) fail('checkout_sessions', error.message)
+      return (data ?? []).map(toCheckoutSession)
     },
 
     async reserveCheckoutSession(row) {
@@ -279,10 +300,6 @@ export function createSupabasePurchaseStore(
       return data === null ? null : toCheckoutSession(data)
     },
 
-    async completeCheckoutSession(id) {
-      return transitionCheckout(client, id, 'completed')
-    },
-
     async releaseCheckoutSession(id) {
       const { data, error } = await client.rpc('release_checkout_stake', {
         p_checkout_id: id,
@@ -299,45 +316,54 @@ export function createSupabasePurchaseStore(
       return row === null ? null : toCheckoutSession(row)
     },
 
-    async markCheckoutPaidUnfulfilled(id) {
-      return transitionCheckout(client, id, 'paid_unfulfilled', ['open', 'expired', 'released'])
-    },
-
     async expireCheckoutSessions() {
       const { data, error } = await client.rpc('expire_checkout_stakes')
       if (error) fail('expire_checkout_stakes', error.message)
       return Number(data ?? 0)
     },
-
-    async sellStake(dslId, stake) {
-      const { data, error } = await client.rpc('sell_stake_atomically', {
-        p_dsl_id: dslId,
-        p_stake: stake,
-      })
-      if (error) fail('sell_stake_atomically', error.message)
-      return num(data)
-    },
   }
 }
 
 /**
- * A conditional update, not a read-then-write: PostgREST applies
- * `status = 'open'` in the WHERE clause, so the first caller wins and every
- * later one sees no row.
+ * `record_sale_atomically` returns a one-row table. PostgREST hands that back
+ * as an array of rows whose `sale` column is the composite, in snake_case.
  */
-async function transitionCheckout(
+async function recordSaleAtomically(
   client: SupabaseClient,
-  id: string,
-  next: CheckoutStatus,
-  from: readonly CheckoutStatus[] = ['open'],
-): Promise<CheckoutSessionRow | null> {
-  const { data, error } = await client
-    .from('checkout_sessions')
-    .update({ status: next, closed_at: new Date().toISOString() })
-    .eq('id', id)
-    .in('status', [...from])
-    .select('*')
-    .maybeSingle()
-  if (error) throw new Error(`checkout_sessions: ${error.message}`)
-  return data === null ? null : toCheckoutSession(data)
+  input: {
+    checkoutId: string | null
+    stripeSessionId: string
+    stripeAmountTotalCents: number
+    stripeCurrency: string
+    stripeIdentityId: string | null
+  },
+): Promise<RecordSaleResult> {
+  const { data, error } = await client.rpc('record_sale_atomically', {
+    p_checkout_id: input.checkoutId,
+    p_stripe_session_id: input.stripeSessionId,
+    p_stripe_amount_total_cents: input.stripeAmountTotalCents,
+    p_stripe_currency: input.stripeCurrency,
+    p_stripe_identity_id: input.stripeIdentityId,
+  })
+  if (error) throw new Error(`record_sale_atomically: ${error.message}`)
+
+  const first = Array.isArray(data) ? data[0] : data
+  const row = record(first)
+  const outcome = str(row.outcome)
+  const outcomes: readonly SaleRecordOutcome[] = [
+    'sale_written',
+    'idempotent_replay',
+    'paid_unfulfilled',
+  ]
+  if (!(outcomes as readonly string[]).includes(outcome)) {
+    throw new Error(
+      `record_sale_atomically: '${outcome}' is not one of the three outcomes`,
+    )
+  }
+
+  return {
+    outcome: outcome as SaleRecordOutcome,
+    sale: row.sale == null ? null : toSale(row.sale),
+    reason: strOrNull(row.reason),
+  }
 }

@@ -431,7 +431,7 @@ export function DslWizard({
         <input type="hidden" name="dslId" value={defaults.dslId} />
       )}
 
-      <Stepper steps={STEPS} current={step} />
+      <Stepper steps={STEPS} current={step} onSelect={setStep} />
 
       {/* Step 1 — Parties */}
       <div hidden={step !== 1}>
@@ -535,7 +535,7 @@ export function DslWizard({
       {/* Step 2 — Commercials */}
       <div hidden={step !== 2}>
         <FieldGroup legend="Commercials" description="One price, two ways. Retail stays a whole dollar, rounded up.">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid items-start gap-3 sm:grid-cols-2">
             <Field label="Wholesale cost per 1%, per month" htmlFor="wholesale" error={priceError}>
               <input
                 id="wholesale"
@@ -577,7 +577,7 @@ export function DslWizard({
             />
           </dl>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid items-start gap-3 sm:grid-cols-2">
             <Field label="Investor return, 50 to 85" htmlFor="investorSplit">
               <input
                 id="investorSplit"

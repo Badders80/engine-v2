@@ -125,16 +125,19 @@ export function ErrorSlot({ message }: { message: string | null }) {
 export function Stepper({
   steps,
   current,
+  onSelect,
 }: {
   steps: readonly string[]
   current: number
+  onSelect?: (step: number) => void
 }) {
   return (
     <ol aria-label="Progress" className="flex flex-wrap items-center gap-3">
       {steps.map((step, index) => {
         const state = index < current - 1 ? 'done' : index === current - 1 ? 'current' : 'next'
-        return (
-          <li key={step} className="flex items-center gap-2">
+        const number = index + 1
+        const content = (
+          <>
             <span
               aria-hidden="true"
               className={classes(
@@ -144,7 +147,7 @@ export function Stepper({
                   : 'border-line text-low',
               )}
             >
-              {index + 1}
+              {number}
             </span>
             <span
               className={classes(
@@ -154,6 +157,23 @@ export function Stepper({
             >
               {step}
             </span>
+          </>
+        )
+
+        return (
+          <li key={step} className="flex items-center gap-2">
+            {onSelect === undefined ? (
+              <span className="flex items-center gap-2">{content}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelect(number)}
+                aria-current={state === 'current' ? 'step' : undefined}
+                className="flex cursor-pointer items-center gap-2 rounded-sm p-0 text-left hover:text-ink"
+              >
+                {content}
+              </button>
+            )}
             {index < steps.length - 1 ? (
               <span aria-hidden="true" className="text-low">
                 ·

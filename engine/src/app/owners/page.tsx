@@ -33,7 +33,8 @@ export default async function Page() {
             className="grid min-h-32 gap-2 rounded-md border border-line bg-panel p-5 hover:border-line-strong"
           >
             <p className="text-body text-ink">{row.displayName}</p>
-            <p className="text-caption text-muted">{row.contact ?? '—'}</p>
+            <p className="text-caption text-muted">{row.company ?? '—'}</p>
+            <p className="text-caption text-low">{row.location ?? '—'}</p>
           </Link>
         ))}
       </div>

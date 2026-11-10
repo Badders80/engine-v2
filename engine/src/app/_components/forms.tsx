@@ -169,7 +169,7 @@ export function Stepper({
                 type="button"
                 onClick={() => onSelect(number)}
                 aria-current={state === 'current' ? 'step' : undefined}
-                className="flex cursor-pointer items-center gap-2 rounded-sm p-0 text-left hover:text-ink"
+                className="flex min-h-0 cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent p-0 text-left hover:text-ink"
               >
                 {content}
               </button>

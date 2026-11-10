@@ -462,7 +462,7 @@ export function DslWizard({
               value={trainerId}
               onChange={(event) => setTrainerId(event.target.value)}
             >
-              <option value="">— no trainer yet (Coming Soon only) —</option>
+              <option value="">— choose a trainer —</option>
               {trainers.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.displayName}
@@ -479,7 +479,7 @@ export function DslWizard({
               value={ownerId}
               onChange={(event) => setOwnerId(event.target.value)}
             >
-              <option value="">— no owner yet (Coming Soon only) —</option>
+              <option value="">— choose an owner —</option>
               {owners.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.displayName}
@@ -535,34 +535,36 @@ export function DslWizard({
       {/* Step 2 — Commercials */}
       <div hidden={step !== 2}>
         <FieldGroup legend="Commercials" description="One price, two ways. Retail stays a whole dollar, rounded up.">
-          <Field label="Wholesale cost per 1%, per month" htmlFor="wholesale" error={priceError}>
-            <input
-              id="wholesale"
-              name="wholesaleMonthlyPerPercent"
-              type="number"
-              step="1"
-              min="1"
-              value={wholesale}
-              onChange={(event) => changeWholesale(event.target.value)}
-              required
-            />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Wholesale cost per 1%, per month" htmlFor="wholesale" error={priceError}>
+              <input
+                id="wholesale"
+                name="wholesaleMonthlyPerPercent"
+                type="number"
+                step="1"
+                min="1"
+                value={wholesale}
+                onChange={(event) => changeWholesale(event.target.value)}
+                required
+              />
+            </Field>
 
-          <Field
-            label="Retail price per 1%, per month"
-            htmlFor="retail"
-            help="Whole dollars. Typing a retail rate derives the wholesale rate that produces it."
-            error={priceError}
-          >
-            <input
-              id="retail"
-              type="number"
-              step="1"
-              min="1"
-              value={retail}
-              onChange={(event) => changeRetail(event.target.value)}
-            />
-          </Field>
+            <Field
+              label="Retail price per 1%, per month"
+              htmlFor="retail"
+              help="Whole dollars. Typing a retail rate derives the wholesale rate that produces it."
+              error={priceError}
+            >
+              <input
+                id="retail"
+                type="number"
+                step="1"
+                min="1"
+                value={retail}
+                onChange={(event) => changeRetail(event.target.value)}
+              />
+            </Field>
+          </div>
 
           <dl className="grid gap-1 rounded-sm border border-line bg-panel p-4 text-body">
             <ReadOnlyRow
@@ -575,57 +577,59 @@ export function DslWizard({
             />
           </dl>
 
-          <Field label="Investor return, 50 to 85" htmlFor="investorSplit">
-            <input
-              id="investorSplit"
-              name="investorSplit"
-              type="number"
-              step="0.01"
-              min="50"
-              max="85"
-              value={investorSplit}
-              onChange={(event) => setInvestorSplit(event.target.value)}
-            />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Investor return, 50 to 85" htmlFor="investorSplit">
+              <input
+                id="investorSplit"
+                name="investorSplit"
+                type="number"
+                step="0.01"
+                min="50"
+                max="85"
+                value={investorSplit}
+                onChange={(event) => setInvestorSplit(event.target.value)}
+              />
+            </Field>
 
-          <Field label="Listed stake %" htmlFor="listedStake">
-            <input
-              id="listedStake"
-              name="listedStake"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={listedStake}
-              onChange={(event) => setListedStake(event.target.value)}
-              required
-            />
-          </Field>
+            <Field label="Listed stake %" htmlFor="listedStake">
+              <input
+                id="listedStake"
+                name="listedStake"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={listedStake}
+                onChange={(event) => setListedStake(event.target.value)}
+                required
+              />
+            </Field>
 
-          <Field label="Minimum stake %" htmlFor="minStake">
-            <input
-              id="minStake"
-              name="minStake"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={minStake}
-              onChange={(event) => setMinStake(event.target.value)}
-              required
-            />
-          </Field>
+            <Field label="Minimum stake %" htmlFor="minStake">
+              <input
+                id="minStake"
+                name="minStake"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={minStake}
+                onChange={(event) => setMinStake(event.target.value)}
+                required
+              />
+            </Field>
 
-          <Field label="Step %" htmlFor="stepSize">
-            <input
-              id="stepSize"
-              name="step"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={stepSize}
-              onChange={(event) => setStepSize(event.target.value)}
-              required
-            />
-          </Field>
+            <Field label="Step %" htmlFor="stepSize">
+              <input
+                id="stepSize"
+                name="step"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={stepSize}
+                onChange={(event) => setStepSize(event.target.value)}
+                required
+              />
+            </Field>
+          </div>
         </FieldGroup>
 
         <StepButtons step={step} setStep={setStep} />

@@ -171,7 +171,7 @@ export function DslWizard({
     defaults.closeStyle ?? 'fourteen_day',
   )
   const [distributionSchedule, setDistributionSchedule] = useState(
-    text(defaults.distributionSchedule),
+    text(defaults.distributionSchedule) || 'quarterly',
   )
 
   const [aboutText, setAboutText] = useState(defaults.narrative.aboutHorse)
@@ -698,12 +698,17 @@ export function DslWizard({
           </Field>
 
           <Field label="Distribution schedule" htmlFor="distributionSchedule">
-            <input
+            <select
               id="distributionSchedule"
               name="distributionSchedule"
               value={distributionSchedule}
               onChange={(event) => setDistributionSchedule(event.target.value)}
-            />
+            >
+              {distributionSchedule !== '' && distributionSchedule !== 'quarterly' ? (
+                <option value={distributionSchedule}>{distributionSchedule}</option>
+              ) : null}
+              <option value="quarterly">quarterly</option>
+            </select>
           </Field>
         </FieldGroup>
 

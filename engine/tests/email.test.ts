@@ -14,7 +14,7 @@
  *   - `payment_intent.payment_failed` and `checkout.session.expired` write no `sales` row and send zero emails
  *   - `stripe.createCheckoutSession` failure in `openCheckoutSession` sends `founder_our_fault_failure` (`stage: 'checkout'`) and writes no `sales` row
  *   - Buyer-fault validation rejections in `openCheckoutSession` send zero founder emails
- *   - Our-fault webhook failures send `founder_our_fault_failure` (`stage: 'webhook'`) and roll back any `sales` row via `deleteSaleById` if `updateDsl` throws after `insertSale`
+ *   - Our-fault webhook failures send `founder_our_fault_failure` (`stage: 'webhook'`) and leave no sale row: the sale is written by one atomic RPC
  */
 
 import { describe, expect, it } from 'vitest'
@@ -138,6 +138,21 @@ describe('Step 9 — EMAIL_KINDS and pure builders', () => {
       saMarkdown: '# SA',
       pdsHash: 'a'.repeat(64),
       saHash: 'b'.repeat(64),
+      wholesaleMonthlyPerPercent: null,
+      retailMonthlyPerPercent: null,
+      investorSplit: null,
+      listedStake: null,
+      minStake: null,
+      step: null,
+      endDate: null,
+      paymentModelAtSale: null,
+      closeStyle: null,
+      distributionSchedule: null,
+      termStart: null,
+      termEnd: null,
+      termMonths: null,
+      trainerId: null,
+      ownerId: null,
       createdAt: '2026-10-21T00:00:00.000Z',
     }
     const account = {
@@ -214,7 +229,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       email: 'aroha@example.co.nz',
       horseLegalName: 'Lady Ketchikan',
       stake: 20,
-      amountNzd: 1420,
+      amountNzd: 7100,
       executedDate: '2026-10-21',
       pdsMarkdown: '# PDS',
       saMarkdown: '# SA',
@@ -231,7 +246,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
         object: {
           id: 'cs_step9_1',
           payment_status: 'paid',
-          amount_total: 142_000,
+          amount_total: 710_000,
           currency: 'nzd',
           metadata: { checkout_id: checkout.id, stripe_identity_id: 'vs_step9_1' },
         },
@@ -244,7 +259,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     expect(sender.sent[0].kind).toBe('buyer_sale_written')
     expect(sender.sent[0].to).toBe('aroha@example.co.nz')
     expect(sender.sent[0].text).toContain('20%')
-    expect(sender.sent[0].text).toContain('$1420 NZD')
+    expect(sender.sent[0].text).toContain('$7100 NZD')
     expect(sender.sent[0].text).toContain('https://www.evolutionstables.nz/mystable')
 
     expect(sender.sent[1].kind).toBe('founder_sale_succeeded')
@@ -331,14 +346,14 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     expect(sender.sent).toHaveLength(0)
   })
 
-  it('rolls back the sale row via deleteSaleById and sends founder_our_fault_failure if store.updateDsl throws after insertSale', async () => {
+  it('writes no sale and sends founder_our_fault_failure when the atomic write throws', async () => {
     const { store, dslId, accountId } = await seedStore()
     const sender = createInMemoryEmailSender('alex@evolutionstables.nz')
 
     const failingStore = {
       ...store,
-      async updateDsl(): ReturnType<typeof store.updateDsl> {
-        throw new Error('simulated updateDsl failure after insertSale')
+      async recordSaleAtomically(): Promise<never> {
+        throw new Error('simulated atomic write failure')
       },
     }
 
@@ -349,7 +364,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       email: 'aroha@example.co.nz',
       horseLegalName: 'Lady Ketchikan',
       stake: 20,
-      amountNzd: 1420,
+      amountNzd: 7100,
       executedDate: '2026-10-21',
       pdsMarkdown: '# PDS',
       saMarkdown: '# SA',
@@ -367,7 +382,7 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
           object: {
             id: 'cs_partial_fail_1',
             payment_status: 'paid',
-            amount_total: 142_000,
+            amount_total: 710_000,
             currency: 'nzd',
             metadata: { checkout_id: checkout.id },
           },
@@ -378,13 +393,14 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
     )
 
     expect(res.ok).toBe(false)
-    // Compensating rollback removed the inserted sale row ("leaves no sale", PLAN.md:238)
+    // The sale is written inside one transaction, so a failure leaves no row
+    // standing and there is no compensating delete to run (H6).
     expect(store.dump().sales).toHaveLength(0)
     expect(sender.sent).toHaveLength(1)
     expect(sender.sent[0].kind).toBe('founder_our_fault_failure')
     expect(sender.sent[0].to).toBe('alex@evolutionstables.nz')
     expect(sender.sent[0].text).toContain('Stage: webhook')
-    expect(sender.sent[0].text).toContain('simulated updateDsl failure after insertSale')
+    expect(sender.sent[0].text).toContain('simulated atomic write failure')
   })
 
   it('sends founder_our_fault_failure (stage: webhook) on missing webhook metadata and writes no sale', async () => {
@@ -406,7 +422,8 @@ describe('Step 9 — webhook email triggers and silence guarantees', () => {
       sender,
     )
 
-    expect(res.ok).toBe(false)
+    // An unbound session is a typed refusal: no sale, paid_unfulfilled, alert.
+    expect(res.ok).toBe(true)
     expect(store.dump().sales).toHaveLength(0)
     expect(sender.sent).toHaveLength(1)
     expect(sender.sent[0].kind).toBe('founder_our_fault_failure')

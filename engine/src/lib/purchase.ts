@@ -17,7 +17,7 @@
  *   `stakeRemaining` and flipping `status` to `'fully_allocated'` at 0 (`PLAN.md:316`).
  */
 
-import { isPricedDsl, type PaymentModel, type PricedDsl } from './dslStore'
+import { isListableDsl, type ListableDsl, type PaymentModel } from './dslStore'
 import {
   createInMemoryEmailSender,
   sendEngineEmail,
@@ -107,7 +107,7 @@ export type PurchaseQuote = {
 }
 
 export function validatePurchaseStake(
-  dsl: PricedDsl,
+  dsl: ListableDsl,
   stake: number,
 ): Result<{ effectiveMin: number }> {
   if (dsl.status !== 'available' || !dsl.published) {
@@ -144,15 +144,95 @@ export function validatePurchaseStake(
   return { ok: true, value: { effectiveMin } }
 }
 
+export type SaleTimeTerms = {
+  termStart: string
+  termMonths: number
+  paymentModel: PaymentModel
+}
+
+/**
+ * U21 (ruling 25): the start and the model are a property of the sale, not of
+ * the listing. A chunk-3 listing carries an expiry and no start, so at
+ * checkout the start becomes the first day of the calendar month the investor
+ * buys in, and the model becomes `upfront` when the listing is upfront or five
+ * months or less remain. The listing's `term_start` is never written.
+ */
+export function saleTimeTerms(
+  dsl: ListableDsl,
+  executedDate: string,
+): Result<SaleTimeTerms> {
+  const termStart = /^\d{4}-\d{2}-\d{2}$/.test(executedDate)
+    ? `${executedDate.slice(0, 7)}-01`
+    : null
+  if (termStart === null) {
+    return { ok: false, reason: 'the execution date must be YYYY-MM-DD' }
+  }
+
+  const termMonths = termMonthsBetween(termStart, dsl.endDate)
+  if (termMonths === null || termMonths < 1) {
+    return { ok: false, reason: 'term dates are invalid' }
+  }
+
+  const paymentModel: PaymentModel =
+    dsl.paymentModel === 'upfront' || termMonths <= 5
+      ? 'upfront'
+      : 'subscription_float'
+
+  return { ok: true, value: { termStart, termMonths, paymentModel } }
+}
+
+export type PricedPurchase = {
+  terms: SaleTimeTerms
+  stake: number
+  effectiveMinStake: number
+  initialPaymentNzd: number
+  monthlyPaymentNzd: number
+}
+
+/**
+ * The one price a purchase pays: the stake guard plus the U21 sale-time start,
+ * remaining months and effective model. The database's
+ * `record_sale_atomically` derives the same numbers from the bound checkout.
+ */
+export function pricePurchase(
+  dsl: ListableDsl,
+  stake: number,
+  executedDate: string,
+): Result<PricedPurchase> {
+  const checked = validatePurchaseStake(dsl, stake)
+  if (!checked.ok) return checked
+
+  const terms = saleTimeTerms(dsl, executedDate)
+  if (!terms.ok) return terms
+
+  const { termMonths, paymentModel } = terms.value
+  const retailRate = dsl.retailMonthlyPerPercent
+
+  return {
+    ok: true,
+    value: {
+      terms: terms.value,
+      stake,
+      effectiveMinStake: checked.value.effectiveMin,
+      initialPaymentNzd:
+        paymentModel === 'upfront'
+          ? upfrontTotal(termMonths, retailRate, stake)
+          : floatTotal(retailRate, stake),
+      monthlyPaymentNzd:
+        paymentModel === 'upfront' ? 0 : totalForStake(retailRate, stake),
+    },
+  }
+}
+
 export async function computeQuote(
-  input: { dslId: string; stake?: number },
+  input: { dslId: string; stake?: number; executedDate?: string },
   store: PurchaseStore,
 ): Promise<Result<PurchaseQuote>> {
   const dsl = await store.findDslById(input.dslId)
   if (dsl === null) {
     return { ok: false, reason: `DSL ${input.dslId} does not exist` }
   }
-  if (!isPricedDsl(dsl)) {
+  if (!isListableDsl(dsl)) {
     return { ok: false, reason: 'this listing does not have its commercial terms yet' }
   }
 
@@ -166,40 +246,32 @@ export async function computeQuote(
     return { ok: false, reason: 'missing required value for dsl.investor_split' }
   }
 
-  const termMonths = termMonthsBetween(dsl.termStart, dsl.endDate)
-  if (termMonths === null || termMonths < 1) {
-    return { ok: false, reason: 'term dates are invalid' }
-  }
+  // A dated listing quotes from its own start unless the caller supplies the
+  // month the buyer is executing in. The sale itself always uses the latter.
+  const executedDate =
+    input.executedDate ?? dsl.termStart ?? new Date().toISOString().slice(0, 10)
 
   const effectiveMin = effectiveMinStake(dsl.minStake, dsl.stakeRemaining)
   const chosenStake = input.stake ?? effectiveMin
 
-  const checked = validatePurchaseStake(dsl, chosenStake)
-  if (!checked.ok) return checked
-
-  const retailRate = dsl.retailMonthlyPerPercent
-  const initialPaymentNzd =
-    dsl.paymentModel === 'upfront'
-      ? upfrontTotal(termMonths, retailRate, chosenStake)
-      : floatTotal(retailRate, chosenStake)
-  const monthlyPaymentNzd =
-    dsl.paymentModel === 'upfront' ? 0 : totalForStake(retailRate, chosenStake)
+  const priced = pricePurchase(dsl, chosenStake, executedDate)
+  if (!priced.ok) return priced
 
   return {
     ok: true,
     value: {
       dslId: dsl.id,
       horseLegalName: horse.legalName,
-      paymentModel: dsl.paymentModel,
+      paymentModel: priced.value.terms.paymentModel,
       stake: chosenStake,
-      effectiveMinStake: effectiveMin,
+      effectiveMinStake: priced.value.effectiveMinStake,
       maxStake: dsl.stakeRemaining,
       step: dsl.step,
-      initialPaymentNzd,
-      monthlyPaymentNzd,
-      termStart: dsl.termStart,
+      initialPaymentNzd: priced.value.initialPaymentNzd,
+      monthlyPaymentNzd: priced.value.monthlyPaymentNzd,
+      termStart: priced.value.terms.termStart,
       endDate: dsl.endDate,
-      termMonths,
+      termMonths: priced.value.terms.termMonths,
       investorSplit: split,
       refundSentence: REFUND_SENTENCE,
     },
@@ -249,12 +321,17 @@ export async function compileBuyerDocuments(
     return { ok: false, reason: `account ${input.accountId} does not exist` }
   }
 
-  const quoteResult = await computeQuote({ dslId: input.dslId, stake: input.stake }, store)
+  const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
+
+  const quoteResult = await computeQuote(
+    { dslId: input.dslId, stake: input.stake, executedDate },
+    store,
+  )
   if (!quoteResult.ok) return quoteResult
 
   const dsl = await store.findDslById(input.dslId)
   if (dsl === null) return { ok: false, reason: `DSL ${input.dslId} does not exist` }
-  if (!isPricedDsl(dsl)) {
+  if (!isListableDsl(dsl)) {
     return { ok: false, reason: 'this listing does not have its commercial terms yet' }
   }
 
@@ -269,13 +346,17 @@ export async function compileBuyerDocuments(
   const owner = await store.findPartyById(dsl.ownerId)
   if (owner === null) return { ok: false, reason: 'dsl has no owner row' }
 
-  const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
-
   try {
     const pack = compileLegalPack(
       {
         account: { fullName: account.fullName },
-        dsl,
+        // The documents print the sale's start and the model actually charged
+        // (U21), never the listing's absent start.
+        dsl: {
+          ...dsl,
+          termStart: quoteResult.value.termStart,
+          paymentModel: quoteResult.value.paymentModel,
+        },
         horse,
         trainer,
         owner,
@@ -403,7 +484,12 @@ export async function openCheckoutSession(
   // here, before this buyer is refused for stock that is actually free.
   await store.expireCheckoutSessions()
 
-  const quoteResult = await computeQuote({ dslId: input.dslId, stake: input.stake }, store)
+  const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
+
+  const quoteResult = await computeQuote(
+    { dslId: input.dslId, stake: input.stake, executedDate },
+    store,
+  )
   if (!quoteResult.ok) return quoteResult
 
   // B7: the stored count is a claim; the bucket is the fact. A horse that says
@@ -422,8 +508,6 @@ export async function openCheckoutSession(
       reason: `this listing has ${imagesInBucket} image(s) in the bucket; ${imagesRequired} are needed before it can be bought`,
     }
   }
-
-  const executedDate = input.executedDate ?? new Date().toISOString().slice(0, 10)
 
   // B5: compile and freeze the exact documents the buyer is about to accept,
   // before Stripe is called. The webhook reads this row, never a fresh compile.
@@ -611,132 +695,90 @@ export async function recordWebhookEvent(
     return failWebhook('checkout.session.completed is missing session id')
   }
 
-  const existingSale = await store.findSaleByStripeSessionId(stripeSessionId)
-  if (existingSale !== null) {
-    return {
-      ok: true,
-      value: { action: 'sale_written', sale: existingSale, idempotentReplay: true },
-    }
-  }
-
   const checkoutId = metadataString(metadata, 'checkout_id')
-  const checkout =
+  const bound =
     checkoutId !== ''
       ? await store.findCheckoutSessionById(checkoutId)
       : await store.findCheckoutSessionByStripeSessionId(stripeSessionId)
 
-  if (checkout === null) {
-    return failWebhook(
-      `checkout.session.completed ${stripeSessionId} has no bound checkout session; no sale was written`,
-    )
-  }
-  const bound = checkout
-
   const stripeIdentityIdRaw = metadataString(metadata, 'stripe_identity_id')
   const stripeIdentityId = stripeIdentityIdRaw !== '' ? stripeIdentityIdRaw : null
 
-  // B4: Stripe's numbers are the money record. The bound quote is the contract.
-  // They must agree before anything is written.
   const paymentStatus = typeof obj.payment_status === 'string' ? obj.payment_status.trim() : ''
-  const currency = typeof obj.currency === 'string' ? obj.currency.trim().toLowerCase() : ''
-  const amountTotal = typeof obj.amount_total === 'number' ? obj.amount_total : Number.NaN
-  const expectedCents = Math.round(bound.amountNzd * 100)
-
-  async function refuse(
-    reason: string,
-    moneyTaken: boolean,
-  ): Promise<Result<WebhookResult>> {
-    if (moneyTaken) {
-      // Keep the hold. Releasing it would put stock back on sale for money that
-      // has already been taken; a human closes this one.
-      await store.markCheckoutPaidUnfulfilled(bound.id)
-    }
+  if (paymentStatus !== 'paid') {
+    // No money moved: no sale, no paid_unfulfilled, and the hold stays open.
+    const reason = `Stripe reports payment_status '${paymentStatus || 'missing'}'`
     await sendEngineEmail(
       {
         kind: 'founder_our_fault_failure',
         stage: 'webhook',
-        reason: `checkout ${bound.id} (${stripeSessionId}): ${reason}`,
+        reason: `checkout ${bound?.id ?? stripeSessionId} (${stripeSessionId}): ${reason}`,
       },
       emailSender,
     )
     return { ok: true, value: { action: 'refused', reason, eventType: event.type } }
   }
 
-  if (paymentStatus !== 'paid') {
-    return refuse(`Stripe reports payment_status '${paymentStatus || 'missing'}'`, false)
+  // H6: one call writes the snapshot and claims the hold, or refuses. Amount
+  // and currency are re-validated inside the transaction; nothing here writes
+  // a sale row separately, and there is no delete to compensate with.
+  let recorded
+  try {
+    recorded = await store.recordSaleAtomically({
+      checkoutId: bound?.id ?? (checkoutId !== '' ? checkoutId : null),
+      stripeSessionId,
+      stripeAmountTotalCents:
+        typeof obj.amount_total === 'number' ? obj.amount_total : Number.NaN,
+      stripeCurrency: typeof obj.currency === 'string' ? obj.currency : '',
+      stripeIdentityId,
+    })
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : 'failed to write the sale atomically'
+    return failWebhook(reason)
   }
-  if (!Number.isFinite(amountTotal) || amountTotal !== expectedCents) {
-    return refuse(
-      `Stripe charged ${Number.isFinite(amountTotal) ? `${amountTotal}c` : 'no amount'} but the bound quote is ${expectedCents}c`,
-      true,
+
+  if (recorded.outcome === 'paid_unfulfilled') {
+    // The database wrote no sale and marked the checkout. The money is real;
+    // a human resolves it.
+    const reason = recorded.reason ?? 'the sale could not be recorded'
+    await sendEngineEmail(
+      {
+        kind: 'founder_our_fault_failure',
+        stage: 'webhook',
+        reason: `checkout ${bound?.id ?? stripeSessionId} (${stripeSessionId}): ${reason}`,
+      },
+      emailSender,
+    )
+    return { ok: true, value: { action: 'refused', reason, eventType: event.type } }
+  }
+
+  const sale = recorded.sale
+  if (sale === null) {
+    return failWebhook(
+      `record_sale_atomically returned ${recorded.outcome} without a sale row`,
     )
   }
-  if (currency !== 'nzd') {
-    return refuse(`Stripe charged in '${currency || 'missing'}', not nzd`, true)
+
+  if (recorded.outcome === 'idempotent_replay') {
+    return {
+      ok: true,
+      value: { action: 'sale_written', sale, idempotentReplay: true },
+    }
   }
 
-  let sale: SaleRow | null = null
-  try {
-    sale = await store.insertSale({
-      dslId: checkout.dslId,
-      userId: checkout.accountId,
-      printedName: checkout.printedName,
-      email: checkout.email,
-      stake: checkout.stake,
-      amount: checkout.amountNzd,
-      stripeSessionId,
-      stripeIdentityId,
-      checkoutSessionId: checkout.id,
-      stripeAmountTotal: amountTotal / 100,
-      stripeCurrency: currency,
-      pdsMarkdown: checkout.pdsMarkdown,
-      saMarkdown: checkout.saMarkdown,
-      pdsHash: checkout.pdsHash,
-      saHash: checkout.saHash,
-    })
-
-    // B6: the stake was taken at Checkout. Claiming the hold is the only
-    // stake-moving step here; if the hold lapsed while the buyer was paying,
-    // the atomic conditional decrement is the backstop.
-    const claimed = await store.completeCheckoutSession(bound.id)
-    if (claimed === null) {
-      try {
-        await store.sellStake(bound.dslId, bound.stake)
-      } catch {
-        // The hold lapsed and the stock went elsewhere while the money was in
-        // flight. No sale, but the payment is real: flag it for the founder,
-        // and do not let Stripe retry a refusal that cannot change.
-        if (sale !== null) {
-          await store.deleteSaleById(sale.id)
-        }
-        return await refuse(
-          'the hold lapsed and no stake remains; the payment is held for the founder',
-          true,
-        )
-      }
-    }
-
-    const dsl = await store.findDslById(bound.dslId)
-    if (dsl === null) {
-      throw new Error(`DSL ${bound.dslId} does not exist`)
-    }
-    if ((dsl.stakeRemaining ?? 0) === 0 && dsl.status === 'available') {
-      await store.updateDsl(dsl.id, { status: 'fully_allocated' })
-    }
-  } catch (error) {
-    if (sale !== null) {
-      await store.deleteSaleById(sale.id)
-    }
-    const reason =
-      error instanceof Error ? error.message : 'failed to persist sale and update DSL'
-    return failWebhook(reason)
+  let horseLegalName = bound?.horseLegalName ?? ''
+  if (horseLegalName === '') {
+    const dsl = await store.findDslById(sale.dslId)
+    const horse = dsl === null ? null : await store.findHorseById(dsl.horseId)
+    horseLegalName = horse?.legalName ?? 'your horse'
   }
 
   await sendEngineEmail(
     {
       kind: 'buyer_sale_written',
       sale,
-      horseLegalName: checkout.horseLegalName,
+      horseLegalName,
     },
     emailSender,
   )
@@ -744,7 +786,7 @@ export async function recordWebhookEvent(
     {
       kind: 'founder_sale_succeeded',
       sale,
-      horseLegalName: checkout.horseLegalName,
+      horseLegalName,
     },
     emailSender,
   )

@@ -120,6 +120,13 @@ export type NewDsl = {
   narrativeRaceExpectation?: string | null
   /** Source and dismissed hashes per overridden slot (U5). */
   narrativeOverrideMeta?: NarrativeOverrideMeta | null
+  /**
+   * The manual close (U19). Absent on older fixtures; a listing that was never
+   * closed has all three null.
+   */
+  closedAt?: string | null
+  closedReason?: string | null
+  closedBy?: string | null
 }
 
 /** One overridden slot's two fingerprints. */
@@ -139,12 +146,15 @@ export type NarrativeOverrideMeta = Partial<
 
 export type DslRow = NewDsl & { id: string }
 
-/** A DSL whose deal is done: every field the quote and the pack need is set. */
-export type PricedDsl = DslRow & {
+/**
+ * A DSL that can be listed and bought: every field the quote and the pack
+ * need except a term start. Chunk 3 listings carry an expiry and no start
+ * (ruling 25); the sale stamps the start.
+ */
+export type ListableDsl = DslRow & {
   trainerId: string
   ownerId: string
   endDate: string
-  termStart: string
   paymentModel: PaymentModel
   closeStyle: CloseStyle
   wholesaleMonthlyPerPercent: number
@@ -156,12 +166,16 @@ export type PricedDsl = DslRow & {
   stakeRemaining: number
 }
 
-export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
+/** A DSL with a real start: the shape a saved, dated deal has. */
+export type PricedDsl = ListableDsl & {
+  termStart: string
+}
+
+export function isListableDsl(dsl: DslRow): dsl is ListableDsl {
   return (
     dsl.trainerId !== null &&
     dsl.ownerId !== null &&
     dsl.endDate !== null &&
-    dsl.termStart !== null &&
     dsl.paymentModel !== null &&
     dsl.closeStyle !== null &&
     dsl.wholesaleMonthlyPerPercent !== null &&
@@ -172,6 +186,10 @@ export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
     dsl.step !== null &&
     dsl.stakeRemaining !== null
   )
+}
+
+export function isPricedDsl(dsl: DslRow): dsl is PricedDsl {
+  return isListableDsl(dsl) && dsl.termStart !== null
 }
 
 export interface DslStore {
@@ -280,7 +298,13 @@ export function createInMemoryDslStore(): InMemoryDslStore {
       return [...dsls]
     },
     async insertDsl(row) {
-      const created = { ...row, id: newId() }
+      const created = {
+        ...row,
+        id: newId(),
+        closedAt: row.closedAt ?? null,
+        closedReason: row.closedReason ?? null,
+        closedBy: row.closedBy ?? null,
+      }
       dsls.push(created)
       return created
     },

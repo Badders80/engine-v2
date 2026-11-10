@@ -5,20 +5,21 @@
  * domain and the Stripe webhook stay pure and testable against the in-memory
  * implementation in CI, where no database and no credentials exist.
  *
- * Row types mirror `supabase/migrations/00006_accounts.sql` and
- * `00007_sales.sql`. Checkout never creates a second profile: accounts exist
- * from signup, and `sales.stripe_session_id` is unique so a retried webhook is
- * idempotent.
+ * Row types mirror the migrations. `00024_ledger.sql` is the authority for the
+ * snapshot columns, the close columns and `record_sale_atomically`.
  */
 
 import {
   createInMemoryDslStore,
+  type CloseStyle,
   type DslRow,
   type DslStore,
   type HorseRow,
   type PartyRow,
+  type PaymentModel,
   type StoreSnapshot,
 } from './dslStore'
+import { termMonthsBetween } from './term'
 
 export const KYC_STATUS_VALUES = ['unverified', 'pending', 'verified', 'failed'] as const
 export type KycStatus = (typeof KYC_STATUS_VALUES)[number]
@@ -52,6 +53,9 @@ export type CheckoutStatus = (typeof CHECKOUT_STATUS_VALUES)[number]
  * One Checkout attempt, frozen before Stripe is called (migration `00016`).
  * The webhook reads this row instead of re-deriving the quote from live DSL
  * state, so the document the buyer received is the document the sale records.
+ *
+ * `stakeReturnedAt` is U20: null while the stake is still held; set when a
+ * release or expiry returned it.
  */
 export type NewCheckoutSession = {
   dslId: string
@@ -75,6 +79,26 @@ export type CheckoutSessionRow = NewCheckoutSession & {
   status: CheckoutStatus
   createdAt: string
   closedAt: string | null
+  stakeReturnedAt: string | null
+}
+
+/** U18: the executed terms frozen onto the sale. None is recomputed later. */
+export type SaleSnapshot = {
+  wholesaleMonthlyPerPercent: number | null
+  retailMonthlyPerPercent: number | null
+  investorSplit: number | null
+  listedStake: number | null
+  minStake: number | null
+  step: number | null
+  endDate: string | null
+  paymentModelAtSale: PaymentModel | null
+  closeStyle: CloseStyle | null
+  distributionSchedule: string | null
+  termStart: string | null
+  termEnd: string | null
+  termMonths: number | null
+  trainerId: string | null
+  ownerId: string | null
 }
 
 export type NewSale = {
@@ -93,11 +117,28 @@ export type NewSale = {
   saMarkdown: string
   pdsHash: string
   saHash: string
-}
+} & SaleSnapshot
 
 export type SaleRow = NewSale & {
   id: string
   createdAt: string
+}
+
+/** The one call that replaces insertSale + completeCheckoutSession + sellStake. */
+export type RecordSaleInput = {
+  checkoutId: string | null
+  stripeSessionId: string
+  stripeAmountTotalCents: number
+  stripeCurrency: string
+  stripeIdentityId: string | null
+}
+
+export type SaleRecordOutcome = 'sale_written' | 'idempotent_replay' | 'paid_unfulfilled'
+
+export type RecordSaleResult = {
+  outcome: SaleRecordOutcome
+  sale: SaleRow | null
+  reason: string | null
 }
 
 export interface PurchaseStore extends DslStore {
@@ -108,8 +149,20 @@ export interface PurchaseStore extends DslStore {
   listSalesByUserId(userId: string): Promise<SaleRow[]>
   /** Every sale, newest first. The operator's read-only Sales section. */
   listSales(): Promise<SaleRow[]>
-  insertSale(row: NewSale): Promise<SaleRow>
-  deleteSaleById(id: string): Promise<void>
+  /**
+   * H6: writes the sale snapshot and claims the hold in one transaction,
+   * mirroring `record_sale_atomically` in `00024`. There is deliberately no
+   * standalone insert, delete, complete or sell operation: the sale is
+   * written once, atomically, and is append-only.
+   */
+  recordSaleAtomically(input: RecordSaleInput): Promise<RecordSaleResult>
+  /**
+   * U19: sweeps this listing's stale holds, then refuses while any open or
+   * paid_unfulfilled checkout exists. Throws with the refusal reason.
+   */
+  closeDsl(dslId: string, reason: string, closedBy: string): Promise<DslRow>
+  /** Every checkout row, newest first. The ledger's cap-table read. */
+  listCheckoutSessions(): Promise<CheckoutSessionRow[]>
   /**
    * B6: takes `stake` out of the DSL and writes the binding row in one step.
    * Throws when the DSL is not available or has less than `stake` left, so two
@@ -122,23 +175,10 @@ export interface PurchaseStore extends DslStore {
   ): Promise<CheckoutSessionRow>
   findCheckoutSessionById(id: string): Promise<CheckoutSessionRow | null>
   findCheckoutSessionByStripeSessionId(stripeSessionId: string): Promise<CheckoutSessionRow | null>
-  /** `open` -> `completed`. Returns null when the row was not open (replay or expiry). */
-  completeCheckoutSession(id: string): Promise<CheckoutSessionRow | null>
   /** `open` -> `released`, and the stake goes back. Null when the row was not open. */
   releaseCheckoutSession(id: string): Promise<CheckoutSessionRow | null>
-  /**
-   * -> `paid_unfulfilled`: Stripe took money the sale may not record. Allowed
-   * from `open`, `expired`, or `released`, because the money can arrive after
-   * the hold has already been swept.
-   */
-  markCheckoutPaidUnfulfilled(id: string): Promise<CheckoutSessionRow | null>
   /** Every open hold past `now` becomes `expired` and returns its stake. */
   expireCheckoutSessions(now?: string): Promise<number>
-  /**
-   * The webhook backstop for a lapsed hold: an atomic conditional decrement.
-   * Returns the new `stake_remaining`; throws when the stake is not there.
-   */
-  sellStake(dslId: string, stake: number): Promise<number>
 }
 
 export type PurchaseStoreSnapshot = StoreSnapshot & {
@@ -159,6 +199,15 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+function cents(value: number): number {
+  return Math.round(value * 100)
+}
+
+function firstDayOfMonth(iso: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null
+  return `${iso.slice(0, 7)}-01`
+}
+
 /** A transition off `open` is a single statement: the first writer wins. */
 function mustFindCheckout(
   row: CheckoutSessionRow | undefined,
@@ -176,10 +225,25 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
   const sales: SaleRow[] = []
   const checkoutSessions: CheckoutSessionRow[] = []
 
+  /**
+   * The in-memory analogue of the RPC's `select ... for update`: one atomic
+   * write at a time, so a replayed or concurrent webhook sees committed state.
+   */
+  let saleQueue: Promise<unknown> = Promise.resolve()
+  function serialise<T>(task: () => Promise<T>): Promise<T> {
+    const run = saleQueue.then(task, task)
+    saleQueue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
   function transition(
     id: string,
     next: CheckoutStatus,
     from: readonly CheckoutStatus[] = ['open'],
+    returnsStake = false,
   ): CheckoutSessionRow | null {
     const index = checkoutSessions.findIndex(
       (row) => row.id === id && from.includes(row.status),
@@ -189,6 +253,7 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       ...checkoutSessions[index],
       status: next,
       closedAt: nowIso(),
+      stakeReturnedAt: returnsStake ? nowIso() : checkoutSessions[index].stakeReturnedAt,
     }
     checkoutSessions[index] = updated
     return { ...updated }
@@ -203,6 +268,214 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       Math.round((dsl.stakeRemaining ?? 0) * 100) + Math.round(row.stake * 100),
     )
     await base.updateDsl(dsl.id, { stakeRemaining: cappedCents / 100 })
+  }
+
+  async function markPaidUnfulfilled(checkout: CheckoutSessionRow): Promise<void> {
+    transition(checkout.id, 'paid_unfulfilled', ['open', 'expired', 'released'])
+  }
+
+  async function writeSale(input: RecordSaleInput): Promise<RecordSaleResult> {
+    if (
+      typeof input.stripeSessionId !== 'string' ||
+      input.stripeSessionId.trim() === ''
+    ) {
+      throw new Error('recordSaleAtomically: a Stripe session id is required')
+    }
+
+    let checkout: CheckoutSessionRow | null = null
+    if (input.checkoutId !== null) {
+      checkout = await findCheckout(input.checkoutId)
+    }
+    if (checkout === null) {
+      checkout = await findCheckoutByStripeSession(input.stripeSessionId)
+    }
+
+    // Idempotency, read after the "lock" so a replay sees the committed sale.
+    const existing = sales.find((row) => row.stripeSessionId === input.stripeSessionId)
+    if (existing !== undefined) {
+      return { outcome: 'idempotent_replay', sale: { ...existing }, reason: null }
+    }
+
+    if (checkout === null) {
+      return {
+        outcome: 'paid_unfulfilled',
+        sale: null,
+        reason:
+          'no checkout session is bound to this Stripe session; no sale was written',
+      }
+    }
+
+    if (checkout.status === 'completed') {
+      return {
+        outcome: 'paid_unfulfilled',
+        sale: null,
+        reason: `checkout ${checkout.id} is already completed but no sale records this Stripe session`,
+      }
+    }
+    if (checkout.status === 'paid_unfulfilled') {
+      return {
+        outcome: 'paid_unfulfilled',
+        sale: null,
+        reason: `checkout ${checkout.id} is already marked paid_unfulfilled`,
+      }
+    }
+
+    const currency = input.stripeCurrency.trim().toLowerCase()
+    let reason: string | null = null
+
+    if (currency !== 'nzd') {
+      reason = `checkout ${checkout.id} was charged in ${
+        input.stripeCurrency || 'no currency'
+      }, not nzd; no sale was written`
+    } else if (
+      !Number.isFinite(input.stripeAmountTotalCents) ||
+      cents(checkout.amountNzd) !== input.stripeAmountTotalCents
+    ) {
+      reason = `checkout ${checkout.id}: Stripe reports ${
+        Number.isFinite(input.stripeAmountTotalCents)
+          ? `${input.stripeAmountTotalCents} cents`
+          : 'no amount'
+      } but the bound quote is ${cents(checkout.amountNzd)} cents; no sale was written`
+    }
+
+    if (reason !== null) {
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    if (checkout.status !== 'open') {
+      reason = `checkout ${checkout.id} is ${checkout.status}: its stake was returned before the money arrived; no sale was written`
+      if (checkout.status === 'expired' || checkout.status === 'released') {
+        await markPaidUnfulfilled(checkout)
+      }
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    const dsl = await base.findDslById(checkout.dslId)
+    if (dsl === null) {
+      reason = `dsl ${checkout.dslId} does not exist; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    if (dsl.closedAt !== null && dsl.closedAt !== undefined) {
+      reason = `dsl ${dsl.id} is closed; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    if (dsl.status !== 'available' && dsl.status !== 'fully_allocated') {
+      reason = `dsl ${dsl.id} is ${dsl.status} and cannot be sold; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    // The snapshot is all-or-nothing (00024): a listing missing its expiry or
+    // retail rate cannot produce a contract, so it is refused rather than
+    // written half-empty.
+    if (dsl.endDate === null || dsl.retailMonthlyPerPercent === null) {
+      reason = `dsl ${dsl.id} does not have its commercial terms; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    const sold = sales
+      .filter((row) => row.dslId === dsl.id)
+      .reduce((total, row) => total + row.stake, 0)
+    if (cents(sold) + cents(checkout.stake) > cents(dsl.listedStake ?? 0)) {
+      reason = `dsl ${dsl.id} has ${sold}% already sold and no stake remains for this ${checkout.stake}% sale; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    // U21: the start is the first day of the executed month, never the listing.
+    const termStart = firstDayOfMonth(checkout.executedDate)
+    const termMonths =
+      termStart === null ? null : termMonthsBetween(termStart, dsl.endDate)
+    if (termStart === null || termMonths === null || termMonths < 1) {
+      reason = `dsl ${dsl.id} ends ${dsl.endDate}, before the sale month; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    const paymentModelAtSale: PaymentModel =
+      dsl.paymentModel === 'upfront' || termMonths <= 5
+        ? 'upfront'
+        : 'subscription_float'
+
+    const expectedCents = cents(
+      dsl.retailMonthlyPerPercent *
+        checkout.stake *
+        (paymentModelAtSale === 'upfront' ? termMonths : 5),
+    )
+    if (cents(checkout.amountNzd) !== expectedCents) {
+      reason = `checkout ${checkout.id} binds $${checkout.amountNzd} but the executed terms price $${
+        expectedCents / 100
+      }; no sale was written`
+      await markPaidUnfulfilled(checkout)
+      return { outcome: 'paid_unfulfilled', sale: null, reason }
+    }
+
+    const sale: SaleRow = {
+      id: newId(),
+      dslId: dsl.id,
+      userId: checkout.accountId,
+      printedName: checkout.printedName,
+      email: checkout.email,
+      stake: checkout.stake,
+      amount: checkout.amountNzd,
+      stripeSessionId: input.stripeSessionId,
+      stripeIdentityId: input.stripeIdentityId,
+      checkoutSessionId: checkout.id,
+      stripeAmountTotal: expectedCents / 100,
+      stripeCurrency: currency,
+      pdsMarkdown: checkout.pdsMarkdown,
+      saMarkdown: checkout.saMarkdown,
+      pdsHash: checkout.pdsHash,
+      saHash: checkout.saHash,
+      wholesaleMonthlyPerPercent: dsl.wholesaleMonthlyPerPercent,
+      retailMonthlyPerPercent: dsl.retailMonthlyPerPercent,
+      investorSplit: dsl.investorSplit,
+      listedStake: dsl.listedStake,
+      minStake: dsl.minStake,
+      step: dsl.step,
+      endDate: dsl.endDate,
+      paymentModelAtSale,
+      closeStyle: dsl.closeStyle,
+      distributionSchedule: dsl.distributionSchedule,
+      termStart,
+      termEnd: dsl.endDate,
+      termMonths,
+      trainerId: dsl.trainerId,
+      ownerId: dsl.ownerId,
+      createdAt: nowIso(),
+    }
+    sales.push(sale)
+
+    transition(checkout.id, 'completed')
+
+    const dslAfterSale = await base.findDslById(dsl.id)
+    if (
+      dslAfterSale !== null &&
+      (dslAfterSale.stakeRemaining ?? 0) === 0 &&
+      dslAfterSale.status === 'available'
+    ) {
+      await base.updateDsl(dsl.id, { status: 'fully_allocated' })
+    }
+
+    return { outcome: 'sale_written', sale: { ...sale }, reason: null }
+  }
+
+  async function findCheckout(id: string): Promise<CheckoutSessionRow | null> {
+    const found = checkoutSessions.find((row) => row.id === id)
+    return found === undefined ? null : { ...found }
+  }
+
+  async function findCheckoutByStripeSession(
+    stripeSessionId: string,
+  ): Promise<CheckoutSessionRow | null> {
+    const found = checkoutSessions.find((row) => row.stripeSessionId === stripeSessionId)
+    return found === undefined ? null : { ...found }
   }
 
   return {
@@ -254,24 +527,60 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       return [...sales].reverse().map((row) => ({ ...row }))
     },
 
-    async insertSale(row) {
-      if (sales.some((existing) => existing.stripeSessionId === row.stripeSessionId)) {
-        throw new Error(`sale with stripe_session_id ${row.stripeSessionId} already exists`)
-      }
-      const created: SaleRow = {
-        ...row,
-        id: newId(),
-        createdAt: nowIso(),
-      }
-      sales.push(created)
-      return { ...created }
+    recordSaleAtomically(input) {
+      return serialise(() => writeSale(input))
     },
 
-    async deleteSaleById(id) {
-      const index = sales.findIndex((row) => row.id === id)
-      if (index !== -1) {
-        sales.splice(index, 1)
+    async closeDsl(dslId, reason, closedBy) {
+      if (reason.trim() === '') {
+        throw new Error('closeDsl: a reason is required')
       }
+      if (closedBy.trim() === '') {
+        throw new Error('closeDsl: a closer is required')
+      }
+
+      const dsl = await base.findDslById(dslId)
+      if (dsl === null) throw new Error(`dsl ${dslId} does not exist`)
+      if (dsl.closedAt !== null && dsl.closedAt !== undefined) {
+        throw new Error(`dsl ${dslId} is already closed`)
+      }
+      if (dsl.status !== 'available' && dsl.status !== 'fully_allocated') {
+        throw new Error(
+          `dsl ${dslId} is ${dsl.status} and cannot be closed; only an available or fully allocated listing closes`,
+        )
+      }
+
+      // Sweep this listing's stale holds only.
+      const now = nowIso()
+      for (const row of checkoutSessions) {
+        if (row.dslId !== dslId || row.status !== 'open' || row.expiresAt > now) continue
+        const expired = transition(row.id, 'expired', ['open'], true)
+        if (expired !== null) await restoreStake(expired)
+      }
+
+      const blocking = checkoutSessions.filter(
+        (row) =>
+          row.dslId === dslId &&
+          (row.status === 'open' || row.status === 'paid_unfulfilled'),
+      )
+      if (blocking.length > 0) {
+        const held = blocking.filter((row) => row.stakeReturnedAt === null).length
+        const returned = blocking.length - held
+        throw new Error(
+          `dsl ${dslId} cannot be closed: ${held} held and ${returned} returned open or paid_unfulfilled checkout(s) exist`,
+        )
+      }
+
+      return base.updateDsl(dslId, {
+        status: 'completed',
+        closedAt: nowIso(),
+        closedReason: reason,
+        closedBy,
+      })
+    },
+
+    async listCheckoutSessions() {
+      return [...checkoutSessions].reverse().map((row) => ({ ...row }))
     },
 
     async reserveCheckoutSession(row) {
@@ -294,6 +603,7 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
         status: 'open',
         createdAt: nowIso(),
         closedAt: null,
+        stakeReturnedAt: null,
       }
       checkoutSessions.push(created)
       return { ...created }
@@ -320,19 +630,11 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       return found === undefined ? null : { ...found }
     },
 
-    async completeCheckoutSession(id) {
-      return transition(id, 'completed')
-    },
-
     async releaseCheckoutSession(id) {
-      const released = transition(id, 'released')
+      const released = transition(id, 'released', ['open'], true)
       if (released === null) return null
       await restoreStake(released)
       return released
-    },
-
-    async markCheckoutPaidUnfulfilled(id) {
-      return transition(id, 'paid_unfulfilled', ['open', 'expired', 'released'])
     },
 
     async expireCheckoutSessions(now = nowIso()) {
@@ -341,30 +643,12 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       )
       let expired = 0
       for (const row of due) {
-        const closed = transition(row.id, 'expired')
+        const closed = transition(row.id, 'expired', ['open'], true)
         if (closed === null) continue
         await restoreStake(closed)
         expired += 1
       }
       return expired
-    },
-
-    async sellStake(dslId, stake) {
-      const dsl = await base.findDslById(dslId)
-      if (dsl === null) {
-        throw new Error(`sell stake: dsl ${dslId} does not exist`)
-      }
-      const remainingCents = Math.round((dsl.stakeRemaining ?? 0) * 100)
-      const stakeCents = Math.round(stake * 100)
-      if (dsl.status !== 'available' || remainingCents < stakeCents) {
-        throw new Error(`no stake available on dsl ${dslId}`)
-      }
-      const nextRemaining = (remainingCents - stakeCents) / 100
-      await base.updateDsl(dslId, {
-        stakeRemaining: nextRemaining,
-        ...(nextRemaining === 0 ? { status: 'fully_allocated' as const } : {}),
-      })
-      return nextRemaining
     },
 
     dump(): PurchaseStoreSnapshot {

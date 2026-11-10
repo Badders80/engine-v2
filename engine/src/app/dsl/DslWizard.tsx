@@ -164,14 +164,12 @@ export function DslWizard({
       ? ''
       : (monthKey(defaults.endDate) ?? ''),
   )
-  const [paymentModel, setPaymentModel] = useState<PaymentModel>(
-    defaults.paymentModel ?? 'upfront',
+  const [paymentModel, setPaymentModel] = useState<PaymentModel | ''>(
+    defaults.paymentModel ?? '',
   )
-  const [closeStyle, setCloseStyle] = useState<CloseStyle>(
-    defaults.closeStyle ?? 'fourteen_day',
-  )
+  const [closeStyle, setCloseStyle] = useState<CloseStyle | ''>(defaults.closeStyle ?? '')
   const [distributionSchedule, setDistributionSchedule] = useState(
-    text(defaults.distributionSchedule) || 'quarterly',
+    text(defaults.distributionSchedule),
   )
 
   const [aboutText, setAboutText] = useState(defaults.narrative.aboutHorse)
@@ -208,17 +206,19 @@ export function DslWizard({
   // the options. The effective model is derived, never set during render: an
   // illegal stored choice is shown and submitted as upfront until the operator
   // picks again on a longer term.
-  const effectiveModel: PaymentModel =
-    duration !== null && !paymentModelAllowed(paymentModel, duration)
-      ? 'upfront'
-      : paymentModel
+  const effectiveModel: PaymentModel | '' =
+    paymentModel === ''
+      ? ''
+      : duration !== null && !paymentModelAllowed(paymentModel, duration)
+        ? 'upfront'
+        : paymentModel
 
   const retailNumber = Number(retail)
   const wholesaleNumber = Number(wholesale)
 
   const initialPerPercent = useMemo(() => {
     if (!Number.isFinite(retailNumber) || retailNumber <= 0) return null
-    if (duration === null) return null
+    if (duration === null || effectiveModel === '') return null
     return effectiveModel === 'upfront'
       ? upfrontTotal(duration, retailNumber, 1)
       : floatTotal(retailNumber, 1)
@@ -293,7 +293,9 @@ export function DslWizard({
         ? 2
         : endDate === null
           ? 2
-          : distributionSchedule.trim() === ''
+          : paymentModel === '' ||
+              closeStyle === '' ||
+              distributionSchedule.trim() === ''
             ? 3
             : 4
 
@@ -385,8 +387,8 @@ export function DslWizard({
     ownerId: ownerId === '' ? null : ownerId,
     endDate,
     termStart: null,
-    paymentModel: effectiveModel,
-    closeStyle,
+    paymentModel: effectiveModel === '' ? null : effectiveModel,
+    closeStyle: closeStyle === '' ? null : closeStyle,
     status: 'coming_soon',
     published: false,
     wholesaleMonthlyPerPercent: wholesale === '' ? null : wholesaleNumber,
@@ -676,8 +678,10 @@ export function DslWizard({
               id="paymentModel"
               name="paymentModel"
               value={effectiveModel}
-              onChange={(event) => setPaymentModel(event.target.value as PaymentModel)}
+              onChange={(event) => setPaymentModel(event.target.value as PaymentModel | '')}
+              required
             >
+              <option value="">— choose a payment model —</option>
               {duration !== null && duration < 6 ? null : (
                 <option value="subscription_float">subscription_float</option>
               )}
@@ -690,8 +694,10 @@ export function DslWizard({
               id="closeStyle"
               name="closeStyle"
               value={closeStyle}
-              onChange={(event) => setCloseStyle(event.target.value as CloseStyle)}
+              onChange={(event) => setCloseStyle(event.target.value as CloseStyle | '')}
+              required
             >
+              <option value="">— choose a close style —</option>
               <option value="fourteen_day">fourteen_day</option>
               <option value="three_x_remaining">three_x_remaining</option>
             </select>
@@ -703,7 +709,9 @@ export function DslWizard({
               name="distributionSchedule"
               value={distributionSchedule}
               onChange={(event) => setDistributionSchedule(event.target.value)}
+              required
             >
+              <option value="">— choose a distribution schedule —</option>
               {distributionSchedule !== '' && distributionSchedule !== 'quarterly' ? (
                 <option value={distributionSchedule}>{distributionSchedule}</option>
               ) : null}
@@ -915,7 +923,7 @@ function reviewGaps(input: {
   trainer: WizardTrainer | null
   owner: WizardOwner | null
   endDate: string | null
-  closeStyle: CloseStyle
+  closeStyle: CloseStyle | ''
   wholesale: string
   investorSplit: string
   listedStake: string

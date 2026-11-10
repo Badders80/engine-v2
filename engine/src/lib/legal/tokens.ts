@@ -32,6 +32,10 @@ export type LegalPackInput = {
     minStake: number
     step: number
     retailMonthlyPerPercent: number
+    /** Deal-local soft content overrides (chunk 3, U14). */
+    narrativeAboutHorse?: string | null
+    narrativeRacingOutlook?: string | null
+    narrativeRaceExpectation?: string | null
   }
   horse: {
     slug: string

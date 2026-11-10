@@ -93,3 +93,65 @@ function lastDayOfMonth(year: number, month: number): number {
 export function paymentModelAllowed(paymentModel: PaymentModel, termMonths: number): boolean {
   return paymentModel === 'upfront' || termMonths >= FLOAT_MIN_TERM_MONTHS
 }
+
+/** `2027-09` for the `type="month"` input. */
+export function monthKey(iso: string): string | null {
+  const date = parseIsoDate(iso)
+  if (date === null) return null
+  return `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}`
+}
+
+/** The month key of a civil date, defaulting to today in UTC. */
+export function currentMonthKey(now: Date = new Date()): string {
+  return `${String(now.getUTCFullYear()).padStart(4, '0')}-${String(
+    now.getUTCMonth() + 1,
+  ).padStart(2, '0')}`
+}
+
+/** The first day of a `YYYY-MM` month, as `YYYY-MM-DD`; null on bad input. */
+export function firstDayOfMonthKey(key: string): string | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(key)
+  if (match === null) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (year < 1900 || year > 2200 || month < 1 || month > 12) return null
+  return `${match[1]}-${match[2]}-01`
+}
+
+/**
+ * The last day of a `YYYY-MM` month, as `YYYY-MM-DD`; null on bad input.
+ * Creation asks only for the expiry month and stores this date.
+ */
+export function lastDayOfMonthKey(key: string): string | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(key)
+  if (match === null) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (year < 1900 || year > 2200 || month < 1 || month > 12) return null
+  const day = lastDayOfMonth(year, month)
+  return `${match[1]}-${match[2]}-${String(day).padStart(2, '0')}`
+}
+
+/**
+ * Inclusive full-calendar months from the current month to an expiry date.
+ *
+ * Chunk 3 stores no start: the duration shown is "current month → expiry",
+ * recomputed on every view and never written down. The sale stamps the
+ * buyer's start (chunk 4) and prices the remaining months.
+ */
+export function durationFromCurrentMonth(
+  endIso: string | null,
+  now: Date = new Date(),
+): number | null {
+  if (endIso === null) return null
+  const end = parseIsoDate(endIso)
+  if (end === null) return null
+  if (end.day !== lastDayOfMonth(end.year, end.month)) return null
+
+  const nowKey = currentMonthKey(now)
+  const nowYear = Number(nowKey.slice(0, 4))
+  const nowMonth = Number(nowKey.slice(5, 7))
+
+  const months = (end.year - nowYear) * 12 + (end.month - nowMonth) + 1
+  return months >= 1 ? months : null
+}

@@ -24,10 +24,15 @@ import {
   type PartyRole,
   type PartyRow,
   type PaymentModel,
+  type NarrativeOverrideMeta,
 } from './dslStore'
 import { isInvestorReturnPctInRange, retailPerPercentFromWholesale, validateStake } from './pricing'
 import { checkDslReadiness, readinessReason, type ReadinessResult } from './readiness'
-import { paymentModelAllowed, termMonthsBetween } from './term'
+import {
+  durationFromCurrentMonth,
+  paymentModelAllowed,
+  termMonthsBetween,
+} from './term'
 
 export const DSL_STATUSES = DSL_STATUS_VALUES
 
@@ -103,6 +108,11 @@ export type DslDraft = {
   narrativeSignoff?: Record<string, boolean> | null
   narrativeApprovedAt?: string | null
   narrativeApprovedHash?: string | null
+  /** Deal-local soft content (chunk 3, U14). Absent means "leave it alone". */
+  narrativeAboutHorse?: string | null
+  narrativeRacingOutlook?: string | null
+  narrativeRaceExpectation?: string | null
+  narrativeOverrideMeta?: NarrativeOverrideMeta | null
 }
 
 /**
@@ -195,6 +205,10 @@ function dealColumns(dsl: DslDraft) {
     narrativeSignoff: dsl.narrativeSignoff,
     narrativeApprovedAt: dsl.narrativeApprovedAt,
     narrativeApprovedHash: dsl.narrativeApprovedHash,
+    narrativeAboutHorse: dsl.narrativeAboutHorse,
+    narrativeRacingOutlook: dsl.narrativeRacingOutlook,
+    narrativeRaceExpectation: dsl.narrativeRaceExpectation,
+    narrativeOverrideMeta: dsl.narrativeOverrideMeta,
   })
 }
 
@@ -238,10 +252,16 @@ function checkCommercialTerms(dsl: DslDraft): CheckResult {
   const hasTermStart = text(dsl.termStart) !== null
   const hasEndDate = text(dsl.endDate) !== null
 
-  if (hasTermStart && hasEndDate) {
-    const termMonths = termMonthsBetween(dsl.termStart, dsl.endDate)
+  // Chunk 3: creation stores the expiry only. The duration that filters the
+  // payment model is then current month -> expiry, the same number the wizard
+  // shows. A dated row (a sale) still uses the stored start.
+  if (hasEndDate) {
+    const termMonths = hasTermStart
+      ? termMonthsBetween(dsl.termStart, dsl.endDate)
+      : durationFromCurrentMonth(dsl.endDate)
+
     if (termMonths === null || termMonths < 1) {
-      return { ok: false, reason: 'term dates are invalid' }
+      return { ok: false, reason: 'the expiry is invalid' }
     }
 
     if (text(dsl.paymentModel) !== null && !paymentModelAllowed(dsl.paymentModel, termMonths)) {
@@ -316,6 +336,9 @@ function readinessFor(args: {
       step: numberOrNull(dsl.step),
       stakeRemaining: args.stakeRemaining,
       distributionSchedule: text(dsl.distributionSchedule),
+      narrativeAboutHorse: text(dsl.narrativeAboutHorse),
+      narrativeRacingOutlook: text(dsl.narrativeRacingOutlook),
+      narrativeRaceExpectation: text(dsl.narrativeRaceExpectation),
     },
     horse: {
       registered: horse.registered,

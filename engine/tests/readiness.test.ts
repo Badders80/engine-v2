@@ -75,11 +75,16 @@ describe('a DSL before its deal is not ready', () => {
     expect(missingOf(checkDslReadiness(input))).toContain('the owner on the term sheet')
   })
 
-  it('names the term dates', () => {
+  it('names the expiry', () => {
     const input = ready()
     input.dsl.endDate = null
+    expect(missingOf(checkDslReadiness(input))).toContain('the expiry')
+  })
+
+  it('does not require a term start: the sale stamps it (chunk 3)', () => {
+    const input = ready()
     input.dsl.termStart = null
-    expect(missingOf(checkDslReadiness(input))).toContain('the term start and end date')
+    expect(checkDslReadiness(input)).toEqual({ ok: true })
   })
 
   it('names the payment model and close style', () => {

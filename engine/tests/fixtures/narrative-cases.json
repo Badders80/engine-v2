@@ -1,0 +1,242 @@
+{
+  "description": "The fixture set `just check:db` uses to prove the TS resolver and the SQL function agree. Read by engine/tests/narrative-parity.test.ts and scripts/check-db-narrative.sql.",
+  "horses": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "slug": "records-only",
+      "legal_name": "Records Only",
+      "foaling_date": "2021-09-14",
+      "sex": "Filly",
+      "colour": "Bay",
+      "sire_name": "Sire One",
+      "dam_name": "Dam One",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": "Records about.",
+      "racing_outlook_and_pedigree": "Records outlook.",
+      "race_expectation": "Records expectation."
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "slug": "overrides-win",
+      "legal_name": "Overrides Win",
+      "foaling_date": "2020-01-01",
+      "sex": "Colt",
+      "colour": "Brown",
+      "sire_name": "Sire Two",
+      "dam_name": "Dam Two",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": "Records about.",
+      "racing_outlook_and_pedigree": "Records outlook.",
+      "race_expectation": "Records expectation."
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "slug": "partial-override",
+      "legal_name": "Partial Override",
+      "foaling_date": "2019-02-02",
+      "sex": "Gelding",
+      "colour": "Grey",
+      "sire_name": "Sire Three",
+      "dam_name": "Dam Three",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": "Records about.",
+      "racing_outlook_and_pedigree": null,
+      "race_expectation": "Records expectation."
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "slug": "whitespace-trimmed",
+      "legal_name": "Whitespace Trimmed",
+      "foaling_date": "2018-03-03",
+      "sex": "Mare",
+      "colour": "Chestnut",
+      "sire_name": "Sire Four",
+      "dam_name": "Dam Four",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": "  Records about with edges.  ",
+      "racing_outlook_and_pedigree": "\n  Outlook with a leading newline.  \n",
+      "race_expectation": "   "
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "slug": "missing-party",
+      "legal_name": "Missing Party",
+      "foaling_date": "2017-04-04",
+      "sex": "Filly",
+      "colour": "Black",
+      "sire_name": "Sire Five",
+      "dam_name": "Dam Five",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": "Records about.",
+      "racing_outlook_and_pedigree": "Records outlook.",
+      "race_expectation": "Records expectation."
+    },
+    {
+      "id": "66666666-6666-4666-8666-666666666666",
+      "slug": "missing-sources",
+      "legal_name": "Missing Sources",
+      "foaling_date": "2016-05-05",
+      "sex": "Colt",
+      "colour": "Bay",
+      "sire_name": "Sire Six",
+      "dam_name": "Dam Six",
+      "registered": true,
+      "image_count": 3,
+      "about_horse": null,
+      "racing_outlook_and_pedigree": "   ",
+      "race_expectation": null
+    }
+  ],
+  "parties": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "display_name": "Trainer One",
+      "bio": "Trainer bio one.",
+      "roles": ["trainer"]
+    },
+    {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "display_name": "Trainer Two",
+      "bio": "  Trainer bio with edges.  ",
+      "roles": ["trainer"]
+    }
+  ],
+  "dsls": [
+    {
+      "id": "a1111111-1111-4111-8111-111111111111",
+      "horse_id": "11111111-1111-4111-8111-111111111111",
+      "trainer_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "status": "coming_soon",
+      "narrative_about_horse": null,
+      "narrative_racing_outlook": null,
+      "narrative_race_expectation": null
+    },
+    {
+      "id": "a2222222-2222-4222-8222-222222222222",
+      "horse_id": "22222222-2222-4222-8222-222222222222",
+      "trainer_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "status": "coming_soon",
+      "narrative_about_horse": "Deal about.",
+      "narrative_racing_outlook": "Deal outlook.",
+      "narrative_race_expectation": "Deal expectation."
+    },
+    {
+      "id": "a3333333-3333-4333-8333-333333333333",
+      "horse_id": "33333333-3333-4333-8333-333333333333",
+      "trainer_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "status": "coming_soon",
+      "narrative_about_horse": "Deal about only.",
+      "narrative_racing_outlook": null,
+      "narrative_race_expectation": null
+    },
+    {
+      "id": "a4444444-4444-4444-8444-444444444444",
+      "horse_id": "44444444-4444-4444-8444-444444444444",
+      "trainer_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "status": "coming_soon",
+      "narrative_about_horse": "   ",
+      "narrative_racing_outlook": null,
+      "narrative_race_expectation": null
+    },
+    {
+      "id": "a5555555-5555-4555-8555-555555555555",
+      "horse_id": "55555555-5555-4555-8555-555555555555",
+      "trainer_id": null,
+      "status": "coming_soon",
+      "narrative_about_horse": null,
+      "narrative_racing_outlook": null,
+      "narrative_race_expectation": null
+    },
+    {
+      "id": "a6666666-6666-4666-8666-666666666666",
+      "horse_id": "66666666-6666-4666-8666-666666666666",
+      "trainer_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "status": "coming_soon",
+      "narrative_about_horse": null,
+      "narrative_racing_outlook": null,
+      "narrative_race_expectation": null
+    }
+  ],
+  "cases": [
+    {
+      "name": "records-only",
+      "horse_id": "11111111-1111-4111-8111-111111111111",
+      "dsl_id": "a1111111-1111-4111-8111-111111111111",
+      "party_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "expected": {
+        "horse.about_horse": { "text": "Records about.", "overridden": false },
+        "horse.racing_outlook_and_pedigree": { "text": "Records outlook.", "overridden": false },
+        "horse.race_expectation": { "text": "Records expectation.", "overridden": false },
+        "trainer.bio": { "text": "Trainer bio one.", "overridden": false }
+      }
+    },
+    {
+      "name": "overrides-win",
+      "horse_id": "22222222-2222-4222-8222-222222222222",
+      "dsl_id": "a2222222-2222-4222-8222-222222222222",
+      "party_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "expected": {
+        "horse.about_horse": { "text": "Deal about.", "overridden": true },
+        "horse.racing_outlook_and_pedigree": { "text": "Deal outlook.", "overridden": true },
+        "horse.race_expectation": { "text": "Deal expectation.", "overridden": true },
+        "trainer.bio": { "text": "Trainer bio one.", "overridden": false }
+      }
+    },
+    {
+      "name": "partial-override-with-missing-record",
+      "horse_id": "33333333-3333-4333-8333-333333333333",
+      "dsl_id": "a3333333-3333-4333-8333-333333333333",
+      "party_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "expected": {
+        "horse.about_horse": { "text": "Deal about only.", "overridden": true },
+        "horse.racing_outlook_and_pedigree": { "text": null, "overridden": false },
+        "horse.race_expectation": { "text": "Records expectation.", "overridden": false },
+        "trainer.bio": { "text": "Trainer bio one.", "overridden": false }
+      }
+    },
+    {
+      "name": "whitespace-is-trimmed-on-both-sides",
+      "horse_id": "44444444-4444-4444-8444-444444444444",
+      "dsl_id": "a4444444-4444-4444-8444-444444444444",
+      "party_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "expected": {
+        "horse.about_horse": { "text": "Records about with edges.", "overridden": false },
+        "horse.racing_outlook_and_pedigree": {
+          "text": "Outlook with a leading newline.",
+          "overridden": false
+        },
+        "horse.race_expectation": { "text": null, "overridden": false },
+        "trainer.bio": { "text": "Trainer bio with edges.", "overridden": false }
+      }
+    },
+    {
+      "name": "no-party-means-no-trainer-bio",
+      "horse_id": "55555555-5555-4555-8555-555555555555",
+      "dsl_id": "a5555555-5555-4555-8555-555555555555",
+      "party_id": null,
+      "expected": {
+        "horse.about_horse": { "text": "Records about.", "overridden": false },
+        "horse.racing_outlook_and_pedigree": { "text": "Records outlook.", "overridden": false },
+        "horse.race_expectation": { "text": "Records expectation.", "overridden": false },
+        "trainer.bio": { "text": null, "overridden": false }
+      }
+    },
+    {
+      "name": "every-source-empty-resolves-to-null",
+      "horse_id": "66666666-6666-4666-8666-666666666666",
+      "dsl_id": "a6666666-6666-4666-8666-666666666666",
+      "party_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "expected": {
+        "horse.about_horse": { "text": null, "overridden": false },
+        "horse.racing_outlook_and_pedigree": { "text": null, "overridden": false },
+        "horse.race_expectation": { "text": null, "overridden": false },
+        "trainer.bio": { "text": "Trainer bio one.", "overridden": false }
+      }
+    }
+  ]
+}

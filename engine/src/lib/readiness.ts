@@ -17,12 +17,18 @@
  */
 
 import { SOFT_TOKEN_KEYS } from './legal/tokens'
+import { resolveNarrative } from './narrative'
 
 export const NARRATIVE_SLOTS = SOFT_TOKEN_KEYS
 
 export type ReadinessDsl = {
   ownerId: string | null
   endDate: string | null
+  /**
+   * Chunk 3 stores no start on a draft. The sale stamps it (chunk 4), so the
+   * Available gate requires the expiry only. `termStart` stays in the shape so
+   * a dated row can still report it, but it is not a readiness requirement.
+   */
   termStart: string | null
   paymentModel: string | null
   closeStyle: string | null
@@ -33,6 +39,10 @@ export type ReadinessDsl = {
   step: number | null
   stakeRemaining: number | null
   distributionSchedule: string | null
+  /** Deal-local overrides; null/absent means the Records text wins. */
+  narrativeAboutHorse?: string | null
+  narrativeRacingOutlook?: string | null
+  narrativeRaceExpectation?: string | null
 }
 
 export type ReadinessHorse = {
@@ -87,7 +97,8 @@ export function checkDslReadiness(input: ReadinessInput): ReadinessResult {
 
   if (dsl.ownerId === null) missing.push('the owner on the term sheet')
 
-  if (dsl.endDate === null || dsl.termStart === null) missing.push('the term start and end date')
+  // Chunk 3: a draft has an expiry and no start. The sale stamps the start.
+  if (dsl.endDate === null) missing.push('the expiry')
   if (dsl.paymentModel === null) missing.push('the payment model')
   if (dsl.closeStyle === null) missing.push('the close style')
 
@@ -112,11 +123,28 @@ export function checkDslReadiness(input: ReadinessInput): ReadinessResult {
     missing.push(`at least ${MINIMUM_IMAGES} horse images`)
   }
 
-  if (!present(horse.aboutHorse)) missing.push('the about-the-horse paragraph')
-  if (!present(horse.racingOutlookAndPedigree)) missing.push('the racing outlook and pedigree paragraph')
-  if (!present(horse.raceExpectation)) missing.push('the race expectation paragraph')
+  // The four soft slots are judged on what the deal will actually print: a
+  // deal-local override counts, and an untouched slot reads through live.
+  const resolved = resolveNarrative(
+    horse,
+    {
+      narrativeAboutHorse: dsl.narrativeAboutHorse,
+      narrativeRacingOutlook: dsl.narrativeRacingOutlook,
+      narrativeRaceExpectation: dsl.narrativeRaceExpectation,
+    },
+    trainer,
+  )
 
-  if (trainer === null || !present(trainer.bio)) missing.push("the trainer's bio")
+  if (!present(resolved['horse.about_horse'].text)) {
+    missing.push('the about-the-horse paragraph')
+  }
+  if (!present(resolved['horse.racing_outlook_and_pedigree'].text)) {
+    missing.push('the racing outlook and pedigree paragraph')
+  }
+  if (!present(resolved['horse.race_expectation'].text)) {
+    missing.push('the race expectation paragraph')
+  }
+  if (!present(resolved['trainer.bio'].text)) missing.push("the trainer's bio")
   if (!narrativeApproved(narrative)) {
     missing.push('the narrative sign-off (all four PDS soft slots approved)')
   }

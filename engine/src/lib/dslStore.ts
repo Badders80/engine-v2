@@ -111,7 +111,31 @@ export type NewDsl = {
   narrativeSignoff: Record<string, boolean> | null
   narrativeApprovedAt: string | null
   narrativeApprovedHash: string | null
+  /**
+   * Deal-local soft content. Optional on the type so older fixtures stay
+   * valid; a null or blank value means "read through from Records live".
+   */
+  narrativeAboutHorse?: string | null
+  narrativeRacingOutlook?: string | null
+  narrativeRaceExpectation?: string | null
+  /** Source and dismissed hashes per overridden slot (U5). */
+  narrativeOverrideMeta?: NarrativeOverrideMeta | null
 }
+
+/** One overridden slot's two fingerprints. */
+export type NarrativeOverrideMetaEntry = {
+  sourceHash?: string
+  dismissedHash?: string
+}
+
+export type NarrativeOverrideMeta = Partial<
+  Record<
+    | 'horse.about_horse'
+    | 'horse.racing_outlook_and_pedigree'
+    | 'horse.race_expectation',
+    NarrativeOverrideMetaEntry
+  >
+>
 
 export type DslRow = NewDsl & { id: string }
 

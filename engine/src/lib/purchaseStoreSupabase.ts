@@ -141,6 +141,9 @@ function toCheckoutSession(value: unknown): CheckoutSessionRow {
     createdAt: str(row.created_at),
     closedAt: strOrNull(row.closed_at),
     stakeReturnedAt: strOrNull(row.stake_returned_at),
+    resolvedAt: strOrNull(row.resolved_at),
+    resolvedBy: strOrNull(row.resolved_by),
+    resolution: strOrNull(row.resolution),
   }
 }
 
@@ -314,6 +317,17 @@ export function createSupabasePurchaseStore(
         .maybeSingle()
       if (readError) fail('checkout_sessions', readError.message)
       return row === null ? null : toCheckoutSession(row)
+    },
+
+    async resolvePaidUnfulfilled(id, resolvedBy, resolution) {
+      const { data, error } = await client.rpc('resolve_paid_unfulfilled', {
+        p_checkout_id: id,
+        p_resolved_by: resolvedBy,
+        p_resolution: resolution,
+      })
+      if (error) fail('resolve_paid_unfulfilled', error.message)
+      if (data === null) fail('resolve_paid_unfulfilled', `checkout ${id} vanished`)
+      return toCheckoutSession(data)
     },
 
     async expireCheckoutSessions() {

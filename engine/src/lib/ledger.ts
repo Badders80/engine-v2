@@ -75,10 +75,54 @@ export function capTableIdentityHolds(cap: CapTable): boolean {
   )
 }
 
+/** P0: paid_unfulfilled rows that still block the close. */
+export function unresolvedPaidUnfulfilled(
+  dslId: string,
+  checkouts: readonly CheckoutSessionRow[],
+): CheckoutSessionRow[] {
+  return checkouts.filter(
+    (row) =>
+      row.dslId === dslId &&
+      row.status === 'paid_unfulfilled' &&
+      row.resolvedAt === null,
+  )
+}
+
+/**
+ * P0: record that a paid_unfulfilled exception is settled. The store returns
+ * any held stake and stamps who, when and why; a second resolution is refused.
+ */
+export async function resolveCheckout(
+  input: { checkoutId: string; resolvedBy: string; resolution: string },
+  store: PurchaseStore,
+): Promise<Result<CheckoutSessionRow>> {
+  if (input.resolvedBy.trim() === '') {
+    return { ok: false, reason: 'the operator resolving the exception is required' }
+  }
+  if (input.resolution.trim() === '') {
+    return { ok: false, reason: 'a resolution note is required' }
+  }
+
+  try {
+    const row = await store.resolvePaidUnfulfilled(
+      input.checkoutId,
+      input.resolvedBy.trim(),
+      input.resolution.trim(),
+    )
+    return { ok: true, value: row }
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error instanceof Error ? error.message : 'the exception could not be resolved',
+    }
+  }
+}
+
 /**
  * U19: the operator close. The store sweeps this listing's stale holds, then
- * refuses while any open or paid_unfulfilled checkout exists — held or
- * returned, because money was taken without a sale.
+ * refuses while any open hold or unresolved paid_unfulfilled checkout exists —
+ * held or returned, because money was taken without a sale.
  */
 export async function closeListing(
   input: { dslId: string; reason: string; closedBy: string },

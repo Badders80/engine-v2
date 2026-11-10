@@ -10,7 +10,12 @@ import { describe, expect, it } from 'vitest'
 
 import { saveDsl, type DslDraft } from '../src/lib/dsl'
 import { createInMemoryEmailSender } from '../src/lib/email'
-import { capTableFor, capTableIdentityHolds, closeListing } from '../src/lib/ledger'
+import {
+  capTableFor,
+  capTableIdentityHolds,
+  closeListing,
+  resolveCheckout,
+} from '../src/lib/ledger'
 import { openCheckoutSession, recordWebhookEvent, SA_DECLARATIONS } from '../src/lib/purchase'
 import { createInMemoryPurchaseStore } from '../src/lib/purchaseStore'
 import type { StripeGateway } from '../src/lib/stripe'
@@ -419,6 +424,103 @@ describe('Chunk 4 — U19 close guard and U20 invariant', () => {
     await expect(store.closeDsl(dsl.id, 'close', 'operator')).rejects.toThrow(
       /0 held and 1 returned/,
     )
+  })
+
+  it('resolves a held paid_unfulfilled, returns its stake, and unblocks the close', async () => {
+    const { store, dsl, account } = await setup()
+    const { checkout } = await openCheckout(store, dsl.id, account.id, 5, '2026-11-15')
+
+    await recordWebhookEvent(
+      completedEvent('cs_chunk4_resolve_held', checkout.id, 190_000, { currency: 'usd' }),
+      store,
+      createInMemoryEmailSender(),
+    )
+    const before = await store.findCheckoutSessionById(checkout.id)
+    expect(before?.status).toBe('paid_unfulfilled')
+    expect(before?.stakeReturnedAt).toBeNull()
+
+    const resolved = await resolveCheckout(
+      {
+        checkoutId: checkout.id,
+        resolvedBy: 'operator',
+        resolution: 'refunded, no sale',
+      },
+      store,
+    )
+    expect(resolved.ok).toBe(true)
+
+    const after = await store.findCheckoutSessionById(checkout.id)
+    expect(after?.resolvedAt).not.toBeNull()
+    expect(after?.resolvedBy).toBe('operator')
+    expect(after?.resolution).toBe('refunded, no sale')
+    expect(after?.stakeReturnedAt).not.toBeNull()
+    expect((await store.findDslById(dsl.id))?.stakeRemaining).toBe(10)
+
+    const closed = await closeListing(
+      { dslId: dsl.id, reason: 'season ended', closedBy: 'operator' },
+      store,
+    )
+    expect(closed.ok).toBe(true)
+  })
+
+  it('resolves a returned paid_unfulfilled and unblocks the close', async () => {
+    const { store, dsl, account } = await setup()
+    const { stripeSessionId, checkout, quote } = await openCheckout(
+      store,
+      dsl.id,
+      account.id,
+      5,
+      '2026-11-15',
+    )
+
+    await store.releaseCheckoutSession(checkout.id)
+    await recordWebhookEvent(
+      completedEvent(stripeSessionId, checkout.id, Math.round(quote.initialPaymentNzd * 100)),
+      store,
+      createInMemoryEmailSender(),
+    )
+    const before = await store.findCheckoutSessionById(checkout.id)
+    expect(before?.stakeReturnedAt).not.toBeNull()
+
+    const resolved = await resolveCheckout(
+      { checkoutId: checkout.id, resolvedBy: 'operator', resolution: 'refunded twice' },
+      store,
+    )
+    expect(resolved.ok).toBe(true)
+
+    const closed = await closeListing(
+      { dslId: dsl.id, reason: 'season ended', closedBy: 'operator' },
+      store,
+    )
+    expect(closed.ok).toBe(true)
+  })
+
+  it('refuses a second resolution and an empty note', async () => {
+    const { store, dsl, account } = await setup()
+    const { checkout } = await openCheckout(store, dsl.id, account.id, 5, '2026-11-15')
+    await recordWebhookEvent(
+      completedEvent('cs_chunk4_resolve_twice', checkout.id, 190_000, { currency: 'usd' }),
+      store,
+      createInMemoryEmailSender(),
+    )
+
+    const empty = await resolveCheckout(
+      { checkoutId: checkout.id, resolvedBy: 'operator', resolution: '   ' },
+      store,
+    )
+    expect(empty.ok).toBe(false)
+
+    const first = await resolveCheckout(
+      { checkoutId: checkout.id, resolvedBy: 'operator', resolution: 'refunded' },
+      store,
+    )
+    expect(first.ok).toBe(true)
+
+    const second = await resolveCheckout(
+      { checkoutId: checkout.id, resolvedBy: 'operator', resolution: 'again' },
+      store,
+    )
+    expect(second.ok).toBe(false)
   })
 
   it('sweeps a stale hold, then closes with a reason and a closer', async () => {

@@ -1,9 +1,13 @@
 import Link from 'next/link'
 
-import { capTableFor, capTableIdentityHolds } from '@/lib/ledger'
+import {
+  capTableFor,
+  capTableIdentityHolds,
+  unresolvedPaidUnfulfilled,
+} from '@/lib/ledger'
 import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 
-import { closeListingAction } from './actions'
+import { closeListingAction, resolveCheckoutAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +41,8 @@ export default async function Page({
 }) {
   const params = await searchParams
   const closeError = first(params.close_error)
+  const resolveError = first(params.resolve_error)
+  const resolvedId = first(params.resolved)
   const closedId = first(params.closed)
   const dslFilter = first(params.dsl)
 
@@ -62,6 +68,7 @@ export default async function Page({
       dsl,
       rows: salesByDsl.get(dsl.id) ?? [],
       cap: capTableFor(dsl, sales, checkouts),
+      exceptions: unresolvedPaidUnfulfilled(dsl.id, checkouts),
     }))
 
   return (
@@ -89,6 +96,21 @@ export default async function Page({
         </p>
       ) : null}
 
+      {resolveError !== null ? (
+        <p
+          role="alert"
+          className="mb-6 rounded-sm border border-line-strong px-4 py-3 text-body"
+        >
+          Resolution refused: <span className="font-figure">{resolveError}</span>
+        </p>
+      ) : null}
+
+      {resolvedId !== null ? (
+        <p className="mb-6 rounded-sm border border-line bg-row px-4 py-3 text-body">
+          Exception resolved. The checkout no longer blocks a close.
+        </p>
+      ) : null}
+
       {sections.length === 0 ? (
         <p className="mt-6 text-body text-muted">
           No listings{dslFilter === null ? ' yet' : ' match this filter'}. A sale
@@ -96,11 +118,12 @@ export default async function Page({
         </p>
       ) : null}
 
-      {sections.map(({ dsl, rows, cap }) => {
+      {sections.map(({ dsl, rows, cap, exceptions }) => {
         const identityHolds = capTableIdentityHolds(cap)
         const canClose =
           dsl.status !== 'completed' &&
-          (dsl.status === 'available' || dsl.status === 'fully_allocated')
+          (dsl.status === 'available' || dsl.status === 'fully_allocated') &&
+          exceptions.length === 0
 
         return (
           <section key={dsl.id} className="mb-12 border-t border-line pt-6">
@@ -251,6 +274,57 @@ export default async function Page({
                 </pre>
               </details>
             ))}
+
+            {exceptions.length > 0 && !dsl.closedAt ? (
+              <div className="mt-6 border border-line-strong p-4">
+                <h3 className="text-body">Unresolved checkout exceptions</h3>
+                <p className="mt-1 text-caption text-muted">
+                  Money was taken without a sale. Resolve each one before the
+                  listing can close.
+                </p>
+                {exceptions.map((checkout) => (
+                  <form
+                    key={checkout.id}
+                    action={resolveCheckoutAction}
+                    className="mt-4 flex flex-wrap items-end gap-3 border-t border-line pt-4"
+                  >
+                    <input type="hidden" name="checkoutId" value={checkout.id} />
+                    <input type="hidden" name="dslId" value={dsl.id} />
+                    <p className="w-full font-figure text-caption text-muted">
+                      {checkout.email} · {checkout.stake}% · ${checkout.amountNzd} ·{' '}
+                      {checkout.stakeReturnedAt === null ? 'stake held' : 'stake returned'}
+                    </p>
+                    <label className="text-caption uppercase tracking-caption text-muted">
+                      Resolution
+                      <input
+                        name="resolution"
+                        required
+                        placeholder="refunded 2026-11-12, ref …"
+                        className="mt-1 block w-72 rounded-sm border border-line bg-canvas px-3 py-2 text-body text-ink"
+                      />
+                    </label>
+                    <label className="text-caption uppercase tracking-caption text-muted">
+                      Resolved by
+                      <input
+                        name="resolvedBy"
+                        required
+                        defaultValue="operator"
+                        className="mt-1 block w-40 rounded-sm border border-line bg-canvas px-3 py-2 text-body text-ink"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="rounded-sm border border-line-strong px-4 py-2 text-caption uppercase tracking-caption hover:border-accent"
+                    >
+                      Resolve exception
+                    </button>
+                  </form>
+                ))}
+                <p className="mt-4 text-caption text-muted">
+                  Close is blocked until every exception is resolved.
+                </p>
+              </div>
+            ) : null}
 
             {dsl.closedAt ? (
               <p className="mt-5 text-caption text-muted">

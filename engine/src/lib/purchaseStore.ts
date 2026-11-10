@@ -80,6 +80,10 @@ export type CheckoutSessionRow = NewCheckoutSession & {
   createdAt: string
   closedAt: string | null
   stakeReturnedAt: string | null
+  /** P0: a paid_unfulfilled exception is settled; null while unresolved. */
+  resolvedAt: string | null
+  resolvedBy: string | null
+  resolution: string | null
 }
 
 /** U18: the executed terms frozen onto the sale. None is recomputed later. */
@@ -175,6 +179,16 @@ export interface PurchaseStore extends DslStore {
   ): Promise<CheckoutSessionRow>
   findCheckoutSessionById(id: string): Promise<CheckoutSessionRow | null>
   findCheckoutSessionByStripeSessionId(stripeSessionId: string): Promise<CheckoutSessionRow | null>
+  /**
+   * P0: an operator records that a paid_unfulfilled exception is settled.
+   * A held stake goes back to the listing; the row stays paid_unfulfilled but
+   * carries who, when and why. A second resolution is refused.
+   */
+  resolvePaidUnfulfilled(
+    checkoutId: string,
+    resolvedBy: string,
+    resolution: string,
+  ): Promise<CheckoutSessionRow>
   /** `open` -> `released`, and the stake goes back. Null when the row was not open. */
   releaseCheckoutSession(id: string): Promise<CheckoutSessionRow | null>
   /** Every open hold past `now` becomes `expired` and returns its stake. */
@@ -561,7 +575,8 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       const blocking = checkoutSessions.filter(
         (row) =>
           row.dslId === dslId &&
-          (row.status === 'open' || row.status === 'paid_unfulfilled'),
+          (row.status === 'open' ||
+            (row.status === 'paid_unfulfilled' && row.resolvedAt === null)),
       )
       if (blocking.length > 0) {
         const held = blocking.filter((row) => row.stakeReturnedAt === null).length
@@ -604,6 +619,9 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
         createdAt: nowIso(),
         closedAt: null,
         stakeReturnedAt: null,
+        resolvedAt: null,
+        resolvedBy: null,
+        resolution: null,
       }
       checkoutSessions.push(created)
       return { ...created }
@@ -635,6 +653,35 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
       if (released === null) return null
       await restoreStake(released)
       return released
+    },
+
+    async resolvePaidUnfulfilled(id, resolvedBy, resolution) {
+      if (resolvedBy.trim() === '') {
+        throw new Error('resolvePaidUnfulfilled: a resolver is required')
+      }
+      if (resolution.trim() === '') {
+        throw new Error('resolvePaidUnfulfilled: a resolution is required')
+      }
+      const index = checkoutSessions.findIndex((row) => row.id === id)
+      const row = mustFindCheckout(checkoutSessions[index], id)
+      if (row.status !== 'paid_unfulfilled') {
+        throw new Error(`checkout ${id} is ${row.status}, not paid_unfulfilled`)
+      }
+      if (row.resolvedAt !== null) {
+        throw new Error(`checkout ${id} is already resolved`)
+      }
+      if (row.stakeReturnedAt === null) {
+        await restoreStake(row)
+      }
+      const resolved: CheckoutSessionRow = {
+        ...row,
+        resolvedAt: nowIso(),
+        resolvedBy: resolvedBy.trim(),
+        resolution: resolution.trim(),
+        stakeReturnedAt: row.stakeReturnedAt ?? nowIso(),
+      }
+      checkoutSessions[index] = resolved
+      return { ...resolved }
     },
 
     async expireCheckoutSessions(now = nowIso()) {

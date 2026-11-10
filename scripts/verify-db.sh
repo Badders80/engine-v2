@@ -33,6 +33,11 @@ if [[ "$rest" == \[* ]]; then
 else
   host="${rest%%[:/]*}"
 fi
+# Hosted Supabase is refused unconditionally; ALLOW_DB_HOST is for a CI
+# container only. No variable may point this at production.
+case "$host" in
+  *.supabase.co) fail "refusing hosted Supabase host '$host'" ;;
+esac
 case "$host" in
   localhost|127.0.0.1|::1|"[::1]") ;;
   *)
@@ -42,11 +47,22 @@ case "$host" in
     ;;
 esac
 
+port="${rest#*:}"
+if [ "$port" = "$rest" ]; then port=5432; else port="${port%%/*}"; fi
+echo "== verify-db target: ${host}:${port} (credentials not printed) =="
+
 # 3. The stack must be up. A hung image pull must fail, not stall the chunk.
-if ! pg_isready -h 127.0.0.1 -p 54422 >/dev/null 2>&1; then
-  command -v supabase >/dev/null 2>&1 || fail "database is down and supabase CLI is missing"
-  echo "== starting the local Supabase stack (3 min cap) =="
-  timeout 180 supabase start >/dev/null || fail "supabase start failed or timed out"
+if ! PGCONNECT_TIMEOUT=5 psql "$DB_URL" -Atqc "select 1" >/dev/null 2>&1; then
+  case "$host" in
+    localhost|127.0.0.1|::1|"[::1]")
+      command -v supabase >/dev/null 2>&1 || fail "database is down and supabase CLI is missing"
+      echo "== starting the local Supabase stack (3 min cap) =="
+      timeout 180 supabase start >/dev/null || fail "supabase start failed or timed out"
+      ;;
+    *)
+      fail "database at ${host}:${port} is unreachable"
+      ;;
+  esac
 fi
 
 # 4. The schema the probes were written for must be the schema on disk.
@@ -54,13 +70,20 @@ version="$(psql "$DB_URL" -Atqc "select max(version) from supabase_migrations.sc
 [ "$version" = "$EXPECTED_SCHEMA" ] || \
   fail "schema is $version, expected $EXPECTED_SCHEMA — run 'supabase migration up --local' and bump EXPECTED_SCHEMA with the migration"
 
-# 5. Serialise concurrent runs: the probes use fixed fixture ids. The advisory
-#    lock is session-scoped and releases on disconnect.
+# 5. Every probe, discovered not listed: a new probe runs the moment it lands.
+#    The advisory lock is session-scoped and releases on disconnect.
 echo "== probes =="
+probes=()
+while IFS= read -r file; do probes+=("$file"); done < <(
+  find "$ROOT/scripts" -maxdepth 1 -name 'probe-*.sql' | sort
+)
+[ "${#probes[@]}" -gt 0 ] || fail "no probe files found in scripts/"
+probe_args=()
+for file in "${probes[@]}"; do probe_args+=( -f "$file" ); done
+
 psql "$DB_URL" -v ON_ERROR_STOP=1 -q \
   -c "select pg_advisory_lock(hashtext('verify-db'))" \
-  -f "$ROOT/scripts/probe-00024.sql" \
-  -f "$ROOT/scripts/probe-00026.sql" \
+  "${probe_args[@]}" \
   -c "select pg_advisory_unlock(hashtext('verify-db'))"
 
 # 6. The TS/SQL narrative parity check, unchanged.

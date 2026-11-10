@@ -132,8 +132,14 @@ select n, check_name, case when passed then 'PASS' else 'FAIL' end as result, de
 select count(*) filter (where not passed) as failures from probe_results;
 
 do $$
+declare
+  v_count integer;
 begin
-  if (select count(*) from probe_results where not passed) > 0 then
+  select count(*) into v_count from probe_results;
+  if v_count <> 7 then
+    raise exception 'probe-00026 expected 7 rows, got %', v_count;
+  end if;
+  if exists (select 1 from probe_results where not passed) then
     raise exception 'probe-00026 failures: %',
       (select string_agg(check_name, '; ' order by n) from probe_results where not passed);
   end if;

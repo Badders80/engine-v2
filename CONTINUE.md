@@ -2,9 +2,10 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** walk chunk 3 on 3001 (`/dsl/new` → Review), then say
-**`go chunk 4`** — open `/home/evo/sandbox/v2/dsl-sidequest/STATE.md` § Chunk 4:
-the ledger (U15) and the append-only `sales` trigger (`00023`).
+**Next action:** open the walk DSL on 3001
+(`/dsl/2c2f45c9-23d4-44ae-8d99-b3765c21f71f`) — **Approve narrative**, then
+**Publish**. Then say **`go chunk 4`** — `/home/evo/sandbox/v2/dsl-sidequest/STATE.md`
+§ Chunk 4: the ledger (U15) and the append-only `sales` trigger (`00024`).
 
 ## State — 2026-11-10
 
@@ -40,17 +41,25 @@ the ledger (U15) and the append-only `sales` trigger (`00023`).
   derived Duration; three deal-local narrative overrides with one shared
   resolver; one-time override warning; `00022` (override columns, meta, role
   check, one-dateless-draft index, expiry-only Available gate); DRAFT banner.
-- **Gate:** `pnpm verify` green 2026-11-10 on the merged branch — **370 engine /
-  54 website**, both builds; `just check-db` 6/6.
+- **Chunk 3 walk polish** (`19a138d`…`39e24bf`): clickable step rail without the
+  button frame; party selects read "choose a …"; expiry month moved onto the
+  Commercials row; wholesale/retail and the stake fields two-up; terms selects
+  open blank and are required.
+- **Images never block a listing** (`97598c4`, ruling 26): readiness and the
+  Available trigger ignore `image_count` (`00023`); upload, recount and remove
+  live on the horse profile; the DSL page is read-only with a link.
+- **Gate:** `pnpm verify` green 2026-11-10 — **371 engine / 54 website**, both
+  builds; `just check-db` 6/6.
 - **Target database:** new hosted Supabase `evolution-engine`
-  (`rkcptsghxovoeaycabah`, Sydney). 22 migrations replayed (`00001`–`00022`),
+  (`rkcptsghxovoeaycabah`, Sydney). 23 migrations replayed (`00001`–`00023`),
   schema parity **335/335** manifest lines identical local ↔ hosted, migration
   history recorded —
   `supabase db push --dry-run` says *up to date*. `engine/.env.local` points at it.
   The old project `ejdenhlpvtldiljxawtd` stays untouched with the public site.
-- **Data:** 1 party (trainer role), 1 horse — Mulan The Brave (NZ), registered —
-  0 DSLs, 0 sales. The local 54422 stack is scratch only.
-- **Chunk 4 is LOCKED** (2026-11-10): ledger, H6 append-only (`00023`).
+- **Data:** 1 party (trainer role), 1 horse — Mulan The Brave (NZ), registered,
+  3 images — 1 DSL (`coming_soon`, created by the walk, narrative unapproved),
+  0 sales. The local 54422 stack is scratch only.
+- **Chunk 4 is LOCKED** (2026-11-10): ledger, H6 append-only (`00024`).
   Contents are in `STATE.md` and change only by ruling.
 - **Plan of record:** `/home/evo/sandbox/v2/dsl-sidequest/` — `STATE.md` (position),
   `PLAN.md` (what), `EXECUTION-DOD-2026-11-09.md` (how we run: gate, decision
@@ -60,6 +69,7 @@ the ledger (U15) and the append-only `sales` trigger (`00023`).
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-10 | Images never block; wizard polish; wrap | engine_v2/website | `97598c4` | done |
 | 2026-11-10 | DSL 3 — deal assembly | engine_v2/website | `73f65bb` / merge `3dfdac6` | done |
 | 2026-11-10 | DSL 2 — profiles/roles + hardening | engine_v2/website | `e1f12f9` | done |
 | 2026-11-10 | DSL 1d — profile polish (names, links, handles, edit routes, dev cache) | engine_v2/website | `d387225` | done |

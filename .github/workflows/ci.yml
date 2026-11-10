@@ -1,14 +1,21 @@
 name: ci
 
+# PRs and every branch push. Chunk work merges into `dsl-sidequest` before
+# `main`, so main-only would let a branch pass unseen.
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
-    branches: [main]
+
+# One run per ref; a superseded push cancels the older runner.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -18,11 +25,23 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Lint
-        run: pnpm run lint
-      - name: Test
-        run: pnpm run test
-      - name: Build
-        run: pnpm run build
+
+      # The repo gate. Deliberately DB-free: CI and worktrees may have no
+      # Postgres, so a DB-optional gate would silently skip.
+      - name: Verify
+        run: pnpm verify
+
+      # The SQL gate. Same job, after the repo gate, so a red on either stops
+      # the run. No secrets: the local stack uses the CLI's own demo keys and
+      # works on a fork PR.
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase
+        run: supabase start
+      - name: Apply every migration
+        run: supabase db reset --local
+      - uses: extractions/setup-just@v2
+      - name: SQL gate
+        run: just verify-db

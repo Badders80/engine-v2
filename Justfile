@@ -15,8 +15,8 @@ alias db := check-db
 # the narrative parity check. Refuses a non-local database, asserts the schema
 # version, and takes an advisory lock so two runs cannot collide.
 #
-# Not part of `check` or `pnpm verify`: CI runs it as its own job with
-# `supabase start`; locally it is best-effort.
+# Not part of `check` or `pnpm verify`: CI runs it in the verify job after
+# `pnpm verify`, with `supabase start`; locally it is best-effort.
 verify-db:
 	bash scripts/verify-db.sh
 alias vdb := verify-db

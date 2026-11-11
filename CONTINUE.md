@@ -20,7 +20,10 @@ pushed.
   `just verify-db` (`221e25f`, hardened `6caffd2`); `00027` draft
   archive-in-place (`bae753f`); `00028` dateless-draft index (`5d8fc86`);
   `00029` closed-row immutability (`740c7e6`).
-- **Gate:** `pnpm verify` **395 engine / 1 skipped, 54 website**, both builds.
+- **Images:** the checkout bucket check is removed (`567e052`); the generic
+  placeholder was dropped (`81b5f5d`). The gallery stays blank until real images
+  are added; `image_count` stays truthful.
+- **Gate:** `pnpm verify` **393 engine / 1 skipped, 54 website**, both builds.
   `just verify-db` **27 + 7 + 2 + 3 + 5 probes**, `check-db` 6/6.
 - **CI** (`482b6d6`): `pnpm verify` then `supabase start` + `db reset` +
   `just verify-db`, on every PR and branch push, no secrets.
@@ -36,6 +39,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-11 | Images — checkout unblocked; placeholder dropped | engine_v2/website | `81b5f5d` | done |
 | 2026-11-11 | DSL 4 — ledger, resolution, archive, SQL gate, CI | engine_v2/website | `482b6d6` | done |
 | 2026-11-10 | Images never block; wizard polish; wrap | engine_v2/website | `97598c4` | done |
 | 2026-11-10 | DSL 3 — deal assembly | engine_v2/website | `73f65bb` / merge `3dfdac6` | done |

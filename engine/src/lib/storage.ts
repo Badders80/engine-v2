@@ -30,9 +30,6 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3'
 
-/** The display target: the horse gallery fills to this many tiles. Not a gate. */
-export const HORSE_IMAGE_SLOTS = 3
-
 /**
  * Every public image is served as this type. The key carries no extension, so
  * nothing downstream can infer the type: it has to be set at upload time.

@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import type { DslRow } from '@/lib/dslStore'
-import { gallerySlots } from '@/lib/gallery'
 import { imageKeys, publicImageUrl } from '@/lib/storage'
 
 import { SummaryRow } from '../../_components/forms'
@@ -57,10 +56,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         url: publicImageUrl(key, publicUrlBase),
       }))
     : []
-
-  // The display target is always three tiles. Missing photos show the branded
-  // placeholder; the count stays truthful, so the operator still sees the gap.
-  const slots = gallerySlots(images)
 
   return (
     <main className="grid gap-8">
@@ -196,46 +191,37 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </div>
 
         <p className="mb-3 text-body text-low">
-          Images never block a listing. Missing slots show the branded placeholder
-          until a photo is uploaded; the count below stays truthful.
+          Images never block a listing. The public card shows a placeholder until one is uploaded.
         </p>
 
-        {!publicUrlBase.startsWith('https://') ? (
-          <p className="mb-3 text-caption text-low">
-            Public image host is not configured in this environment; placeholders shown.
+        {images.length === 0 ? (
+          <p className="text-body text-low">
+            {horse.imageCount === 0
+              ? 'No images yet.'
+              : 'The public image host is not configured in this environment.'}
           </p>
-        ) : null}
-
-        <ol className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
-          {slots.map((slot) => (
-            <li key={slot.key} className="overflow-hidden rounded-sm border border-line">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={slot.url}
-                alt={
-                  slot.placeholder
-                    ? 'Image coming soon — photos pending'
-                    : `${horse.legalName} image ${String(slot.number)}`
-                }
-                width={240}
-                height={180}
-                className="h-full w-full object-cover"
-              />
-              {slot.placeholder ? (
-                <p className="p-2 text-caption uppercase tracking-caption text-low">
-                  Placeholder · add a photo
-                </p>
-              ) : (
+        ) : (
+          <ol className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
+            {images.map((image) => (
+              <li key={image.key} className="overflow-hidden rounded-sm border border-line">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.url}
+                  alt={`${horse.legalName} image ${String(image.number)}`}
+                  width={240}
+                  height={180}
+                  className="h-full w-full object-cover"
+                />
                 <form action={deleteHorseImageAction} className="p-2">
                   <input type="hidden" name="horseId" value={horse.id} />
                   <input type="hidden" name="back" value={`/horses/${horse.id}`} />
-                  <input type="hidden" name="imageNumber" value={slot.number} />
-                  <button type="submit">Remove {slot.number}</button>
+                  <input type="hidden" name="imageNumber" value={image.number} />
+                  <button type="submit">Remove {image.number}</button>
                 </form>
-              )}
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        )}
 
         <form action={uploadHorseImageAction} className="mt-3 grid max-w-md gap-2">
           <input type="hidden" name="horseId" value={horse.id} />

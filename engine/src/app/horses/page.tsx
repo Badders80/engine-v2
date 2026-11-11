@@ -9,22 +9,25 @@ export const dynamic = 'force-dynamic'
 function HeroImage({ slug, imageCount }: { slug: string; imageCount: number }) {
   const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
   const showable = imageCount > 0 && publicUrlBase.startsWith('https://')
-  const src = showable
-    ? publicImageUrl(imageKey(slug, 1), publicUrlBase)
-    : '/brand/coming-soon.jpg'
 
   return (
     <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm border border-line bg-raised">
-      {/* The bucket serves the object; Next's image optimiser has no origin
-          configured for it, so a plain img is correct here. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={showable ? '' : 'Image coming soon — photos pending'}
-        width={480}
-        height={360}
-        className="h-full w-full object-cover"
-      />
+      {showable ? (
+        // The bucket serves the object; Next's image optimiser has no origin
+        // configured for it, so a plain img is correct here.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={publicImageUrl(imageKey(slug, 1), publicUrlBase)}
+          alt=""
+          width={480}
+          height={360}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="text-caption uppercase tracking-caption text-low">
+          {imageCount === 0 ? 'No image' : `${imageCount} images`}
+        </span>
+      )}
     </div>
   )
 }

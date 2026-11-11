@@ -114,8 +114,6 @@ describe.skipIf(!LOCAL)('local-stack synthetic ledger fixture', () => {
       },
       store,
       stripe,
-      undefined,
-      { countImages: async () => 3 },
     )
     if (!opened.ok) throw new Error(opened.reason)
 

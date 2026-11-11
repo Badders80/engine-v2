@@ -114,10 +114,6 @@ function fakeGateway(): StripeGateway {
   }
 }
 
-/** Hermetic stand-in for R2: CI has no bucket. */
-function fakeImages(count = 3) {
-  return { countImages: async () => count }
-}
 
 describe('B6 — reserve at Checkout', () => {
   it('takes the stake out of the listing as soon as Checkout opens', async () => {
@@ -140,7 +136,6 @@ describe('B6 — reserve at Checkout', () => {
       store,
       fakeGateway(),
       undefined,
-      fakeImages(),
     )
     expect(opened.ok).toBe(true)
 

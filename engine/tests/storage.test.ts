@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  MIN_IMAGES_FOR_AVAILABLE,
+  HORSE_IMAGE_SLOTS,
   R2_IMAGE_CONTENT_TYPE,
   assertPublicImageKey,
   imageCountFromKeys,
@@ -305,8 +305,8 @@ describe('image_count is derived from the bucket, never stored as a path map', (
     expect(() => imageCountFromKeys('lady-ketchikan', ['lady-ketchikan/01.jpg'])).toThrow(/off-convention/)
   })
 
-  it('pins the minimum for Available at three', () => {
-    expect(MIN_IMAGES_FOR_AVAILABLE).toBe(3)
+  it('pins the gallery display target at three', () => {
+    expect(HORSE_IMAGE_SLOTS).toBe(3)
   })
 })
 

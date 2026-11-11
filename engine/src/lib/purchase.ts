@@ -35,7 +35,6 @@ import {
   validateStake,
 } from './pricing'
 import type { AccountRow, CheckoutSessionRow, PurchaseStore, SaleRow } from './purchaseStore'
-import { listPublicImages, MIN_IMAGES_FOR_AVAILABLE } from './storage'
 import type { StripeGateway, StripeWebhookEvent } from './stripe'
 import { termMonthsBetween } from './term'
 
@@ -52,24 +51,6 @@ export type Result<T> = { ok: true; value: T } | { ok: false; reason: string }
  * cron interval.
  */
 export const CHECKOUT_HOLD_SECONDS = 600
-
-/**
- * How many images the public bucket actually holds for a horse. Injected so
- * tests stay hermetic: CI has no bucket and no credentials.
- */
-export type HorseImageSource = {
-  countImages(slug: string): Promise<number>
-}
-
-export function createR2HorseImageSource(
-  env: Record<string, string | undefined> = process.env,
-): HorseImageSource {
-  return {
-    async countImages(slug) {
-      return (await listPublicImages({ slug, env })).length
-    },
-  }
-}
 
 /**
  * The four mandatory SA declarations from `PLAN.md:232`, verbatim.
@@ -463,7 +444,6 @@ export async function openCheckoutSession(
   store: PurchaseStore,
   stripe: StripeGateway,
   emailSender: EmailSender = createInMemoryEmailSender(),
-  imageSource: HorseImageSource = createR2HorseImageSource(),
 ): Promise<Result<{ checkoutSessionId: string; checkoutUrl: string; quote: PurchaseQuote }>> {
   const accepted = verifyDocumentAcceptance(input.acceptance)
   if (!accepted.ok) return accepted
@@ -492,23 +472,7 @@ export async function openCheckoutSession(
   )
   if (!quoteResult.ok) return quoteResult
 
-  // B7: the stored count is a claim; the bucket is the fact. A horse that says
-  // three and holds none must not be sold, and neither must one that lost an
-  // image after the operator last saved.
-  const imageDsl = await store.findDslById(input.dslId)
-  if (imageDsl === null) return { ok: false, reason: `DSL ${input.dslId} does not exist` }
-  const imageHorse = await store.findHorseById(imageDsl.horseId)
-  if (imageHorse === null) return { ok: false, reason: `horse ${imageDsl.horseId} does not exist` }
-
-  const imagesInBucket = await imageSource.countImages(imageHorse.slug)
-  const imagesRequired = Math.max(MIN_IMAGES_FOR_AVAILABLE, imageHorse.imageCount)
-  if (imagesInBucket < imagesRequired) {
-    return {
-      ok: false,
-      reason: `this listing has ${imagesInBucket} image(s) in the bucket; ${imagesRequired} are needed before it can be bought`,
-    }
-  }
-
+  // Ruling 26: images never block. The checkout does not read the bucket.
   // B5: compile and freeze the exact documents the buyer is about to accept,
   // before Stripe is called. The webhook reads this row, never a fresh compile.
   const compiled = await compileBuyerDocuments(

@@ -94,10 +94,6 @@ async function seedStore(): Promise<{
   return { store, dslId: saved.value.dsl.id, accountId: account.id }
 }
 
-/** Hermetic stand-in for R2: CI has no bucket. */
-function fakeImages(count = 3) {
-  return { countImages: async () => count }
-}
 
 describe('Step 9 — EMAIL_KINDS and pure builders', () => {
   it('defines the exact four EMAIL_KINDS and rejects any fifth kind at runtime', async () => {
@@ -466,7 +462,6 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
       store,
       throwingStripe,
       sender,
-      fakeImages(),
     )
 
     expect(res.ok).toBe(false)
@@ -507,7 +502,6 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
       store,
       noopStripe,
       sender,
-      fakeImages(),
     )
     expect(unaccepted.ok).toBe(false)
 
@@ -524,7 +518,6 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
       store,
       noopStripe,
       sender,
-      fakeImages(),
     )
     expect(badStake.ok).toBe(false)
 
@@ -542,7 +535,6 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
       store,
       noopStripe,
       sender,
-      fakeImages(),
     )
     expect(unverified.ok).toBe(false)
 

@@ -37,10 +37,6 @@ function fakeStripe(): StripeGateway {
   }
 }
 
-/** Hermetic stand-in for R2: CI has no bucket. */
-function fakeImages(count = 3) {
-  return { countImages: async () => count }
-}
 
 const acceptance = {
   pdsAccepted: true,
@@ -117,7 +113,6 @@ async function openCheckout(
     store,
     fakeStripe(),
     undefined,
-    fakeImages(),
   )
   if (!opened.ok) throw new Error(opened.reason)
   const row = await store.findCheckoutSessionByStripeSessionId(opened.value.checkoutSessionId)

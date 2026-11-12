@@ -74,6 +74,9 @@ pushed.
 - **Landing parity integration:** founder visual walk at 1440 and 390, then
   decide whether to reconcile with `dsl-sidequest` and merge. The branch is
   already pushed; no merge before that gate.
+- **Preview environment:** this isolated worktree has no `.env.local`. `/` renders
+  without it, but `/marketplace` and `/sitemap.xml` throw unless the local env is
+  supplied; copy it from the main checkout for a full-site walk.
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.
 - **F3** — external immutable document archive + manifest. **Priority.**

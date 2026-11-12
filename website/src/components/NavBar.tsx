@@ -32,7 +32,7 @@ export function NavBar() {
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="fixed inset-x-0 top-0 z-nav w-full overflow-hidden">
+    <header className="fixed inset-x-0 top-0 z-nav min-h-28 w-full overflow-hidden">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-canvas/40 backdrop-blur-2xl"

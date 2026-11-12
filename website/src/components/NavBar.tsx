@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const NAV_LINDS = [
+const NAV_LINKS = [
   { label: 'About', href: '/#about' },
   { label: 'Mission', href: '/#mission' },
   { label: 'Model', href: '/#digital-syndication' },
@@ -18,34 +18,50 @@ export function NavBar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mobileMenuOpen])
+
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="sticky top-0 z-nav w-full border-b border-border bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-12 md:px-16 lg:px-20">
-        <Link href="/" onClick={closeMenu} className="flex items-center gap-3">
-          <Image
-            src="/brand/lockups/lockup-horizontal-gold.svg"
-            alt="Evolution Stables"
-            width={180}
-            height={32}
-            priority
-            style={{ width: 'auto', height: '2rem' }}
-            className="h-8 w-auto object-contain"
-          />
-        </Link>
+    <header className="fixed inset-x-0 top-0 z-nav w-full border-b border-border bg-canvas/40 backdrop-blur-md">
+      <div className="mx-auto flex h-20 max-w-6xl items-center px-12 md:px-16 lg:px-20">
+        <div className="flex flex-1 items-center">
+          <Link
+            href="/"
+            onClick={closeMenu}
+            className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
+          >
+            <Image
+              src="/brand/lockups/lockup-horizontal-muted-grey.svg"
+              alt="Evolution Stables"
+              width={192}
+              height={64}
+              priority
+              className="h-7 w-auto object-contain"
+            />
+          </Link>
+        </div>
 
-        {/* Desktop Navigation */}
-        <nav aria-label="Main Navigation" className="hidden items-center gap-8 md:flex">
-          {NAV_LINDS.map((item) => {
+        <nav aria-label="Main Navigation" className="hidden flex-1 items-center justify-center md:flex">
+          {NAV_LINKS.map((item) => {
             const isRoute = !item.href.includes('#')
             const active = isRoute && pathname === item.href
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`label-eyebrow transition-colors duration-hover ${
-                  active ? 'text-gold' : 'text-muted-foreground hover:text-heading'
+                aria-current={active ? 'page' : undefined}
+                className={`label-eyebrow whitespace-nowrap px-2.5 py-4 transition-colors duration-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge ${
+                  active ? 'text-gold' : 'text-ink hover:text-heading'
                 }`}
               >
                 {item.label}
@@ -54,66 +70,53 @@ export function NavBar() {
           })}
         </nav>
 
-        {/* Action Button */}
-        <div className="hidden items-center gap-4 md:flex">
+        <div className="flex flex-1 items-center justify-end">
           <Link
             href="/marketplace"
-            className="label-action rounded-full border border-gold/40 px-5 py-2 text-gold transition-colors duration-hover hover:border-gold hover:bg-surface"
+            className="label-action hidden rounded-full border border-edge/70 bg-surface px-6 py-2.5 text-heading transition-colors duration-hover hover:border-edge hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge md:inline-flex"
           >
             Get Started
           </Link>
-        </div>
 
-        {/* Mobile Hamburger Toggle */}
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border text-heading md:hidden"
-        >
-          {mobileMenuOpen ? (
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-hover hover:bg-surface hover:text-heading focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge md:hidden"
+          >
+            {mobileMenuOpen ? (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
       {mobileMenuOpen ? (
-        <div className="border-b border-border bg-surface px-12 py-6 md:hidden">
-          <nav aria-label="Mobile Navigation" className="flex flex-col gap-4">
-            {NAV_LINDS.map((item) => (
+        <div id="mobile-navigation" className="border-t border-border bg-canvas/95 backdrop-blur-md md:hidden">
+          <nav aria-label="Mobile Navigation" className="mx-auto flex max-w-6xl flex-col px-8 py-6 md:hidden">
+            {NAV_LINKS.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
                 onClick={closeMenu}
-                className="label-eyebrow py-2 text-muted-foreground transition-colors duration-hover hover:text-heading"
+                className="label-eyebrow rounded-lg px-4 py-3.5 text-ink transition-colors duration-hover hover:bg-surface hover:text-heading focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
               >
                 {item.label}
               </Link>
             ))}
-            <div className="pt-2">
+            <div className="mt-4 border-t border-border pt-6">
               <Link
                 href="/marketplace"
                 onClick={closeMenu}
-                className="label-action block w-full rounded-full border border-gold/40 py-2.5 text-center text-gold transition-colors duration-hover hover:border-gold hover:bg-canvas"
+                className="label-action block w-full rounded-full border border-edge/70 bg-surface py-3 text-center text-heading transition-colors duration-hover hover:border-edge hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
               >
                 Get Started
               </Link>

@@ -191,7 +191,7 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-start gap-4 px-8 pb-16 md:px-12">
           <h1 className="w-full max-w-3xl">
             <Image
-              src="/brand/lockups/lockup-horizontal-gold.svg"
+              src="/brand/wordmark/wordmark-gold.svg"
               alt="Evolution Stables — Digital Racehorse Ownership"
               width={1200}
               height={400}

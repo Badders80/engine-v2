@@ -32,8 +32,17 @@ export function NavBar() {
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="fixed inset-x-0 top-0 z-nav w-full bg-canvas/40 backdrop-blur-md">
-      <div className="mx-auto flex h-20 max-w-6xl items-center px-12 md:px-16 lg:px-20">
+    <header className="fixed inset-x-0 top-0 z-nav w-full overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-canvas/40 backdrop-blur-2xl"
+        style={{
+          maskImage: 'linear-gradient(to bottom, black 0%, black 58%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 58%, transparent 100%)',
+        }}
+      />
+
+      <div className="relative mx-auto flex h-20 max-w-6xl items-center px-12 md:px-16 lg:px-20">
         <div className="flex flex-1 items-center">
           <Link
             href="/"

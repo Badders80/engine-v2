@@ -1,8 +1,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import type { CSSProperties } from 'react'
 
 import { FaqAccordion, type FaqItem } from '../components/FaqAccordion'
 import { PhotographicDivider } from '../components/PhotographicDivider'
+import { ScrollReveal } from '../components/ScrollReveal'
 import { SITE_URL } from '../lib/site'
 
 type AudienceCard = {
@@ -125,6 +127,10 @@ const FAQS: readonly FaqItem[] = [
   },
 ]
 
+function revealDelay(index: number): CSSProperties {
+  return { '--reveal-delay': `${index * 60}ms` } as CSSProperties
+}
+
 function MarketplaceIcon({ icon }: { icon: MarketplaceFeature['icon'] }) {
   if (icon === 'search') {
     return (
@@ -171,6 +177,7 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
+      <ScrollReveal />
 
       <section
         id="hero"
@@ -213,7 +220,11 @@ export default function HomePage() {
       </section>
 
       <section id="about" className="bg-canvas py-section">
-        <div className="mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20">
+        <div
+          className="mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20"
+          data-reveal
+          data-reveal-mode="fade"
+        >
           <p className="label-eyebrow mb-12 text-muted-foreground">About</p>
           <h2 className="mb-8 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
             Own the Experience
@@ -233,7 +244,7 @@ export default function HomePage() {
 
       <section id="mission" className="bg-canvas py-section">
         <div className="mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20">
-          <div className="mb-16">
+          <div className="mb-16" data-reveal data-reveal-mode="fade">
             <p className="label-eyebrow mb-12 text-muted-foreground">Our Mission</p>
             <h2 className="mb-8 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
               How It Works
@@ -245,9 +256,11 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {AUDIENCE_CARDS.map((card) => (
+            {AUDIENCE_CARDS.map((card, index) => (
               <article
                 key={card.tag}
+                data-reveal
+                style={revealDelay(index)}
                 className="group flex flex-col overflow-hidden rounded-lg border border-border bg-surface transition-colors duration-hover hover:border-edge lg:h-[340px]"
               >
                 <div className="flex h-28 flex-col justify-center border-b border-border bg-surface p-6">
@@ -284,7 +297,7 @@ export default function HomePage() {
           <p className="label-eyebrow mb-12 text-muted-foreground">Our Model</p>
 
           <div className="grid gap-16 lg:grid-cols-2 lg:gap-32">
-            <div className="space-y-8">
+            <div className="space-y-8" data-reveal data-reveal-mode="fade">
               <h2 className="text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
                 Digital Syndication
               </h2>
@@ -301,8 +314,8 @@ export default function HomePage() {
 
             <div className="flex flex-col justify-end">
               <div className="space-y-6">
-                {BENEFITS.map((benefit) => (
-                  <div key={benefit.title} className="py-2">
+                {BENEFITS.map((benefit, index) => (
+                  <div key={benefit.title} data-reveal style={revealDelay(index)} className="py-2">
                     <div className="flex items-center gap-6">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center">
                         <Image
@@ -335,21 +348,25 @@ export default function HomePage() {
 
       <section id="marketplace" className="bg-canvas py-section">
         <div className="mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20">
-          <p className="label-eyebrow mb-12 text-muted-foreground">Regulated Marketplace</p>
-          <h2 className="mb-6 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
-            Transformation Powered
-            <br />
-            by <span className="text-spot-mint">Regulation</span>
-          </h2>
-          <p className="mb-16 max-w-3xl text-body font-light leading-body text-muted-foreground">
-            Evolution Stables operates as an Authorised Syndicator — delivering regulated,
-            financial-grade infrastructure built for modern racehorse owners.
-          </p>
+          <div data-reveal data-reveal-mode="fade">
+            <p className="label-eyebrow mb-12 text-muted-foreground">Regulated Marketplace</p>
+            <h2 className="mb-6 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
+              Transformation Powered
+              <br />
+              by <span className="text-spot-mint">Regulation</span>
+            </h2>
+            <p className="mb-16 max-w-3xl text-body font-light leading-body text-muted-foreground">
+              Evolution Stables operates as an Authorised Syndicator — delivering regulated,
+              financial-grade infrastructure built for modern racehorse owners.
+            </p>
+          </div>
 
           <div className="mt-32 grid grid-cols-1 md:grid-cols-3">
-            {MARKETPLACE_FEATURES.map((feature) => (
+            {MARKETPLACE_FEATURES.map((feature, index) => (
               <article
                 key={feature.title}
+                data-reveal
+                style={revealDelay(index)}
                 className="flex flex-col gap-6 border-l border-border px-8 py-12 transition-colors duration-hover hover:border-gold md:px-10 md:py-16"
               >
                 <MarketplaceIcon icon={feature.icon} />
@@ -384,7 +401,7 @@ export default function HomePage() {
 
       <section id="news" className="relative overflow-hidden bg-canvas py-24">
         <div className="mx-auto w-full max-w-6xl space-y-24 px-12 md:px-16 lg:px-20">
-          <div>
+          <div data-reveal data-reveal-mode="fade">
             <p className="label-eyebrow mb-12 text-muted-foreground">News and Updates</p>
 
             <div className="grid grid-cols-1 gap-0 lg:grid-cols-[6fr_4fr]">
@@ -465,24 +482,26 @@ export default function HomePage() {
 
       <section id="faq" className="bg-canvas py-section">
         <div className="mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20">
-          <p className="label-eyebrow mb-12 text-muted-foreground">FAQ</p>
-          <h2 className="mb-6 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
-            Understanding
-            <br />
-            Digital-Syndication
-          </h2>
-          <p className="mb-24 max-w-xl text-card-heading font-light leading-body text-muted-foreground">
-            A considered guide to the essentials — how digital-syndication works, what it means for
-            ownership, and where Evolution Stables fits in.
-          </p>
-          <div className="mx-auto max-w-3xl">
+          <div data-reveal data-reveal-mode="fade">
+            <p className="label-eyebrow mb-12 text-muted-foreground">FAQ</p>
+            <h2 className="mb-6 text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
+              Understanding
+              <br />
+              Digital-Syndication
+            </h2>
+            <p className="mb-24 max-w-xl text-card-heading font-light leading-body text-muted-foreground">
+              A considered guide to the essentials — how digital-syndication works, what it means for
+              ownership, and where Evolution Stables fits in.
+            </p>
+          </div>
+          <div className="mx-auto max-w-3xl" data-reveal>
             <FaqAccordion items={FAQS} />
           </div>
         </div>
       </section>
 
       <section className="border-t border-border bg-canvas py-32 text-center">
-        <div className="mx-auto max-w-3xl px-12">
+        <div className="mx-auto max-w-3xl px-12" data-reveal data-reveal-mode="fade">
           <h2 className="text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
             The Future of <span className="text-gold">Ownership</span>
             <br />

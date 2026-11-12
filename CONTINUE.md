@@ -2,12 +2,28 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** the side quest's four chunks are closed. Read
-`/home/evo/sandbox/v2/dsl-sidequest/HANDOFF-2026-11-11.md`; the next job is
-**F3** (external immutable archive for executed PDS/SA), its own session. No
-code work is queued on this branch.
+**Next action:** open
+`/home/evo/sandbox/mvp/audits/landing-parity-2026-11-12/EVIDENCE.md` and
+founder-walk this branch at 1440 and 390. After the integration decision,
+resume F1 and then F3 from `dsl-sidequest`.
 
-## State — 2026-11-11
+## State — 2026-11-12
+
+**Landing parity is ready for the founder walk on `landing-parity-2026-11-12`**
+at `5726a51`; the worktree is clean, local only, not merged or pushed.
+
+- Production-matched landing structure: hero, about, mission, model,
+  marketplace, coming-soon news, FAQ and footer CTA.
+- Final polish: hero image visible; wordmark-only nav; no nav divider; masked
+  40px glass fade; 112px visual nav height with the 80px content row unchanged;
+  300ms FAQ expansion with reduced-motion fallback.
+- Gate: `just check` exit 0, **393 engine passed / 1 skipped, 54 website**, both
+  builds. Landing audit passed on the initial diff; final refinement audit had
+  one WARN for its read-only skipped build, then `just check` passed in the
+  disposable audit clone.
+- Evidence: `/home/evo/sandbox/mvp/audits/landing-parity-2026-11-12/`.
+- Branch base is `6c42125`; `dsl-sidequest` has later docs tip `a7e48cc`, so
+  reconcile before integration.
 
 **The DSL side quest is closed on `dsl-sidequest`.** `main` untouched; nothing
 pushed.
@@ -39,6 +55,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-12 | Landing parity + nav/hero/FAQ refinement | engine_v2/website | `c1ca04e`…`5726a51` | done; founder walk pending |
 | 2026-11-11 | Images — checkout unblocked; placeholder dropped | engine_v2/website | `81b5f5d` | done |
 | 2026-11-11 | DSL 4 — ledger, resolution, archive, SQL gate, CI | engine_v2/website | `482b6d6` | done |
 | 2026-11-10 | Images never block; wizard polish; wrap | engine_v2/website | `97598c4` | done |
@@ -53,6 +70,9 @@ pushed.
 
 ## Blocked
 
+- **Landing parity integration:** founder visual walk at 1440 and 390, then
+  decide whether to reconcile with `dsl-sidequest` and merge. No push or merge
+  before that gate.
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.
 - **F3** — external immutable document archive + manifest. **Priority.**

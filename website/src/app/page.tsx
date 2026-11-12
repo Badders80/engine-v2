@@ -188,25 +188,27 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-canvas/35" />
         </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-start gap-4 px-8 pb-16 md:px-12">
-          <h1 className="w-full max-w-3xl">
-            <Image
-              src="/brand/wordmark/wordmark-gold.svg"
-              alt="Evolution Stables — Digital Racehorse Ownership"
-              width={1200}
-              height={400}
-              priority
-              className="h-auto w-full"
-            />
-          </h1>
+        <div className="relative z-10 mx-auto w-full max-w-5xl px-8 pb-16 md:px-12">
+          <div className="flex w-full max-w-3xl flex-col gap-4">
+            <h1 className="w-full">
+              <Image
+                src="/brand/wordmark/wordmark-gold.svg"
+                alt="Evolution Stables — Digital Racehorse Ownership"
+                width={1200}
+                height={400}
+                priority
+                className="h-auto w-full"
+              />
+            </h1>
 
-          <p className="mt-10 max-w-3xl text-label font-medium uppercase leading-body tracking-label text-edge">
-            <span className="whitespace-nowrap">Grounded in tradition.</span>
-            <br />
-            <span className="whitespace-nowrap">Evolved through innovation.</span>
-            <br />
-            Ownership transformed.
-          </p>
+            <p className="ml-[3.33%] mt-10 max-w-3xl text-label font-medium uppercase leading-body tracking-label text-edge">
+              <span className="whitespace-nowrap">Grounded in tradition.</span>
+              <br />
+              <span className="whitespace-nowrap">Evolved through innovation.</span>
+              <br />
+              Ownership transformed.
+            </p>
+          </div>
         </div>
       </section>
 

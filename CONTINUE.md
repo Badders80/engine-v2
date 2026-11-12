@@ -10,7 +10,7 @@ resume F1 and then F3 from `dsl-sidequest`.
 ## State — 2026-11-12
 
 **Landing parity is ready for the founder walk on `landing-parity-2026-11-12`**
-at `5726a51`; the worktree is clean, local only, not merged or pushed.
+at `73dd144` (code `5726a51`); the branch is pushed, worktree clean and not merged.
 
 - Production-matched landing structure: hero, about, mission, model,
   marketplace, coming-soon news, FAQ and footer CTA.
@@ -56,6 +56,7 @@ pushed.
 | date | what | repo | commit | state |
 |---|---|---|---|---|
 | 2026-11-12 | Landing parity + nav/hero/FAQ refinement | engine_v2/website | `c1ca04e`…`5726a51` | done; founder walk pending |
+| 2026-11-12 | wrap notes and branch publication | engine_v2/website | `73dd144` | pushed |
 | 2026-11-11 | Images — checkout unblocked; placeholder dropped | engine_v2/website | `81b5f5d` | done |
 | 2026-11-11 | DSL 4 — ledger, resolution, archive, SQL gate, CI | engine_v2/website | `482b6d6` | done |
 | 2026-11-10 | Images never block; wizard polish; wrap | engine_v2/website | `97598c4` | done |
@@ -71,8 +72,8 @@ pushed.
 ## Blocked
 
 - **Landing parity integration:** founder visual walk at 1440 and 390, then
-  decide whether to reconcile with `dsl-sidequest` and merge. No push or merge
-  before that gate.
+  decide whether to reconcile with `dsl-sidequest` and merge. The branch is
+  already pushed; no merge before that gate.
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.
 - **F3** — external immutable document archive + manifest. **Priority.**

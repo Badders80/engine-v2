@@ -176,7 +176,7 @@ export default function HomePage() {
         id="hero"
         className="relative flex min-h-screen items-center justify-center overflow-hidden pt-24 pb-48"
       >
-        <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0">
           <Image
             src="/images/landing/horse-double-black.webp"
             alt="Majestic racehorses representing Evolution Stables digital ownership"

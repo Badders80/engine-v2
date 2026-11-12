@@ -41,10 +41,10 @@ export function NavBar() {
             className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
           >
             <Image
-              src="/brand/monogram/monogram-muted-grey.svg"
+              src="/brand/wordmark/wordmark-muted-grey.svg"
               alt="Evolution Stables"
-              width={128}
-              height={114}
+              width={1534}
+              height={488}
               priority
               className="h-7 w-auto object-contain"
             />

@@ -265,8 +265,8 @@
     opacity: 1;
     translate: 0 0;
     transition:
-      opacity 600ms var(--ease-enter) var(--reveal-delay, 0ms),
-      translate 600ms var(--ease-enter) var(--reveal-delay, 0ms);
+      opacity 750ms var(--ease-enter) var(--reveal-delay, 0ms),
+      translate 750ms var(--ease-enter) var(--reveal-delay, 0ms);
   }
 
   html[data-reveal-ready] [data-reveal-mode='fade'] {

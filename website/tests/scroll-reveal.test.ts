@@ -25,7 +25,7 @@ describe('landing scroll reveal', () => {
     expect(componentSource).toContain("root.setAttribute('data-reveal-ready', '')")
     expect(cssSource).toContain("html[data-reveal-ready] [data-reveal='armed']")
     expect(cssSource).toContain('translate: 0 var(--reveal-travel, 12px)')
-    expect(cssSource).toContain('600ms')
+    expect(cssSource).toContain('750ms')
   })
 
   it('keeps the hero static and reveals selected landing groups only', () => {

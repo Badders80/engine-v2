@@ -15,31 +15,54 @@ export function FaqAccordion({ items }: { items: readonly FaqItem[] }) {
   }
 
   return (
-    <div className="divide-y divide-border border-y border-border">
+    <div className="border-y border-border">
       {items.map((item, index) => {
         const isOpen = openIndex === index
         return (
-          <div key={item.question} className="py-6">
+          <div key={item.question} className="border-b border-border py-8">
             <button
+              id={`faq-trigger-${index}`}
               type="button"
               onClick={() => toggle(index)}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-4 text-left"
+              aria-controls={`faq-panel-${index}`}
+              className="flex w-full items-center justify-between gap-6 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
             >
-              <span className="text-body font-light text-heading transition-colors duration-hover hover:text-gold md:text-card-heading">
+              <span className="text-body font-light text-heading transition-colors duration-hover hover:text-heading">
                 {item.question}
               </span>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-transform duration-micro">
-                {isOpen ? '−' : '+'}
-              </span>
+              <svg
+                className={`h-5 w-5 shrink-0 transition-transform duration-step ease-enter ${
+                  isOpen ? 'rotate-45 text-gold' : 'rotate-0 text-muted-foreground'
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
             </button>
-            {isOpen ? (
-              <div className="mt-4 pr-12">
-                <p className="text-body font-light leading-body text-ink">
+            <div
+              id={`faq-panel-${index}`}
+              role="region"
+              aria-labelledby={`faq-trigger-${index}`}
+              aria-hidden={!isOpen}
+              className={`grid transition-[grid-template-rows,opacity] duration-collapse ease-enter ${
+                isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <p
+                  className={`max-w-2xl pt-4 pb-2 text-body font-light leading-body text-ink transition-transform duration-collapse ease-enter ${
+                    isOpen ? 'translate-y-0' : '-translate-y-1'
+                  }`}
+                >
                   {item.answer}
                 </p>
               </div>
-            ) : null}
+            </div>
           </div>
         )
       })}

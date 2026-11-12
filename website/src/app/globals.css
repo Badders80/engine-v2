@@ -253,10 +253,42 @@
   animation-duration: 40000ms;
 }
 
+/* Reveal-once scroll motion. The observer adds `data-reveal-ready` after mount,
+   so content stays visible when JavaScript is unavailable. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-reveal-ready] [data-reveal='armed'] {
+    opacity: 0;
+    translate: 0 var(--reveal-travel, 12px);
+  }
+
+  html[data-reveal-ready] [data-reveal='revealed'] {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 750ms var(--ease-enter) var(--reveal-delay, 0ms),
+      translate 750ms var(--ease-enter) var(--reveal-delay, 0ms);
+  }
+
+  html[data-reveal-ready] [data-reveal-mode='fade'] {
+    --reveal-travel: 0px;
+  }
+}
+
 /* Body owns the face. No component sets font-sans or font-serif. */
 body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   line-height: var(--leading-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

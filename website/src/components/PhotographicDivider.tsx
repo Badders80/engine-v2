@@ -8,7 +8,7 @@ export function PhotographicDivider({
   alt: string
 }) {
   return (
-    <section className="relative h-[45vh] w-full overflow-hidden md:h-[55vh]" aria-hidden="true">
+    <section className="relative h-[50vh] w-full overflow-hidden" aria-hidden="true">
       <Image
         src={src}
         alt={alt}
@@ -16,7 +16,6 @@ export function PhotographicDivider({
         sizes="100vw"
         className="object-cover"
       />
-      <div className="absolute inset-0 bg-canvas/25" />
     </section>
   )
 }

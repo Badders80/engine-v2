@@ -32,7 +32,7 @@ export function NavBar() {
   const closeMenu = () => setMobileMenuOpen(false)
 
   return (
-    <header className="fixed inset-x-0 top-0 z-nav w-full border-b border-border bg-canvas/40 backdrop-blur-md">
+    <header className="fixed inset-x-0 top-0 z-nav w-full bg-canvas/40 backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-6xl items-center px-12 md:px-16 lg:px-20">
         <div className="flex flex-1 items-center">
           <Link
@@ -41,10 +41,10 @@ export function NavBar() {
             className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
           >
             <Image
-              src="/brand/lockups/lockup-horizontal-muted-grey.svg"
+              src="/brand/monogram/monogram-muted-grey.svg"
               alt="Evolution Stables"
-              width={192}
-              height={64}
+              width={128}
+              height={114}
               priority
               className="h-7 w-auto object-contain"
             />

@@ -21,6 +21,7 @@ export function FaqAccordion({ items }: { items: readonly FaqItem[] }) {
         return (
           <div key={item.question} className="border-b border-border py-8">
             <button
+              id={`faq-trigger-${index}`}
               type="button"
               onClick={() => toggle(index)}
               aria-expanded={isOpen}
@@ -31,7 +32,7 @@ export function FaqAccordion({ items }: { items: readonly FaqItem[] }) {
                 {item.question}
               </span>
               <svg
-                className={`h-5 w-5 shrink-0 transition-transform duration-micro ${
+                className={`h-5 w-5 shrink-0 transition-transform duration-step ease-enter ${
                   isOpen ? 'rotate-45 text-gold' : 'rotate-0 text-muted-foreground'
                 }`}
                 viewBox="0 0 24 24"
@@ -45,10 +46,22 @@ export function FaqAccordion({ items }: { items: readonly FaqItem[] }) {
             </button>
             <div
               id={`faq-panel-${index}`}
-              hidden={!isOpen}
-              className="max-w-2xl pt-4 pb-2"
+              role="region"
+              aria-labelledby={`faq-trigger-${index}`}
+              aria-hidden={!isOpen}
+              className={`grid transition-[grid-template-rows,opacity] duration-collapse ease-enter ${
+                isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+              }`}
             >
-              <p className="text-body font-light leading-body text-ink">{item.answer}</p>
+              <div className="min-h-0 overflow-hidden">
+                <p
+                  className={`max-w-2xl pt-4 pb-2 text-body font-light leading-body text-ink transition-transform duration-collapse ease-enter ${
+                    isOpen ? 'translate-y-0' : '-translate-y-1'
+                  }`}
+                >
+                  {item.answer}
+                </p>
+              </div>
             </div>
           </div>
         )

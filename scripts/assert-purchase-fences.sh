@@ -5,7 +5,7 @@
 #   1. Migration 00012_accounts_signup.sql exists and wires auth.users -> public.accounts.
 #   2. website/src/ imports nothing from engine/, sandbox/rebuild, or legal_engine.
 #   3. website/src/ holds no STRIPE_* or SERVICE_ROLE / service_role / sb_secret_ secret,
-#      and performs no pricing math (1.05 * 1.03) or legal template compilation.
+#      and performs no pricing math (1.08 expense uplift) or legal template compilation.
 #   4. website/src/lib/mystable.ts is the only file in website/src/ that queries
 #      `accounts` or `sales`; every other `.from(...)` in website/src/ targets `dsls`.
 #   5. BuyFlowModal.tsx and engineClient.ts print the verbatim refund sentence,

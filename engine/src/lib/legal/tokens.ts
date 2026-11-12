@@ -17,10 +17,12 @@ import { paymentModelAllowed, termMonthsBetween } from '../term'
 import type { CloseStyle, PaymentModel } from '../dslStore'
 
 /** The pack version printed on every document. One constant, bumped by hand. */
-export const LEGAL_PACK_VERSION = '1.0.1'
+export const LEGAL_PACK_VERSION = '1.0.2'
 
 export type LegalPackInput = {
   account: { fullName: string }
+  /** Absent only on a preview or an older checkout path that has not named the contract. */
+  contract?: { id: string | null }
   dsl: {
     termStart: string
     endDate: string
@@ -66,6 +68,7 @@ export type BlockKey = (typeof BLOCK_KEYS)[number]
 
 export const SCALAR_KEYS = [
   'account.full_name',
+  'contract.id',
   'dsl.campaign_slug',
   'dsl.distribution_schedule',
   'dsl.end_date',
@@ -190,6 +193,11 @@ function investorSplit(input: LegalPackInput): number {
 
 export const RESOLVERS: Record<ScalarKey, (input: LegalPackInput) => string> = {
   'account.full_name': (input) => required(input.account.fullName, 'account.full_name'),
+
+  'contract.id': (input) => {
+    const id = typeof input.contract?.id === 'string' ? input.contract.id.trim() : ''
+    return id === '' ? 'DRAFT — NOT ASSIGNED' : id
+  },
 
   'dsl.campaign_slug': (input) => required(input.horse.slug, 'horse.slug'),
   'dsl.distribution_schedule': (input) =>

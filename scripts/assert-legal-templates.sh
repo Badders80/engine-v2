@@ -111,6 +111,7 @@ done
 # 5. The token contract, in both directions.
 EXPECTED=(
   'account.full_name'
+  'contract.id'
   'dsl.campaign_slug'
   'dsl.distribution_schedule'
   'dsl.end_date'

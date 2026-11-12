@@ -26,6 +26,10 @@ describe('retailPerPercentFromWholesale', () => {
     expect(retailPerPercentFromWholesale(70)).toBe(76)
   })
 
+  it('adds expense rates against wholesale instead of compounding them', () => {
+    expect(retailPerPercentFromWholesale(100)).toBe(108)
+  })
+
   it('always returns a whole dollar amount', () => {
     for (const wholesale of [1, 7, 33, 65, 70, 99, 143, 250]) {
       expect(Number.isInteger(retailPerPercentFromWholesale(wholesale))).toBe(true)

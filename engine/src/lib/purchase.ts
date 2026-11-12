@@ -4,7 +4,7 @@
  * Pure business logic over `PurchaseStore` and `StripeGateway`:
  * - `computeQuote` wires `effectiveMinStake` (`engine/src/lib/pricing.ts:120`)
  *   and `validateStake`, deriving initial and monthly figures from the DSL's
- *   stored `retailMonthlyPerPercent` without recomputing `wholesale * 1.05 * 1.03`
+ *   stored `retailMonthlyPerPercent` without recomputing `wholesale * 1.08`
  *   and without any `'75'` split fallback.
  * - `compileBuyerDocuments` compiles the PDS and SA with `account.fullName` and
  *   validates the buyer's acceptance of the PDS, the SA, and the four mandatory

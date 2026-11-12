@@ -8,7 +8,9 @@
     "start": "next start --port 3001",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "legal:package": "node --env-file-if-exists=.env.local --import tsx scripts/legal-package.ts",
+    "legal:package:fixture": "node --import tsx scripts/legal-package.ts --fixture tests/fixtures/legal-package.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1150.0",
@@ -26,6 +28,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.27",
     "tailwindcss": "4.3.3",
+    "tsx": "4.21.0",
     "typescript": "5.9.3",
     "vitest": "^3.2.7"
   }

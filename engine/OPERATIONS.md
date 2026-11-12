@@ -14,7 +14,7 @@ The buyer pays by hosted Stripe Checkout, on the existing Evolution Stables Limi
 
 The first payment is the one the webhook records. Later monthly charges, failed invoices, and default handling are done by hand. "Billed monthly on the 1st" is a label on the buy screen. It is not an automated charge job.
 
-The price is the rules module, copied from `sandbox/rebuild/src/lib/pricing.ts`. Listed price is wholesale cost times 1.05 times 1.03, rounded up to the next whole dollar. The first payment is five months: 3 months reserve plus 2 months prepaid. Refunds follow the Refund section of `OUTCOME.md`.
+The price is the rules module, copied from `sandbox/rebuild/src/lib/pricing.ts`. Listed price is wholesale cost multiplied by 1 plus the summed expense rates, rounded up to the next whole dollar. The current rates are 5% Evolution margin + 3% platform fee, so the multiplier is 1.08. Rates are additive against wholesale, not compounded. The first payment is five months: 3 months reserve plus 2 months prepaid. Refunds follow the Refund section of `OUTCOME.md`.
 
 ## Payment models
 
@@ -239,7 +239,7 @@ One surface. The same five screens on a phone and on a desktop. The layout reflo
 
 The engine serves five JSON routes for the purchase flow and Stripe webhook:
 
-- `POST /api/purchase/quote` — calls `computeQuote` (`engine/src/lib/purchase.ts`), which wires `effectiveMinStake(dsl.minStake, dsl.stakeRemaining)` (`engine/src/lib/pricing.ts:120`) so a remainder below `min_stake` can be bought whole without leaving orphan inventory, checks `stake % step === 0` in basis points, reads the DSL's stored/generated retail rate (`monthlyRetailPerPercent`) without recomputing `wholesale × 1.05 × 1.03`, and reads the DSL's `investorSplit` (refusing `null` with no `75` fallback).
+- `POST /api/purchase/quote` — calls `computeQuote` (`engine/src/lib/purchase.ts`), which wires `effectiveMinStake(dsl.minStake, dsl.stakeRemaining)` (`engine/src/lib/pricing.ts:120`) so a remainder below `min_stake` can be bought whole without leaving orphan inventory, checks `stake % step === 0` in basis points, reads the DSL's stored/generated retail rate (`monthlyRetailPerPercent`) without recomputing the additive `wholesale × 1.08` uplift, and reads the DSL's `investorSplit` (refusing `null` with no `75` fallback).
 - `POST /api/purchase/documents` — calls `compileBuyerDocuments` (`engine/src/lib/purchase.ts`), which validates stake and calls `compileLegalPack` with `account.fullName` mapped from `accounts.full_name`, returning the PDS and SA Markdown and their SHA-256 hashes.
 - `POST /api/purchase/identity` — calls `beginOrConfirmIdentity` (`engine/src/lib/purchase.ts`), requiring PDS + SA acceptance and the four SA declarations verbatim before advancing. Verified accounts (`account.kycStatus === 'verified'`) confirm their name and skip Stripe Identity; unverified accounts start a Stripe Identity `VerificationSession` (`type: 'document'`); `'failed'` and `'pending'` accounts are refused Checkout.
 - `POST /api/purchase/checkout` — calls `openCheckoutSession` (`engine/src/lib/purchase.ts`), requiring `account.kycStatus === 'verified'`, `dsl.status === 'available'`, and `dsl.published === true`, creating a hosted Stripe Checkout session in `payment` mode, and writing no `sales` row at session creation. It compiles the PDS and SA first and writes them to `public.checkout_sessions`, then calls `reserve_checkout_stake` — one transaction that decrements `dsls.stake_remaining` and inserts the binding row — so the stake is held before the buyer reaches Stripe.
@@ -428,7 +428,7 @@ The same fixture read as `anon`, through the exact select the site issues, so th
 | `accounts?select=id` | `42501 permission denied for table accounts` |
 | `sales?select=id` | `42501 permission denied for table sales` |
 
-The two money figures came back as stored — `109` against a wholesale of `100`, and `130` against `120` — which is the site reading generated columns rather than computing them.
+The two money figures came back as stored — `108` against a wholesale of `100`, and `130` against `120` — which is the site reading generated columns rather than computing them.
 
 ### What an operator has to know when listing
 

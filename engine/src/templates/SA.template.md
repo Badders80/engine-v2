@@ -5,6 +5,7 @@
 **Campaign:** {{dsl.campaign_slug}}  
 **Version:** {{syndicate.version}}  
 **Effective Date:** {{dsl.term_start}}  
+**Contract ID:** {{contract.id}}
 
 ---
 
@@ -51,7 +52,7 @@ The Manager may:
 ---
 
 ## 8. Default, Prize Freeze & Forfeiture
-An investor enters default if a scheduled payment is missed. While in default, prize money distributions are paused. If the outstanding balance is not cleared prior to the next billing cycle, the investment and deposit are forfeited and reallocated to the horse owner. Evolution Stables receives no financial benefit from a default.
+If a scheduled payment due on the 1st is missed, Evolution Stables Ltd will send written notice to the Shareholder during that month. The Shareholder may cure the arrears by the end of that month. If the account is not restored, default takes effect on the 1st of the next month. At default, any already earned but unpaid winnings are distributed to the Shareholder. The three-month deposit reserve and the Shareholder's stake are forfeited to the Owner, and the Shareholder's future distribution and ownership rights cease from the default date. Evolution Stables Ltd receives no financial benefit from a default.
 
 ---
 
@@ -80,7 +81,7 @@ All amounts are stated inclusive of GST at 15%. No additional GST is charged and
 ---
 
 ## 11. Syndicate Management Fee
-A 5.0% Evolution Stables margin and 3.0% Platform Fee are incorporated into the listed price of each stake. No separate management invoices or secondary accounting fees are charged.
+A 5.0% Evolution Stables margin and 3.0% Platform Fee are incorporated into the listed price of each stake. These expense rates are calculated against the wholesale lease cost and are additive, not compounded. No separate management invoices or secondary accounting fees are charged.
 
 ---
 
@@ -102,6 +103,8 @@ This syndicate is a leasehold interest, not equity ownership. Leaseholders hold 
 ## 15. Early Termination & Refunds
 If the horse is retired or the lease ends early, the syndicate winds down. Once all trailing expenses and care costs are settled with the owner:
 
+**Voluntary Investor Exit:** A Shareholder may give written notice of voluntary exit only when the account has no arrears and at least five full calendar months remain after the month in which notice is given. The scheduled payment due on the next 1st remains payable. After that payment, recurring billing stops and the one-month advance and three-month deposit reserve are applied at the monthly rate over the following four months. The Shareholder retains participation and distribution rights while the account remains funded, and all winnings in that period are distributed normally. The account and stake end with a zero balance at the end of that fifth month. Voluntary exit is unavailable when fewer than five full calendar months remain, in which case participation continues to the fixed expiry.
+
 {{sa.break_clause_block}}
 
 ---
@@ -116,7 +119,12 @@ Disputes must first be raised with the Manager in writing. If unresolved, disput
 
 ---
 
-## 18. Notices
+## 18. Winding Up and Post-Lease Arrangements
+At the fixed expiry, the Syndicate is automatically wound up. The lease does not roll over unless the Manager offers a renewal and the participant opts into new terms. If the horse is retired, injured, or otherwise unable to race during the lease period, the lease terminates early under clause 15. In either case, all post-racing arrangements remain the responsibility of the horse's connections and must comply with NZTR welfare requirements.
+
+---
+
+## 19. Notices
 Notices may be sent by email to the addresses provided by Shareholders. Notices to the Syndicate are sent to Evolution Stables Ltd.
 
 ---

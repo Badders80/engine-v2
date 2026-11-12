@@ -26,10 +26,27 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: engine/requirements-legal.txt
+
+      - name: Install legal PDF renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python3 -m pip install -r engine/requirements-legal.txt
+
       # The repo gate. Deliberately DB-free: CI and worktrees may have no
       # Postgres, so a DB-optional gate would silently skip.
       - name: Verify
         run: pnpm verify
+
+      # The local document package gate: real combined PDF, exact-byte hash,
+      # source/template hashes, manifest and extracted-text checks.
+      - name: Legal package gate
+        run: bash scripts/legal-package-dod.sh
 
       # The SQL gate. Same job, after the repo gate, so a red on either stops
       # the run. No secrets: the local stack uses the CLI's own demo keys and

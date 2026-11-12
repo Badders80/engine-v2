@@ -5,6 +5,7 @@
 **Campaign:** {{dsl.campaign_slug}}  
 **Version:** {{syndicate.version}}  
 **Effective Date:** {{dsl.term_start}}  
+**Contract ID:** {{contract.id}}
 
 ---
 
@@ -115,9 +116,11 @@ All amounts stated in this document are inclusive of GST at 15%. No additional G
 ---
 
 ## 6. Exit, Default & Forfeiture
+**Voluntary Investor Exit:** An investor may give written notice of voluntary exit only when the account has no arrears and at least five full calendar months remain after the month in which notice is given. The scheduled payment due on the next 1st remains payable. After that payment, recurring billing stops and the one-month advance and three-month deposit reserve are applied at the monthly rate over the following four months. The investor retains participation and distribution rights while the account remains funded, and all winnings in that period are distributed normally. The account and stake end with a zero balance at the end of that fifth month. Voluntary exit is unavailable when fewer than five full calendar months remain, in which case participation continues to the fixed expiry.
+
 {{pds.close_style_block}}
 
-**Default & Forfeiture:** An investor enters default if a scheduled payment is missed. While in default, prize money distributions are paused. If the outstanding balance is not cleared prior to the next billing cycle, the investment and deposit are forfeited and reallocated to the horse owner. Evolution Stables receives no financial benefit from a default.
+**Default & Forfeiture:** If a scheduled payment due on the 1st is missed, Evolution Stables Ltd will send written notice to the investor during that month. The investor may cure the arrears by the end of that month. If the account is not restored, default takes effect on the 1st of the next month. At default, any already earned but unpaid winnings are distributed to the investor. The three-month deposit reserve and the stake are forfeited to the Owner, and the investor's future distribution and ownership rights cease from the default date. Evolution Stables Ltd receives no financial benefit from a default.
 
 ---
 
@@ -138,6 +141,8 @@ If the horse is retired or the lease ends early, the syndicate winds down. Once 
 
 All refunds are calculated strictly in full calendar months. No day-count apportionments apply.
 
+At the fixed expiry, the Syndicate is automatically wound up. The lease does not roll over unless the Manager offers a renewal and the participant opts into new terms. Post-racing arrangements remain the responsibility of the horse's connections and must comply with NZTR welfare requirements.
+
 ---
 
 ## 10. Valuation
@@ -151,7 +156,7 @@ A general veterinary inspection is performed prior to the lease to confirm the h
 ---
 
 ## 12. Material Interests
-Evolution Stables Ltd receives a 5.0% margin included in the listed price to cover syndication management and compliance. A 3.0% Platform Fee covers payment processing and infrastructure. There are no secondary invoices or hidden management charges.
+Evolution Stables Ltd receives a 5.0% margin included in the listed price to cover syndication management and compliance. A 3.0% Platform Fee covers payment processing and infrastructure. These expense rates are calculated against the wholesale lease cost and are additive, not compounded. There are no secondary invoices or hidden management charges.
 
 ---
 

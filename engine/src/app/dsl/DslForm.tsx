@@ -118,8 +118,9 @@ export function DslForm({
         </label>
 
         <p>
-          The engine derives the listed price from that one figure: wholesale times 1.05
-          times 1.03, rounded up to the next whole dollar.
+          The engine derives the listed price from that one figure: wholesale multiplied
+          by 1 plus the summed expense rates (currently 5% + 3% = 1.08), rounded up to
+          the next whole dollar.
         </p>
 
         <label>

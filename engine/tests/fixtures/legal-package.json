@@ -1,0 +1,50 @@
+{
+  "contractId": "ES-DSL-2026-900001",
+  "saleId": "00000000-0000-4000-8000-000000000001",
+  "dslId": "00000000-0000-4000-8000-000000000002",
+  "horseId": "00000000-0000-4000-8000-000000000003",
+  "accountId": "00000000-0000-4000-8000-000000000004",
+  "input": {
+    "account": {
+      "fullName": "Session DoD Buyer"
+    },
+    "dsl": {
+      "termStart": "2026-11-01",
+      "endDate": "2028-06-30",
+      "paymentModel": "subscription_float",
+      "closeStyle": "fourteen_day",
+      "distributionSchedule": "Quarterly",
+      "investorSplit": 75,
+      "listedStake": 5,
+      "minStake": 1,
+      "step": 0.5,
+      "retailMonthlyPerPercent": 65
+    },
+    "horse": {
+      "slug": "mulan-the-brave",
+      "legalName": "Mulan The Brave (NZ)",
+      "foalingDate": "2023-08-17",
+      "sex": "Filly",
+      "colour": "Bay",
+      "breeder": "C W Kwok",
+      "sireName": "TURN ME LOOSE (NZ) 2011",
+      "damName": "YEARN (NZ) 2013",
+      "microchip": "985125000128426",
+      "aboutHorse": "Mulan The Brave is a bay filly by Turn Me Loose out of Yearn, in early education with Stephen Gray at Copper Belt Lodge.",
+      "racingOutlookAndPedigree": "Turn Me Loose and Yearn both showed high-class form from 1200 to 1600 metres.",
+      "raceExpectation": "Trial and race plans follow fitness, nominations and the yard's programme."
+    },
+    "trainer": {
+      "displayName": "Stephen Gray & Bridget Gray",
+      "location": "Copper Belt, Palmerston North, NZ",
+      "bio": "Stephen Gray is a Group 1-winning trainer who returned to New Zealand in 2024 to train from Copper Belt Lodge."
+    },
+    "owner": {
+      "displayName": "Stephen Gray & Bridget Gray"
+    },
+    "sale": {
+      "stake": 1,
+      "executedDate": "2026-11-12"
+    }
+  }
+}

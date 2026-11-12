@@ -38,18 +38,22 @@ export const INVESTOR_RETURN_PCT_MAX = 85
 export const REFUND_SENTENCE =
   'If the horse is retired or the lease ends early, the leaseholder receives a pro-rata refund of the unused lease fee for the full months remaining.'
 
-const MARGIN_MULTIPLIER = 1 + EVOLUTION_MARGIN_PCT / 100
-const FEE_MULTIPLIER = 1 + PLATFORM_FEE_PCT / 100
+/**
+ * Total expense uplift applied to wholesale. Expense rates are additive, not
+ * compounded: every rate is measured against wholesale itself.
+ */
+export const TOTAL_EXPENSE_PCT = EVOLUTION_MARGIN_PCT + PLATFORM_FEE_PCT
+const RETAIL_MULTIPLIER = 1 + TOTAL_EXPENSE_PCT / 100
 
 /**
  * Listed price per 1%, in whole dollars.
  *
  * Ceiling keeps every derived share a whole-dollar amount. This must stay equal
  * to the `retail_monthly_per_percent` generated column on `dsls`, which is
- * `ceil(wholesale_monthly_per_percent * 1.05 * 1.03)` over exact numeric.
+ * `ceil(wholesale_monthly_per_percent * 1.08)` over exact numeric.
  */
 export function retailPerPercentFromWholesale(wholesaleMonthlyPerPercent: number): number {
-  return Math.ceil(wholesaleMonthlyPerPercent * MARGIN_MULTIPLIER * FEE_MULTIPLIER)
+  return Math.ceil(wholesaleMonthlyPerPercent * RETAIL_MULTIPLIER)
 }
 
 /**
@@ -70,9 +74,7 @@ export function wholesaleFromRetail(retailMonthlyPerPercent: number): number | n
     return null
   }
 
-  const guess = Math.floor(
-    retailMonthlyPerPercent / (MARGIN_MULTIPLIER * FEE_MULTIPLIER),
-  )
+  const guess = Math.floor(retailMonthlyPerPercent / RETAIL_MULTIPLIER)
 
   for (let wholesale = Math.max(1, guess - 3); wholesale <= guess + 3; wholesale += 1) {
     if (retailPerPercentFromWholesale(wholesale) === retailMonthlyPerPercent) {

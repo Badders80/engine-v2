@@ -25,6 +25,7 @@ type Overrides = {
 function input(overrides: Overrides = {}): LegalPackInput {
   return {
     account: { fullName: 'Test Buyer', ...overrides.account },
+    contract: { id: 'ES-DSL-2026-900001' },
     dsl: {
       termStart: '2026-01-01',
       endDate: '2027-09-30',
@@ -72,6 +73,11 @@ describe('a 21-month float pack renders', () => {
     expect(pack.pds.markdown).toContain('Outlook and pedigree.')
     expect(pack.pds.markdown).toContain('Race expectation.')
     expect(pack.pds.markdown).toContain('One bio.')
+  })
+
+  it('prints the contract identifier in both documents', () => {
+    expect(pack.pds.markdown).toContain('**Contract ID:** ES-DSL-2026-900001')
+    expect(pack.sa.markdown).toContain('**Contract ID:** ES-DSL-2026-900001')
   })
 
   it('carries none of them in the SA', () => {
@@ -231,6 +237,36 @@ describe('the SA states the break clause', () => {
     expect(fourteen.pds.markdown).toContain('Lessor 14-Day Break')
     const buyout = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
     expect(buyout.pds.markdown).toContain('Early Sale / Buyout')
+  })
+})
+
+describe('exit, default and wind-up rights', () => {
+  const pack = compileLegalPack(input())
+
+  it('states the five-month voluntary exit runway', () => {
+    for (const document of [pack.pds.markdown, pack.sa.markdown]) {
+      expect(document).toContain('Voluntary Investor Exit')
+      expect(document).toContain('at least five full calendar months remain')
+      expect(document).toContain('scheduled payment due on the next 1st remains payable')
+      expect(document).toContain('one-month advance and three-month deposit reserve')
+    }
+  })
+
+  it('restores default notice and pays accrued winnings before forfeiture', () => {
+    for (const document of [pack.pds.markdown, pack.sa.markdown]) {
+      expect(document).toContain('written notice')
+      expect(document).toContain('by the end of that month')
+      expect(document).toContain('already earned but unpaid winnings')
+      expect(document).toContain('forfeited to the Owner')
+    }
+  })
+
+  it('states automatic wind-up and no rollover at expiry', () => {
+    for (const document of [pack.pds.markdown, pack.sa.markdown]) {
+      expect(document).toContain('automatically wound up')
+      expect(document).toContain('does not roll over')
+      expect(document).toContain('participant opts into new terms')
+    }
   })
 })
 

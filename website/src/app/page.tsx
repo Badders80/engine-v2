@@ -500,7 +500,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-border bg-canvas py-32 text-center">
+      <section className="bg-canvas py-32 text-center">
         <div className="mx-auto max-w-3xl px-12" data-reveal data-reveal-mode="fade">
           <h2 className="text-section-heading font-light leading-display tracking-display text-heading md:text-section-heading-wide">
             The Future of <span className="text-gold">Ownership</span>

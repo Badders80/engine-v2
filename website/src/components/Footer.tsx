@@ -4,9 +4,7 @@ export function Footer() {
   return (
     <footer className="overflow-hidden bg-canvas text-muted-foreground">
       <div className="mx-auto flex max-w-6xl flex-col px-8 pt-16 pb-12 md:px-16 md:pt-24 md:pb-16">
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent" />
-
-        <div className="flex flex-col gap-6 pt-12 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-3">
               <Link

@@ -3,10 +3,10 @@
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
 **Next action:** open
-`/home/evo/sandbox/mvp/sessions/active/2026-11-13-marketplace-mystable.md` and run
-the read-only production Marketplace audit from a clean worktree based on
-`origin/dsl-sidequest`. Do not work in the shared checkout that contains the
-uncommitted legal/checkout changes.
+`/home/evo/sandbox/mvp/sessions/active/2026-11-13-checkout-scroll-mapping.md` in a
+clean worktree from local `dsl-sidequest` after this wrap. Review the purchase
+flow prototype and map PDS/SA scroll locks and the post-sale pack/email to the
+current acceptance contract. Do not work in the shared checkout.
 
 ## State — 2026-11-13
 
@@ -94,11 +94,17 @@ pushed.
   PDS/SA acceptance timestamps, the canonical declaration snapshot, typed
   signature and recording time. The evidence is immutable and Stripe cannot bind
   the checkout until it exists. The sale remains linked by `checkout_session_id`.
+- **Feature commit:** legal pack `1.0.4`, Investor Pack presentation and
+  acceptance persistence are committed at `dbd0184` on `dsl-sidequest`.
+- **Marketplace plan preserved:** `/home/evo/sandbox/mvp/sessions/active/2026-11-13-marketplace-mystable.md`
+  remains active after the checkout scroll-mapping session.
 
 ## Ledger
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-13 | Legal pack 1.0.4, Investor Pack presentation and checkout acceptance persistence | engine_v2/website | `dbd0184` | committed |
+| 2026-11-13 | Checkout scroll-mapping next-session plan created | sandbox/mvp | — | ready |
 | 2026-11-13 | F1 acceptance persistence: immutable PDS/SA declarations, typed signature and Stripe precondition | engine_v2/website | — | done |
 | 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
 | 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |

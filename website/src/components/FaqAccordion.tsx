@@ -26,7 +26,7 @@ export function FaqAccordion({ items }: { items: readonly FaqItem[] }) {
               onClick={() => toggle(index)}
               aria-expanded={isOpen}
               aria-controls={`faq-panel-${index}`}
-              className="flex w-full items-center justify-between gap-6 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
+              className="flex min-h-11 w-full items-center justify-between gap-6 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
             >
               <span className="text-body font-light text-heading transition-colors duration-hover hover:text-heading">
                 {item.question}

@@ -1,45 +1,56 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
-import Link from 'next/link'
 
+import { FaqAccordion, type FaqItem } from '../../components/FaqAccordion'
+import { MarketplaceBrowser } from '../../components/MarketplaceBrowser'
 import { PageContainer, PageIntro, PageSection, PageShell } from '../../components/PagePrimitives'
-import StatusBadge from '../../components/StatusBadge'
 import { listPublishedListings, sortForMarketplace, type Listing } from '../../lib/listings'
-import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../lib/site'
+import type { MarketplaceCard } from '../../lib/marketplace'
+import { MARKETPLACE_VISUAL_FIXTURE } from '../../lib/marketplaceFixture'
+import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV } from '../../lib/site'
 
 /**
- * The marketplace. PLAN.md step 6b-ii, deliverable D2.
+ * The public Marketplace.
  *
- * Every card is a published DSL. The read layer filters `published = true` and
- * embeds the horse, so an unpublished DSL cannot reach this grid — and a
- * denormalised card cannot drift from the read layer, because there is only one
- * query shape in the app and this page uses it unchanged.
- *
- * `force-dynamic` is load-bearing, not stylistic. CI runs `pnpm run build` with no
- * environment variables, and the read client throws when its variables are absent
- * rather than returning an empty result. A page prerendered at build time would
- * therefore fail CI for a reason unrelated to the change. Server-rendering per
- * request also satisfies PLAN.md:90 — the first response carries the horse name,
- * the status, and the image as HTML.
- *
- * The grid's order is ruled, 2026-10-20: `available`, `coming_soon`,
- * `fully_allocated`, `completed`, and within a rank the soonest-closing offer
- * first. It is applied by `sortForMarketplace` — one pure function with its own
- * tests — so this page holds no ordering logic of its own.
+ * Production is the content and hierarchy reference. The implementation remains
+ * V2: shared page primitives, existing tokens, one semantic h1, one honest CTA
+ * per card and no page-level separator rules. The visual fixture is selected only
+ * by `WEBSITE_MARKETPLACE_FIXTURE=true`, so normal reads still start at the
+ * published-DSL read layer and no preview content can leak into production.
  */
-
 export const dynamic = 'force-dynamic'
 
 const TITLE = 'Marketplace — Evolution Stables'
 const DESCRIPTION =
   'Ownership stakes in thoroughbreds, with the split, the rate and the term published before the offer opens.'
 
-/**
- * The page's own title, description and canonical. `PLAN.md:80` requires all three
- * per page, and the canonical is absolute through the root layout's `metadataBase`.
- * The Open Graph image is named again rather than inherited, so this page's card
- * does not depend on how metadata merges across segments.
- */
+const OWNERSHIP_FAQS: readonly FaqItem[] = [
+  {
+    question: 'What is a Digitally Syndicated Lease (DSL)?',
+    answer:
+      'A DSL is a regulated fractional leasehold of a thoroughbred racehorse. You hold a stake as a percentage of the syndicate, with direct rights to 75% of official NZTR gross prize money. Minimums and exact percentages are shown on each horse page.',
+  },
+  {
+    question: 'How does the 5×M Join Float Model work?',
+    answer:
+      'When joining a syndicate, you pay an initial float equal to five months of lease payments: three months of security deposit reserve and two months prepaid. Monthly billing starts in month two, and unused funds are refunded pro-rata within 14 days when the lease concludes.',
+  },
+  {
+    question: 'How is prize money calculated and distributed?',
+    answer:
+      'Prize money is calculated from officially published NZTR gross stakes. Syndicate members receive 75% pro-rata to their stake. The remaining 25% is retained by the lessor to absorb jockey, trainer, nomination, acceptance and operational overheads.',
+  },
+  {
+    question: 'Who decides where and when the horse races?',
+    answer:
+      'Under Clause 6 of the Syndicate Agreement, the licensed trainer holds authority over race placement, training, spelling periods and horse welfare decisions.',
+  },
+  {
+    question: 'Is Evolution Stables regulated in New Zealand?',
+    answer:
+      'Yes. Evolution Stables operates as an Authorised Syndicator under New Zealand Thoroughbred Racing, in accordance with the Financial Markets Conduct (Equine Syndicating Schemes) Exemption Notice.',
+  },
+]
+
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
@@ -54,97 +65,78 @@ export const metadata: Metadata = {
   },
 }
 
-/**
- * One card. DESIGN.md's listing-card anatomy: badge over the image frame, the
- * name, and exactly one call to action.
- *
- * Three of its rules shape this markup. **No figures inside the card** —
- * financials belong to the horse page, where mono is the ruled face for them.
- * **The card is never a link**: one anchor inside it, not a card-shaped one, which
- * is why the `article` is not wrapped in a `Link`. And **there is no disabled
- * card**, because an unsellable offering is a status rather than an absent card.
- *
- * The hook the anatomy also asks for is absent: it is horse soft prose, no soft
- * prose column is in the read layer's projection, and widening that projection is
- * not something this step's checklist authorises. Recorded in the plan's ledger
- * rather than filled with invented copy.
- */
-function ListingCard({ listing }: { listing: Listing }) {
-  const { horse } = listing
-  const hero = heroImageUrl(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
-  const href = `/marketplace/${horse.slug}`
-
-  return (
-    <article className="rounded-lg border border-border bg-surface p-8">
-      <div className="relative h-56 w-full overflow-hidden rounded-md bg-raised">
-        {hero ? (
-          <Image
-            src={hero}
-            alt={horse.legalName}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            className="object-cover"
-          />
-        ) : (
-          <p className="label-spec absolute inset-0 flex items-center justify-center text-muted-foreground">
-            No photograph
-          </p>
-        )}
-        <span className="absolute right-4 top-4">
-          <StatusBadge status={listing.status} />
-        </span>
-      </div>
-
-      <h3 className="mt-8 text-card-heading leading-heading text-heading">{horse.legalName}</h3>
-
-      <Link href={href} className="label-action mt-6 inline-block text-gold">
-        View the horse
-      </Link>
-    </article>
-  )
+function cardFromListing(listing: Listing): MarketplaceCard {
+  return {
+    id: listing.id,
+    status: listing.status,
+    endDate: listing.endDate,
+    horse: {
+      slug: listing.horse.slug,
+      legalName: listing.horse.legalName,
+    },
+    hook: null,
+    tags: [],
+    imageSrc: heroImageUrl(
+      listing.horse.slug,
+      listing.horse.imageCount,
+      process.env[R2_PUBLIC_URL_ENV],
+    ),
+  }
 }
 
 export default async function MarketplacePage() {
-  const listings = sortForMarketplace(await listPublishedListings())
+  const fixtureEnabled = process.env.WEBSITE_MARKETPLACE_FIXTURE === 'true'
+  const cards = fixtureEnabled
+    ? MARKETPLACE_VISUAL_FIXTURE
+    : sortForMarketplace(await listPublishedListings()).map(cardFromListing)
 
   return (
     <PageShell>
       <PageIntro
-        eyebrow="Marketplace"
+        eyebrow="Evolution Stables"
         title={
           <>
-            The <span className="type-accent text-gold">Marketplace</span>
+            Ownership,
+            <br />
+            evolved.
           </>
         }
-        description="Every offer below is a published stake. Read the rate, the term and the split before you commit to anything."
+        description={
+          <>
+            Browse active offerings, coming-soon offerings and completed track record. For a deeper
+            dive into our ownership model, read the{' '}
+            <a
+              href="#ownership-faq"
+              className="inline-flex min-h-11 items-center text-gold underline decoration-border underline-offset-4 transition-colors duration-hover hover:text-heading focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
+            >
+              Ownership FAQ
+            </a>{' '}
+            below.
+          </>
+        }
       />
 
-      <PageSection className="py-16">
-        {listings.length === 0 ? (
-          // An empty grid is a real state, not an error: a horse exists only once
-          // it is registered and its DSL is published. Saying so is better than an
-          // empty frame that reads as a broken page.
-          <p className="text-body-small leading-body text-muted-foreground">
-            No offers are published yet. Each one appears here the day it opens.
-          </p>
-        ) : (
-          <ul className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {listings.map((listing) => (
-              <li key={listing.id}>
-                <ListingCard listing={listing} />
-              </li>
-            ))}
-          </ul>
-        )}
+      <PageSection className="pt-16 pb-32">
+        <MarketplaceBrowser cards={cards} />
       </PageSection>
 
-      <footer>
-        <PageContainer className="py-16">
-          <p className="label-spec text-muted-foreground">
-            Evolution Stables · {SITE_URL.replace(/^https?:\/\//, '')}
-          </p>
+      <section id="ownership-faq" className="bg-canvas py-section">
+        <PageContainer>
+          <div data-reveal data-reveal-mode="fade">
+            <p className="label-eyebrow text-muted-foreground">Ownership FAQ</p>
+            <h2 className="mt-6 max-w-3xl text-section-heading leading-display tracking-display text-heading md:text-section-heading-wide">
+              Ownership, explained.
+            </h2>
+            <p className="mt-6 max-w-2xl text-body-small leading-body text-muted-foreground">
+              The mechanics of a Digital Syndication Lease — what you hold, how prize money flows,
+              and who governs the term.
+            </p>
+            <div className="mt-16">
+              <FaqAccordion items={OWNERSHIP_FAQS} />
+            </div>
+          </div>
         </PageContainer>
-      </footer>
+      </section>
     </PageShell>
   )
 }

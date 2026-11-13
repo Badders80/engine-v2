@@ -139,6 +139,15 @@ export const MARKETPLACE_STATUS_RANK: Record<DslStatus, number> = {
   completed: 3,
 }
 
+type MarketplaceSortable = {
+  id: string
+  status: string
+  endDate: string
+  horse: {
+    legalName: string
+  }
+}
+
 /**
  * The rank of a status, or an error. A value outside the four members is a
  * translation failure rather than an ordering question: the design law makes an
@@ -163,7 +172,7 @@ export function marketplaceRank(status: string): number {
  * sitemap is deliberately unaffected — it consumes `listPublishedListings()`
  * directly, and a sitemap has no order to rule.
  */
-export function sortForMarketplace(listings: Listing[]): Listing[] {
+export function sortForMarketplace<T extends MarketplaceSortable>(listings: readonly T[]): T[] {
   // Validate before sorting. A comparator only runs when there are two or more
   // rows, so a lone unrecognised status would otherwise reach the grid
   // unchallenged — and the design law makes that value an error, not a row.

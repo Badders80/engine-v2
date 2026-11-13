@@ -2,11 +2,22 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open
-`/home/evo/sandbox/mvp/sessions/active/2026-11-13-marketplace-mystable.md` and run
-the read-only production Marketplace audit from a clean worktree based on
-`origin/dsl-sidequest`. Do not work in the shared checkout that contains the
-uncommitted legal/checkout changes.
+**Next action:** founder visual walk of the Marketplace checkpoint on
+`marketplace-parity-2026-11-14`. Evidence lives at
+`/home/evo/sandbox/mvp/audits/marketplace-parity-2026-11-14/`; accept or redirect
+the visual direction before Session 2 begins.
+
+## State — 2026-11-14
+
+- Marketplace Session 1 is built on `marketplace-parity-2026-11-14` from
+  `origin/dsl-sidequest` at `e74b725`, in an isolated worktree.
+- The page consumes the shared V2 primitives and tokens, uses a local six-card
+  visual fixture with Mulan first, and performs no database writes or publish.
+- Gate: engine 401 passed / 1 skipped, website 66 passed, both builds. Desktop
+  and mobile axe walks have zero violations; filters, keyboard order, 44px page
+  controls and reduced motion pass.
+- Founder visual acceptance remains pending. Do not merge or start the horse
+  page before that ruling.
 
 ## State — 2026-11-13
 
@@ -95,6 +106,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-14 | Marketplace production audit and V2 local-fixture implementation | engine_v2/website | branch `marketplace-parity-2026-11-14` | founder walk pending |
 | 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
 | 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |
 | 2026-11-13 | Investor Pack presentation baseline checkpointed at legal pack 1.0.3 | engine_v2/website | — | done |

@@ -2,11 +2,26 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** persist the generated `contract_id` through checkout and sale
-(F1), then move the local package into the F3 immutable archive. The final Mulan
-commercial terms are saved and rendered locally.
+**Next action:** open
+`/home/evo/sandbox/mvp/sessions/active/2026-11-13-marketplace-mystable.md` and run
+the read-only production Marketplace audit from a clean worktree based on
+`origin/dsl-sidequest`. Do not work in the shared checkout that contains the
+uncommitted legal/checkout changes.
 
-## State — 2026-11-12
+## State — 2026-11-13
+
+- **Landing parity is merged and pushed** on `dsl-sidequest` at merge commit
+  `03ea397`; founder visual walk accepted.
+- **Shared page foundation is locked and pushed** at `ade0cc3`: global
+  `ScrollReveal`, `--duration-reveal: 750ms`, `PageShell`, `PageContainer`,
+  `PageIntro`, `PageSection`, no page-level separator rule, and pathname-scoped
+  reveal re-arming on client navigation.
+- Marketplace, horse page and MyStable now consume the shared primitives; the
+  Marketplace production audit and visual implementation remain the next work.
+- Integrated gate after the foundation: **402 engine passed / 1 skipped, 63
+  website passed**, both builds.
+- The shared checkout still contains unrelated uncommitted legal/checkout work;
+  preserve it and isolate new website work in a separate worktree.
 
 **The DSL side quest is closed on `dsl-sidequest`.** `main` untouched; nothing
 pushed.
@@ -33,15 +48,32 @@ pushed.
 - **Plan of record + handoff:** `/home/evo/sandbox/v2/dsl-sidequest/` —
   `STATE.md`, `PLAN.md`, `EXECUTION-DOD-2026-11-09.md`, `PUBLIC-WRAP.md`,
   `HANDOFF-2026-11-11.md`; the rulebook is `sandbox/v2/rulebook/`.
-- **Headless legal package — done:** `engine/scripts/legal-package.ts` loads the
-  saved DSL/horse/trainer/owner or a checked-in fixture, renders one combined
-  PDS/SA PDF with ReportLab, and writes the exact-byte hash, PDS/SA source
-  hashes, eight template hashes, provenance and six-field manifest into a
-  write-once local directory. Gate: `bash scripts/legal-package-dod.sh`.
+- **Investor Pack (PDS + SA) — done:** `engine/scripts/legal-package.ts` loads
+  the saved DSL/horse/trainer/owner or a checked-in fixture, renders one
+  combined Investor Pack PDF with ReportLab, and writes the exact-byte hash,
+  PDS/SA source hashes, eight template hashes, provenance and six-field manifest
+  into a write-once local directory. Gate: `bash scripts/legal-package-dod.sh`.
+- **Formal Investor Pack assembly — done 2026-11-13:** page 1 is a cover, page 2
+  is one contents page indexing both legal sections and all subsections, the PDS
+  starts on a fresh page and the SA starts on a later fresh page. Contents page
+  numbers are generated from final pagination. The gate verifies every indexed
+  heading against the PDF body. Typography uses justified `9.5/13.9` body prose,
+  a three-level heading hierarchy, 20mm margins, restrained rules, section-aware
+  running headers and `Page N of M` page furniture.
 - **Saved-record proof:** current Mulan DSL
   `5a46be50-41be-4fca-a554-793d5f1562fa` produced
-  `/home/evo/sandbox/mvp/out/legal/ES-DSL-2026-900006/contract.pdf`; verifier
-  PASS, 11 pages, legal pack `1.0.2`.
+  `/home/evo/sandbox/mvp/out/legal/ES-DSL-2026-900018/contract.pdf`; verifier
+  PASS, 15 pages, legal pack `1.0.4`, PDS page 3, SA page 10 and 54 indexed
+  headings. This is the current formal **Investor Pack (PDS + SA)**.
+- **Previous proofs:** `ES-DSL-2026-900006` remains the pre-cover proof and
+  `ES-DSL-2026-900007` remains the formal pre-polish proof. `ES-DSL-2026-900008`
+  remains the polish proof before true body justification. `ES-DSL-2026-900009`
+  remains the justified proof before the v1.0.3 legal redlines.
+  `ES-DSL-2026-900011` remains the v1.0.3 proof before structural pagination
+  fixes. `ES-DSL-2026-900012` remains the structural proof with dot-leader
+  contents. `ES-DSL-2026-900013` remains the no-dot-leader proof before final
+  density tuning. `ES-DSL-2026-900014` remains the density proof before the
+  declarations and proof-of-address wording were aligned. None may be overwritten.
 - **Mulan terms:** $60 wholesale / $65 retail per 1% per month; 75% investor
   return; 5% listed; 1% minimum; 0.5% step; subscription float; 14-day break;
   quarterly distributions; expiry 30 Jun 2028. Status remains `coming_soon` and
@@ -63,6 +95,16 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
+| 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |
+| 2026-11-13 | Investor Pack presentation baseline checkpointed at legal pack 1.0.3 | engine_v2/website | — | done |
+| 2026-11-13 | Final density pass: compact type, uppercase subsections and signature grids | engine_v2/website | — | done |
+| 2026-11-13 | Contents page refined to whitespace-aligned hierarchy without dot leaders | engine_v2/website | — | done |
+| 2026-11-13 | Structural layout pass: break control, clause hierarchy and schedule tables | engine_v2/website | — | done |
+| 2026-11-13 | Legal pack 1.0.3 redlines, Investor terminology and grayscale polish | engine_v2/website | — | done |
+| 2026-11-13 | Body prose corrected to true justified alignment | engine_v2/website | — | done |
+| 2026-11-13 | Legal-document typography polish and running page furniture | engine_v2/website | — | done |
+| 2026-11-13 | Formal Investor Pack cover, indexed contents and fresh-page sections | engine_v2/website | — | done |
 | 2026-11-12 | docs: wrap 2026-11-12 — resume at F1 | engine_v2/website | this commit | done |
 | 2026-11-12 | Voluntary exit, default notice, wind-up, additive pricing, headless PDS/SA package and CI gate | engine_v2/website | `89ac971` | done |
 | 2026-11-11 | Images — checkout unblocked; placeholder dropped | engine_v2/website | `81b5f5d` | done |
@@ -79,17 +121,17 @@ pushed.
 
 ## Blocked
 
-- **Landing parity integration:** founder visual walk at 1440 and 390, then
-  decide whether to reconcile with `dsl-sidequest` and merge. The branch is
-  already pushed; no merge before that gate.
-- **Preview environment:** this isolated worktree has no `.env.local`. `/` renders
-  without it, but `/marketplace` and `/sitemap.xml` throw unless the local env is
-  supplied; copy it from the main checkout for a full-site walk.
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.
 - **F3** — external immutable document archive + manifest. **Priority.**
-- **F1 / F2 / F4 / F5** — persist the generated contract ID through DB sale
-  storage; post-sale term freeze; offsite backup; recovery drill.
+- **F1** — persist the generated contract ID through DB sale storage; separate
+  the signature/executed date from the selectable whole-month term start; carry
+  both through quote, documents, checkout and the frozen sale snapshot. Add the
+  Investor Pack signing flow: PDS scroll/acceptance; SA scroll, declarations and
+  typed full legal name; unsigned review pack before signing; executed pack after
+  acceptance; persisted hashes, acceptance times, declarations, signature,
+  checkout ID and sale ID. Declarations remain inside the SA; no third document.
+- **F2 / F4 / F5** — post-sale term freeze; offsite backup; recovery drill.
 - **Mumbai project** `umxljalfbmvrocaopao` — confirm deleted.
 - **Keys** — the service-role JWT was pasted into chat; rotate in one batch at
   cutover (ruled, not blocking).

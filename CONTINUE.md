@@ -2,10 +2,10 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** founder visual walk of the Mulan horse-page checkpoint on
-`horse-page-parity-2026-11-14`. Evidence lives at
-`/home/evo/sandbox/mvp/audits/horse-page-parity-2026-11-14/`; accept or redirect
-the page before checkout implementation begins.
+**Next action:** open
+`/home/evo/sandbox/mvp/sessions/active/2026-11-13-checkout-scroll-mapping.md` and
+map the PDS/SA scroll locks and post-sale pack/email against the current checkout
+contracts before changing implementation.
 
 ## State — 2026-11-14
 
@@ -25,8 +25,8 @@ the page before checkout implementation begins.
 - Gate: engine 401 passed / 1 skipped, website 69 passed, both builds. Desktop
   and mobile axe walks have zero violations; gallery, tabs, keyboard, 44px
   controls, reduced motion and conversion-bar/footer clearance pass.
-- Horse-page founder visual acceptance remains pending. Checkout remains next
-  only after that ruling.
+- Horse-page founder visual acceptance is **approved**. Checkout is now the next
+  surface.
 
 ## State — 2026-11-13
 
@@ -115,8 +115,8 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
-| 2026-11-14 | Marketplace horse-page audit and V2 Mulan fixture implementation | engine_v2/website | branch `horse-page-parity-2026-11-14` | founder walk pending |
-| 2026-11-14 | Marketplace production audit and V2 local-fixture implementation | engine_v2/website | branch `marketplace-parity-2026-11-14` | founder walk pending |
+| 2026-11-14 | Marketplace horse-page audit and V2 Mulan fixture implementation | engine_v2/website | branch `horse-page-parity-2026-11-14` | done; founder accepted |
+| 2026-11-14 | Marketplace production audit and V2 local-fixture implementation | engine_v2/website | branch `marketplace-parity-2026-11-14` | done; founder accepted |
 | 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
 | 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |
 | 2026-11-13 | Investor Pack presentation baseline checkpointed at legal pack 1.0.3 | engine_v2/website | — | done |

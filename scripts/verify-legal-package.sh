@@ -74,7 +74,9 @@ pages="$(pdfinfo contract.pdf | awk '/^Pages:/ {print $2}')"
 
 text_file="$(mktemp)"
 trap 'rm -f "$text_file"' EXIT
-pdftotext contract.pdf "$text_file"
+pdftotext -layout contract.pdf "$text_file"
+python3 "$ROOT/scripts/assert-investor-pack-layout.py" \
+  "$text_file" pds.md sa.md "$contract_id" "$ROOT/engine/scripts/render-legal-pdf.py"
 grep -Fq 'MOCK — NOT EXECUTED' "$text_file" || {
   echo "PDF is missing the mock banner" >&2
   exit 1

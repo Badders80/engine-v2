@@ -18,13 +18,16 @@ export const BUY_FLOW_REFUND_SENTENCE =
   'If the horse is retired or the lease ends early, the leaseholder receives a pro-rata refund of the unused lease fee for the full months remaining.'
 
 /**
- * The four mandatory SA declarations from `PLAN.md:232`, verbatim.
+ * The canonical SA declarations. Schedule 2 and checkout must use this wording.
  */
 export const BUY_FLOW_SA_DECLARATIONS = [
-  'not disqualified or suspended under the NZTR Rules of Racing',
-  'acquiring the stake as the true beneficial owner',
-  'bound by the NZTR Rules of Racing and the Welfare Guidelines',
-  'Evolution Stables Limited is the syndicate manager',
+  'I am at least 18 years of age.',
+  'I am not subject to any racing disqualification, exclusion order, or ban under NZTR rules.',
+  'I am acquiring the stake as the true beneficial owner.',
+  'I accept Evolution Stables Ltd as the syndicate manager and agree to be bound by the NZTR Rules of Racing and Welfare Guidelines.',
+  'I understand that participation is a fixed-term leasehold interest and does not confer direct equity ownership.',
+  'I will complete identity verification before payment.',
+  'I will provide proof of address when requested by the Syndicate Manager.',
 ] as const
 
 export type EnginePurchaseQuote = {
@@ -98,15 +101,20 @@ export function requireInvestorSplit(investorSplit: number | null): number {
 }
 
 /**
- * Verifies that the buyer has ticked PDS acceptance, SA acceptance, and all four
+ * Verifies that the buyer has ticked PDS acceptance, SA acceptance, and all seven
  * mandatory SA declarations before advancing past Screen 2 (`PLAN.md:232`).
  */
 export function allDocumentsAccepted(input: {
   pdsAccepted: boolean
   saAccepted: boolean
   declarationsAccepted: readonly string[]
+  typedSignature: string
+  fullName?: string
 }): boolean {
   if (!input.pdsAccepted || !input.saAccepted) return false
+  const typed = input.typedSignature.trim()
+  if (typed === '') return false
+  if (input.fullName !== undefined && typed !== input.fullName.trim()) return false
   const accepted = new Set(input.declarationsAccepted)
   return BUY_FLOW_SA_DECLARATIONS.every((declaration) => accepted.has(declaration))
 }
@@ -162,9 +170,12 @@ export async function fetchEngineDocuments(
 export async function postEngineIdentity(
   input: {
     accountId: string
-    pdsAccepted: boolean
-    saAccepted: boolean
-    declarationsAccepted: readonly string[]
+    acceptance: {
+      pdsAccepted: boolean
+      saAccepted: boolean
+      declarationsAccepted: readonly string[]
+      typedSignature: string
+    }
     confirmedFullName?: string
     returnUrl: string
   },
@@ -183,9 +194,12 @@ export async function postEngineCheckout(
     dslId: string
     accountId: string
     stake: number
-    pdsAccepted: boolean
-    saAccepted: boolean
-    declarationsAccepted: readonly string[]
+    acceptance: {
+      pdsAccepted: boolean
+      saAccepted: boolean
+      declarationsAccepted: readonly string[]
+      typedSignature: string
+    }
     stripeIdentityId?: string | null
     successUrl: string
     cancelUrl: string

@@ -27,7 +27,7 @@ import { SITE_URL } from '../lib/site'
  * 1. `Terms` — stake stepper (`effectiveMinStake` .. `stakeRemaining` by `step`),
  *    four quote rows from the engine, verbatim refund sentence, NZTR syndicator footer.
  * 2. `Documents` — `Review & Sign Documents`, PDS then SA inside `.legal-doc`,
- *    PDS + SA + four verbatim SA declarations required before advancing.
+ *    PDS + SA + seven canonical SA declarations required before advancing.
  * 3. `Identity` — confirms name when `kycStatus === 'verified'`, starts Stripe
  *    Identity (`type: 'document'`) when `unverified`, blocks Checkout when
  *    `failed` or `pending`.
@@ -73,6 +73,7 @@ export default function BuyFlowModal({
   const [pdsAccepted, setPdsAccepted] = useState(false)
   const [saAccepted, setSaAccepted] = useState(false)
   const [declarationsAccepted, setDeclarationsAccepted] = useState<string[]>([])
+  const [typedSignature, setTypedSignature] = useState('')
   const [confirmedName, setConfirmedName] = useState(accountFullName ?? '')
   const [identityOutcome, setIdentityOutcome] = useState<EngineIdentityOutcome | null>(null)
   const [busy, setBusy] = useState(false)
@@ -87,6 +88,8 @@ export default function BuyFlowModal({
     pdsAccepted,
     saAccepted,
     declarationsAccepted,
+    typedSignature,
+    fullName: accountFullName ?? undefined,
   })
 
   async function handleStakeStep(direction: -1 | 1) {
@@ -156,9 +159,12 @@ export default function BuyFlowModal({
       const outcome = await postEngineIdentity(
         {
           accountId,
-          pdsAccepted,
-          saAccepted,
-          declarationsAccepted,
+          acceptance: {
+            pdsAccepted,
+            saAccepted,
+            declarationsAccepted,
+            typedSignature,
+          },
           confirmedFullName: confirmedName,
           returnUrl: `${SITE_URL}/marketplace/${horseSlug}`,
         },
@@ -187,9 +193,12 @@ export default function BuyFlowModal({
           dslId,
           accountId,
           stake: quote.stake,
-          pdsAccepted,
-          saAccepted,
-          declarationsAccepted,
+          acceptance: {
+            pdsAccepted,
+            saAccepted,
+            declarationsAccepted,
+            typedSignature,
+          },
           stripeIdentityId:
             identityOutcome?.status === 'verified' ? identityOutcome.stripeIdentityId : null,
           successUrl: `${SITE_URL}/mystable?session_id={CHECKOUT_SESSION_ID}`,
@@ -355,7 +364,7 @@ export default function BuyFlowModal({
                     onClick={() => void handleProceedToDocuments()}
                     className="label-action min-h-11 rounded-pill bg-gold px-6 py-3 text-on-gold transition duration-hover hover:bg-gold-hover"
                   >
-                    Review Legal Documents
+                    Review Investor Pack
                   </button>
                 </div>
               </div>
@@ -364,9 +373,9 @@ export default function BuyFlowModal({
             {screen === 'Documents' && compiled ? (
               <div className="mt-6 space-y-6">
                 <div>
-                  <p className="label-eyebrow text-gold">Screen 2 · Legal Pack</p>
+                  <p className="label-eyebrow text-gold">Screen 2 · Investor Pack</p>
                   <h2 className="mt-2 text-section-heading leading-heading text-heading">
-                    Review &amp; Sign Documents
+                    Review &amp; Sign Your Investor Pack
                   </h2>
                 </div>
 
@@ -428,6 +437,18 @@ export default function BuyFlowModal({
                       </label>
                     ))}
                   </div>
+
+                  <label htmlFor="typedSignature" className="label-spec mt-4 block text-legal-ink">
+                    Type your full legal name to sign
+                  </label>
+                  <input
+                    id="typedSignature"
+                    type="text"
+                    autoComplete="name"
+                    value={typedSignature}
+                    onChange={(event) => setTypedSignature(event.target.value)}
+                    className="mt-2 min-h-11 w-full rounded border border-legal-border bg-legal-surface px-4 py-3 text-body text-legal-ink"
+                  />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6">

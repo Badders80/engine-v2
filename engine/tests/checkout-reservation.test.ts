@@ -129,6 +129,7 @@ describe('B6 — reserve at Checkout', () => {
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         successUrl: 'https://example.test/ok',
         cancelUrl: 'https://example.test/cancel',

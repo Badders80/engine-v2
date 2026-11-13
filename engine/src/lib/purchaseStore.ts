@@ -73,6 +73,14 @@ export type NewCheckoutSession = {
   expiresAt: string
 }
 
+export type CheckoutAcceptanceEvidence = {
+  pdsAcceptedAt: string
+  saAcceptedAt: string
+  declarationsAccepted: readonly string[]
+  typedSignature: string
+  acceptanceRecordedAt: string
+}
+
 export type CheckoutSessionRow = NewCheckoutSession & {
   id: string
   stripeSessionId: string | null
@@ -84,6 +92,7 @@ export type CheckoutSessionRow = NewCheckoutSession & {
   resolvedAt: string | null
   resolvedBy: string | null
   resolution: string | null
+  acceptance: CheckoutAcceptanceEvidence | null
 }
 
 /** U18: the executed terms frozen onto the sale. None is recomputed later. */
@@ -173,6 +182,10 @@ export interface PurchaseStore extends DslStore {
    * buyers cannot take the same last percent.
    */
   reserveCheckoutSession(row: NewCheckoutSession): Promise<CheckoutSessionRow>
+  recordCheckoutAcceptance(
+    checkoutId: string,
+    acceptance: Omit<CheckoutAcceptanceEvidence, 'pdsAcceptedAt' | 'saAcceptedAt' | 'acceptanceRecordedAt'>,
+  ): Promise<CheckoutSessionRow>
   attachStripeSession(
     checkoutId: string,
     stripeSessionId: string,
@@ -635,9 +648,31 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
         resolvedAt: null,
         resolvedBy: null,
         resolution: null,
+        acceptance: null,
       }
       checkoutSessions.push(created)
       return { ...created }
+    },
+
+    async recordCheckoutAcceptance(checkoutId, acceptance) {
+      const index = checkoutSessions.findIndex((row) => row.id === checkoutId)
+      const found = mustFindCheckout(checkoutSessions[index], checkoutId)
+      if (found.status !== 'open' || found.stripeSessionId !== null || found.acceptance !== null) {
+        throw new Error(`checkout ${checkoutId} is not open for acceptance`)
+      }
+      const recordedAt = nowIso()
+      const updated: CheckoutSessionRow = {
+        ...found,
+        acceptance: {
+          pdsAcceptedAt: recordedAt,
+          saAcceptedAt: recordedAt,
+          declarationsAccepted: [...acceptance.declarationsAccepted],
+          typedSignature: acceptance.typedSignature.trim(),
+          acceptanceRecordedAt: recordedAt,
+        },
+      }
+      checkoutSessions[index] = updated
+      return { ...updated, acceptance: updated.acceptance === null ? null : { ...updated.acceptance } }
     },
 
     async attachStripeSession(checkoutId, stripeSessionId) {

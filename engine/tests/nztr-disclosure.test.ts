@@ -119,7 +119,7 @@ const CHECKLIST: ReadonlyArray<{ item: string; patterns: RegExp[] }> = [
   },
   {
     item: '12. applicant acknowledgement — 18 or over, not prohibited from owning a racehorse, the stake, the price, and their identity',
-    patterns: [/## 19\. Investor Declaration/, /18 (years|or over)|eighteen/i, /not prohibited/i, /Subscriber:/],
+    patterns: [/## 19\. Investor Declaration/, /18 (years|or over)|eighteen/i, /not prohibited/i, /\| Signatory \| Capacity \| Date \|/],
   },
 ]
 

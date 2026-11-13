@@ -36,6 +36,13 @@ function strOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
+function strArray(value: unknown): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw new Error('checkout_sessions.declarations_accepted is not a string array')
+  }
+  return value
+}
+
 function num(value: unknown): number {
   return typeof value === 'number' ? value : Number(value ?? 0)
 }
@@ -121,6 +128,7 @@ function checkoutStatus(value: unknown): CheckoutStatus {
 
 function toCheckoutSession(value: unknown): CheckoutSessionRow {
   const row = record(value)
+  const acceptanceRecordedAt = strOrNull(row.acceptance_recorded_at)
   return {
     id: str(row.id),
     stripeSessionId: strOrNull(row.stripe_session_id),
@@ -144,6 +152,16 @@ function toCheckoutSession(value: unknown): CheckoutSessionRow {
     resolvedAt: strOrNull(row.resolved_at),
     resolvedBy: strOrNull(row.resolved_by),
     resolution: strOrNull(row.resolution),
+    acceptance:
+      acceptanceRecordedAt === null
+        ? null
+        : {
+            pdsAcceptedAt: str(row.pds_accepted_at),
+            saAcceptedAt: str(row.sa_accepted_at),
+            declarationsAccepted: strArray(row.declarations_accepted),
+            typedSignature: str(row.typed_signature),
+            acceptanceRecordedAt,
+          },
   }
 }
 
@@ -269,6 +287,16 @@ export function createSupabasePurchaseStore(
         ),
       })
       if (error) fail('reserve_checkout_stake', error.message)
+      return toCheckoutSession(data)
+    },
+
+    async recordCheckoutAcceptance(checkoutId, acceptance) {
+      const { data, error } = await client.rpc('record_checkout_acceptance', {
+        p_checkout_id: checkoutId,
+        p_declarations: [...acceptance.declarationsAccepted],
+        p_typed_signature: acceptance.typedSignature,
+      })
+      if (error) fail('record_checkout_acceptance', error.message)
       return toCheckoutSession(data)
     },
 

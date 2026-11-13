@@ -107,6 +107,7 @@ describe.skipIf(!LOCAL)('local-stack synthetic ledger fixture', () => {
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         executedDate: '2026-11-15',
         successUrl: 'https://example.test/ok',

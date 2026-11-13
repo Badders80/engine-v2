@@ -1,5 +1,1 @@
-**Break clause — 3× buyout.** Where the underlying head lease provides exit proceeds, the owner may end the lease early by buying out the remainder at three times its value. On settlement:
-- **Upfront Leases:** You receive 3× the pro-rata unused lease fee for the full months remaining.
-- **Monthly Leases:** Monthly billing stops, and you receive 3× the remaining lease payments, plus any unused prepaid payments and deposit reserve.
-
-All refunds are calculated strictly in full calendar months. No day-count apportionments apply.
+**15.1 Early Sale / Buyout:** If the horse is sold or bought out during the term, the Owner may end the lease by paying three times the remaining lease value. Settlement follows Clause 15.3.

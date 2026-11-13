@@ -159,6 +159,12 @@ describe('the raw corpus carries no banned term', () => {
     /fair\s+value/i,
     /\b14\s+business\s+days\b/i,
     /\babsorb(?:ed|ing|s)?\b/i,
+    /head\s+lease/i,
+    /there\s+is\s+no\s+buyout/i,
+    /\bstrictly\b/i,
+    /shareholders?/i,
+    /\blessor\b/i,
+    /prize\s+freeze/i,
   ]
 
   it('passes on every file', () => {

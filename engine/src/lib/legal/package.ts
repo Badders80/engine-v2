@@ -15,6 +15,10 @@ export type PdfRenderer = (input: {
   outputPath: string
   contractId: string
   legalPackVersion: string
+  investorName: string
+  horseName: string
+  executedDate: string
+  createdAt: string
   pdsMarkdown: string
   saMarkdown: string
 }) => Promise<void>
@@ -70,6 +74,10 @@ export async function renderLegalPdfWithReportLab(input: {
   outputPath: string
   contractId: string
   legalPackVersion: string
+  investorName: string
+  horseName: string
+  executedDate: string
+  createdAt: string
   pdsMarkdown: string
   saMarkdown: string
 }): Promise<void> {
@@ -80,6 +88,10 @@ export async function renderLegalPdfWithReportLab(input: {
       output_path: input.outputPath,
       contract_id: input.contractId,
       legal_pack_version: input.legalPackVersion,
+      investor_name: input.investorName,
+      horse_name: input.horseName,
+      executed_date: input.executedDate,
+      created_at: input.createdAt,
       pds_markdown: input.pdsMarkdown,
       sa_markdown: input.saMarkdown,
     }),
@@ -145,6 +157,10 @@ export async function buildLegalPackage(
       outputPath: tempPdfPath,
       contractId: input.contractId,
       legalPackVersion: pack.version,
+      investorName: input.input.account.fullName,
+      horseName: input.input.horse.legalName,
+      executedDate: input.input.sale.executedDate,
+      createdAt: input.createdAt,
       pdsMarkdown: pack.pds.markdown,
       saMarkdown: pack.sa.markdown,
     })

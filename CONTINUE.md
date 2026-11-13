@@ -81,8 +81,8 @@ pushed.
 - **Expense pricing:** expense rates are additive against wholesale. The current
   5% margin + 3% platform fee applies `ceil(wholesale × 1.08)`, not
   `ceil(wholesale × 1.05 × 1.03)`. Future expense rates join the same sum.
-- **Gate:** `pnpm verify` exit 0; engine **401 passed / 1 skipped**, website
-  **54 passed**, both builds.
+- **Gate:** `pnpm verify` exit 0; engine **402 passed / 1 skipped**, website
+  **64 passed**, both builds. `just verify-db` PASS at schema `00031`.
 - **Independent audit:** raw Ollama `kimi-k2.7-code` passed claims 1–5 and 7.
   Its initial claim-6 WARN found that the DOD was not wired into CI. CI now
   installs ReportLab + Poppler and runs the DOD after `pnpm verify`. The
@@ -90,11 +90,16 @@ pushed.
   false positive verified against live tags (`actions/checkout@v7`,
   `pnpm/action-setup@v6`, `actions/setup-node@v7` all exist).
 - **Audit record:** `/home/evo/sandbox/mvp/audits/RAW-OLLAMA-AUDIT-2026-11-12.md`.
+- **F1 acceptance persistence — done 2026-11-13:** checkout sessions now store
+  PDS/SA acceptance timestamps, the canonical declaration snapshot, typed
+  signature and recording time. The evidence is immutable and Stripe cannot bind
+  the checkout until it exists. The sale remains linked by `checkout_session_id`.
 
 ## Ledger
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-13 | F1 acceptance persistence: immutable PDS/SA declarations, typed signature and Stripe precondition | engine_v2/website | — | done |
 | 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
 | 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |
 | 2026-11-13 | Investor Pack presentation baseline checkpointed at legal pack 1.0.3 | engine_v2/website | — | done |
@@ -124,13 +129,11 @@ pushed.
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.
 - **F3** — external immutable document archive + manifest. **Priority.**
-- **F1** — persist the generated contract ID through DB sale storage; separate
-  the signature/executed date from the selectable whole-month term start; carry
-  both through quote, documents, checkout and the frozen sale snapshot. Add the
-  Investor Pack signing flow: PDS scroll/acceptance; SA scroll, declarations and
-  typed full legal name; unsigned review pack before signing; executed pack after
-  acceptance; persisted hashes, acceptance times, declarations, signature,
-  checkout ID and sale ID. Declarations remain inside the SA; no third document.
+- **F1 remaining** — persist the generated contract ID through DB sale storage;
+  separate the signature/executed date from the selectable whole-month term
+  start; carry both through quote, documents, checkout and the frozen sale
+  snapshot; add the post-sale executed Investor Pack and email handoff.
+  Acceptance evidence is done. Declarations remain inside the SA; no third doc.
 - **F2 / F4 / F5** — post-sale term freeze; offsite backup; recovery drill.
 - **Mumbai project** `umxljalfbmvrocaopao` — confirm deleted.
 - **Keys** — the service-role JWT was pasted into chat; rotate in one batch at

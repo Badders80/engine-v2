@@ -146,6 +146,7 @@ describe('Step 8a — recordWebhookEvent', () => {
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         executedDate: '2026-10-21',
         successUrl: 'https://example.test/ok',

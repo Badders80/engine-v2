@@ -66,6 +66,12 @@ BANNED=(
   'fair[[:space:]]+value'
   '\b14[[:space:]]+business[[:space:]]+days\b'
   '\babsorb(ed|ing|s)?\b'
+  'Head[[:space:]]+Lease'
+  'There[[:space:]]+is[[:space:]]+no[[:space:]]+buyout'
+  '\bstrictly\b'
+  'Shareholders?'
+  '\bLessor\b'
+  'Prize[[:space:]]+Freeze'
 )
 banned_hit=0
 for file in "${FILES[@]}"; do
@@ -112,7 +118,6 @@ done
 EXPECTED=(
   'account.full_name'
   'contract.id'
-  'dsl.campaign_slug'
   'dsl.distribution_schedule'
   'dsl.end_date'
   'dsl.investor_split'

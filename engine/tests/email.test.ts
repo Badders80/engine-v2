@@ -432,6 +432,7 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
     pdsAccepted: true,
     saAccepted: true,
     declarationsAccepted: [...SA_DECLARATIONS],
+    typedSignature: 'Test Investor',
   }
 
   it('sends founder_our_fault_failure (stage: checkout) and writes no sale row when stripe.createCheckoutSession throws', async () => {
@@ -495,7 +496,12 @@ describe('Step 9 — checkout email triggers and buyer-fault silence', () => {
         dslId,
         accountId,
         stake: 5,
-        acceptance: { pdsAccepted: false, saAccepted: true, declarationsAccepted: [...SA_DECLARATIONS] },
+        acceptance: {
+          pdsAccepted: false,
+          saAccepted: true,
+          declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
+        },
         successUrl: 'https://www.evolutionstables.nz/mystable',
         cancelUrl: 'https://www.evolutionstables.nz/marketplace/lady-ketchikan',
       },

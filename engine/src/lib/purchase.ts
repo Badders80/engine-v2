@@ -7,7 +7,7 @@
  *   stored `retailMonthlyPerPercent` without recomputing `wholesale * 1.08`
  *   and without any `'75'` split fallback.
  * - `compileBuyerDocuments` compiles the PDS and SA with `account.fullName` and
- *   validates the buyer's acceptance of the PDS, the SA, and the four mandatory
+ *   validates the buyer's acceptance of the PDS, the SA, and the seven mandatory
  *   SA declarations (`PLAN.md:232`).
  * - `beginOrConfirmIdentity` enforces the KYC gate (`PLAN.md:234`).
  * - `openCheckoutSession` creates the hosted Stripe Checkout session in
@@ -53,13 +53,16 @@ export type Result<T> = { ok: true; value: T } | { ok: false; reason: string }
 export const CHECKOUT_HOLD_SECONDS = 600
 
 /**
- * The four mandatory SA declarations from `PLAN.md:232`, verbatim.
+ * The canonical SA declarations. Schedule 2 and checkout must use this wording.
  */
 export const SA_DECLARATIONS = [
-  'not disqualified or suspended under the NZTR Rules of Racing',
-  'acquiring the stake as the true beneficial owner',
-  'bound by the NZTR Rules of Racing and the Welfare Guidelines',
-  'Evolution Stables Limited is the syndicate manager',
+  'I am at least 18 years of age.',
+  'I am not subject to any racing disqualification, exclusion order, or ban under NZTR rules.',
+  'I am acquiring the stake as the true beneficial owner.',
+  'I accept Evolution Stables Ltd as the syndicate manager and agree to be bound by the NZTR Rules of Racing and Welfare Guidelines.',
+  'I understand that participation is a fixed-term leasehold interest and does not confer direct equity ownership.',
+  'I will complete identity verification before payment.',
+  'I will provide proof of address when requested by the Syndicate Manager.',
 ] as const
 
 export type SaDeclaration = (typeof SA_DECLARATIONS)[number]
@@ -68,6 +71,7 @@ export type DocumentAcceptanceInput = {
   pdsAccepted: boolean
   saAccepted: boolean
   declarationsAccepted: readonly string[]
+  typedSignature: string
 }
 
 export type PurchaseQuote = {
@@ -265,6 +269,9 @@ export function verifyDocumentAcceptance(acceptance: DocumentAcceptanceInput): R
   }
   if (!acceptance.saAccepted) {
     return { ok: false, reason: 'you must accept the Syndicate Agreement' }
+  }
+  if (typeof acceptance.typedSignature !== 'string' || acceptance.typedSignature.trim() === '') {
+    return { ok: false, reason: 'type your full legal name to sign the Investor Pack' }
   }
 
   const acceptedSet = new Set(acceptance.declarationsAccepted)
@@ -501,6 +508,22 @@ export async function openCheckoutSession(
   } catch (error) {
     const reason =
       error instanceof Error ? error.message : 'failed to bind the checkout documents'
+    await sendEngineEmail(
+      { kind: 'founder_our_fault_failure', stage: 'checkout', reason },
+      emailSender,
+    )
+    return { ok: false, reason }
+  }
+
+  try {
+    checkout = await store.recordCheckoutAcceptance(checkout.id, {
+      declarationsAccepted: input.acceptance.declarationsAccepted,
+      typedSignature: input.acceptance.typedSignature,
+    })
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : 'failed to record Investor Pack acceptance'
+    await store.releaseCheckoutSession(checkout.id)
     await sendEngineEmail(
       { kind: 'founder_our_fault_failure', stage: 'checkout', reason },
       emailSender,

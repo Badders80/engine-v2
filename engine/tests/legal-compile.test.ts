@@ -102,7 +102,10 @@ describe('a 21-month float pack renders', () => {
   })
 
   it('selects the fourteen-day close paragraph', () => {
-    expect(pack.pds.markdown).toContain('Lessor 14-Day Break')
+    expect(pack.pds.markdown).toContain('9.1 14-Day Notice')
+    expect(pack.pds.markdown).toContain(
+      'Evolution Stables reserves the right to terminate the DSL',
+    )
     expect(pack.pds.markdown).not.toContain('Early Sale / Buyout')
   })
 })
@@ -153,8 +156,8 @@ describe('the payment-model rule is enforced in the compiler', () => {
 describe('the close-style branches do not leak into each other', () => {
   it('prints the three-times-remaining text and not the fourteen-day text', () => {
     const pack = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
-    expect(pack.pds.markdown).toContain('Early Sale / Buyout')
-    expect(pack.pds.markdown).not.toContain('Lessor 14-Day Break')
+    expect(pack.pds.markdown).toContain('9.1 Early Sale / Buyout')
+    expect(pack.pds.markdown).not.toContain('9.1 14-Day Notice')
   })
 })
 
@@ -209,19 +212,21 @@ describe('required values fail loudly', () => {
   })
 })
 
-describe('the SA states the break clause', () => {
-  it('prints the 14-day branch with no buyout', () => {
+describe('the SA states the termination clause', () => {
+  it('prints the 14-day branch as a pass-through right', () => {
     const pack = compileLegalPack(input({ dsl: { closeStyle: 'fourteen_day' } }))
-    expect(pack.sa.markdown).toContain('Break clause — 14-day notice.')
-    expect(pack.sa.markdown).toContain('There is no buyout.')
-    expect(pack.sa.markdown).not.toContain('Break clause — 3× buyout.')
+    expect(pack.sa.markdown).toContain('15.1 14-Day Notice')
+    expect(pack.sa.markdown).toContain(
+      'Evolution Stables reserves the right to terminate this Agreement',
+    )
+    expect(pack.sa.markdown).not.toContain('Early Sale / Buyout')
   })
 
   it('prints the 3× branch with the buyout', () => {
     const pack = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
-    expect(pack.sa.markdown).toContain('Break clause — 3× buyout.')
-    expect(pack.sa.markdown).toContain('3× the pro-rata unused lease fee')
-    expect(pack.sa.markdown).not.toContain('There is no buyout.')
+    expect(pack.sa.markdown).toContain('15.1 Early Sale / Buyout')
+    expect(pack.sa.markdown).toContain('three times the remaining lease value')
+    expect(pack.sa.markdown).not.toContain('15.1 14-Day Notice')
   })
 
   it('prints both payment-model settlements in each branch', () => {
@@ -234,9 +239,11 @@ describe('the SA states the break clause', () => {
 
   it('keeps the PDS and SA aligned on the selected style', () => {
     const fourteen = compileLegalPack(input({ dsl: { closeStyle: 'fourteen_day' } }))
-    expect(fourteen.pds.markdown).toContain('Lessor 14-Day Break')
+    expect(fourteen.pds.markdown).toContain('9.1 14-Day Notice')
+    expect(fourteen.sa.markdown).toContain('15.1 14-Day Notice')
     const buyout = compileLegalPack(input({ dsl: { closeStyle: 'three_x_remaining' } }))
-    expect(buyout.pds.markdown).toContain('Early Sale / Buyout')
+    expect(buyout.pds.markdown).toContain('9.1 Early Sale / Buyout')
+    expect(buyout.sa.markdown).toContain('15.1 Early Sale / Buyout')
   })
 })
 
@@ -245,10 +252,10 @@ describe('exit, default and wind-up rights', () => {
 
   it('states the five-month voluntary exit runway', () => {
     for (const document of [pack.pds.markdown, pack.sa.markdown]) {
-      expect(document).toContain('Voluntary Investor Exit')
-      expect(document).toContain('at least five full calendar months remain')
-      expect(document).toContain('scheduled payment due on the next 1st remains payable')
-      expect(document).toContain('one-month advance and three-month deposit reserve')
+      expect(document).toContain('Voluntary Exit (Subscription Float only)')
+      expect(document).toContain('at least five full calendar months remaining')
+      expect(document).toContain('next scheduled payment remains due')
+      expect(document).toContain('one-month advance plus three-month reserve')
     }
   })
 
@@ -261,11 +268,32 @@ describe('exit, default and wind-up rights', () => {
     }
   })
 
-  it('states automatic wind-up and no rollover at expiry', () => {
+  it('states automatic wind-up and first refusal at expiry', () => {
     for (const document of [pack.pds.markdown, pack.sa.markdown]) {
-      expect(document).toContain('automatically wound up')
-      expect(document).toContain('does not roll over')
-      expect(document).toContain('participant opts into new terms')
+      expect(document).toContain('winds up automatically')
+      expect(document).toContain('right of first refusal')
+      expect(document).toContain('new agreement and Investor opt-in')
+    }
+  })
+
+  it('keeps the agreed plain-language structure', () => {
+    expect(pack.pds.markdown).toContain('## 6. Individual Exit, Default & Forfeiture')
+    expect(pack.pds.markdown).toContain('## 9. Early Termination, Refunds & Expiry')
+    expect(pack.sa.markdown).toContain('## 8. Individual Exit, Default & Forfeiture')
+    expect(pack.sa.markdown).toContain('## 15. Syndicate Early Termination & Refunds')
+    expect(pack.pds.markdown).toContain('**5.1 Calculation:**')
+    expect(pack.pds.markdown).not.toContain('- **5.1 Calculation:**')
+    expect(pack.pds.markdown).toContain('**13.1 Performance:**')
+    expect(pack.sa.markdown).toContain('**7.1** Make all day-to-day decisions')
+    expect(pack.sa.markdown).toContain('**10.1 Entitlement:**')
+    expect(pack.pds.markdown).toContain('**5.3 Schedule:** Monthly on the 1st.')
+    expect(pack.sa.markdown).toContain('| Attribute | Detail |')
+    expect(pack.sa.markdown).toContain('| Signatory | Capacity | Date |')
+    expect(pack.pds.markdown).toContain('6. Are 18 years of age or older')
+
+    for (const document of [pack.pds.markdown, pack.sa.markdown]) {
+      expect(document).not.toMatch(/Head Lease|head lease|There is no buyout|strictly|Shareholder|Lessor|Prize Freeze/i)
+      expect(document.match(/whole calendar months only/g)).toHaveLength(1)
     }
   })
 })
@@ -274,7 +302,7 @@ describe('the output is deterministic', () => {
   const first = compileLegalPack(input())
 
   it('renders a whole percent without decimals', () => {
-    expect(first.sa.markdown).toContain('- **Investor Return:** 75%')
+    expect(first.sa.markdown).toContain('| Investor Return | 75% |')
   })
 
   it('produces identical Markdown and hashes on a second compile', () => {

@@ -29,6 +29,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       declarationsAccepted: Array.isArray(body.acceptance?.declarationsAccepted)
         ? body.acceptance.declarationsAccepted.filter((item): item is string => typeof item === 'string')
         : [],
+      typedSignature:
+        typeof body.acceptance?.typedSignature === 'string'
+          ? body.acceptance.typedSignature
+          : '',
     }
 
     if (accountId === '' || returnUrl === '') {

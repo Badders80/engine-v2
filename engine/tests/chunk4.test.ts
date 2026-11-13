@@ -42,6 +42,7 @@ const acceptance = {
   pdsAccepted: true,
   saAccepted: true,
   declarationsAccepted: [...SA_DECLARATIONS],
+  typedSignature: 'Test Investor',
 }
 
 async function setup(overrides: Partial<DslDraft> = {}) {

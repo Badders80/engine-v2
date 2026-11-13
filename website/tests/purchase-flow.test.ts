@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { BUY_FLOW_SCREENS } from '../src/components/BuyFlowModal'
 import { sanitizeReturnPath, validateSignupInput } from '../src/lib/auth'
@@ -27,6 +27,8 @@ import {
   BUY_FLOW_REFUND_SENTENCE,
   BUY_FLOW_SA_DECLARATIONS,
   canRenderBuyNow,
+  postEngineCheckout,
+  postEngineIdentity,
   requireInvestorSplit,
 } from '../src/lib/engineClient'
 import {
@@ -105,12 +107,22 @@ describe('Step 8b — five-screen BuyFlowModal and Buy Now gate', () => {
     expect(() => requireInvestorSplit(null)).toThrow(/investor_split/)
   })
 
-  it('requires PDS acceptance, SA acceptance, and all four verbatim SA declarations', () => {
+  it('requires PDS acceptance, SA acceptance, and all seven canonical SA declarations', () => {
+    expect(BUY_FLOW_SA_DECLARATIONS).toEqual([
+      'I am at least 18 years of age.',
+      'I am not subject to any racing disqualification, exclusion order, or ban under NZTR rules.',
+      'I am acquiring the stake as the true beneficial owner.',
+      'I accept Evolution Stables Ltd as the syndicate manager and agree to be bound by the NZTR Rules of Racing and Welfare Guidelines.',
+      'I understand that participation is a fixed-term leasehold interest and does not confer direct equity ownership.',
+      'I will complete identity verification before payment.',
+      'I will provide proof of address when requested by the Syndicate Manager.',
+    ])
     expect(
       allDocumentsAccepted({
         pdsAccepted: true,
         saAccepted: true,
-        declarationsAccepted: BUY_FLOW_SA_DECLARATIONS.slice(0, 3),
+        declarationsAccepted: BUY_FLOW_SA_DECLARATIONS.slice(0, 6),
+        typedSignature: 'Test Investor',
       }),
     ).toBe(false)
 
@@ -119,8 +131,72 @@ describe('Step 8b — five-screen BuyFlowModal and Buy Now gate', () => {
         pdsAccepted: true,
         saAccepted: true,
         declarationsAccepted: [...BUY_FLOW_SA_DECLARATIONS],
+        typedSignature: 'Test Investor',
       }),
     ).toBe(true)
+    expect(
+      allDocumentsAccepted({
+        pdsAccepted: true,
+        saAccepted: true,
+        declarationsAccepted: [...BUY_FLOW_SA_DECLARATIONS],
+        typedSignature: 'Wrong Name',
+        fullName: 'Test Investor',
+      }),
+    ).toBe(false)
+  })
+
+  it('sends acceptance evidence inside the API acceptance object', async () => {
+    const acceptance = {
+      pdsAccepted: true,
+      saAccepted: true,
+      declarationsAccepted: [...BUY_FLOW_SA_DECLARATIONS],
+      typedSignature: 'Test Investor',
+    }
+    const bodies: Record<string, unknown>[] = []
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          identity: { status: 'verified', fullName: 'Test Investor', stripeIdentityId: null },
+          checkoutSessionId: 'cs_test',
+          checkoutUrl: 'https://checkout.stripe.com/test',
+          quote: {},
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      await postEngineIdentity(
+        {
+          accountId: 'acc-test',
+          acceptance,
+          confirmedFullName: 'Test Investor',
+          returnUrl: 'https://example.test/return',
+        },
+        'https://engine.example.test',
+      )
+      await postEngineCheckout(
+        {
+          dslId: 'dsl-test',
+          accountId: 'acc-test',
+          stake: 1,
+          acceptance,
+          successUrl: 'https://example.test/success',
+          cancelUrl: 'https://example.test/cancel',
+        },
+        'https://engine.example.test',
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    for (const body of bodies) {
+      expect(body.acceptance).toEqual(acceptance)
+      expect(body).not.toHaveProperty('pdsAccepted')
+      expect(body).not.toHaveProperty('declarationsAccepted')
+    }
   })
 
   it('prints the verbatim refund sentence with zero day-count expressions and uses .legal-doc', () => {
@@ -132,7 +208,7 @@ describe('Step 8b — five-screen BuyFlowModal and Buy Now gate', () => {
     expect(modalSource).not.toMatch(/\d+\s+days?/i)
     expect(modalSource).toContain('legal-doc')
     expect(modalSource).toContain('Evolution Stables is an NZTR-authorised syndicator.')
-    expect(modalSource).toContain('Review &amp; Sign Documents')
+    expect(modalSource).toContain('Review &amp; Sign Your Investor Pack')
     expect(modalSource).toContain('Signed documents are hashed and stored for MyStable.')
     expect(modalSource).toContain('Encrypted and handled under the NZ Privacy Act 2020.')
   })

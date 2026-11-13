@@ -59,7 +59,7 @@ describe('the contract identifier', () => {
   })
 })
 
-describe('the complete legal package', () => {
+describe('the complete Investor Pack', () => {
   it('writes the combined document, manifest, provenance and exact hashes', async () => {
     const outDir = await mkdtemp(join(tmpdir(), 'legal-package-'))
     roots.push(outDir)

@@ -8,7 +8,7 @@
  *   `upfrontTotal` / `totalForStake`).
  * - Item 4: `investorSplit` is required; null is refused with zero `'75'` fallback.
  * - Item 5: `compileBuyerDocuments` compiles PDS and SA with `account.fullName`.
- * - Item 6: `verifyDocumentAcceptance` requires PDS, SA, and all four SA declarations.
+ * - Item 6: `verifyDocumentAcceptance` requires PDS, SA, and all seven SA declarations.
  * - Item 7: `beginOrConfirmIdentity` skips Identity when verified, starts Identity
  *   when unverified, and refuses when failed.
  * - Item 8: `openCheckoutSession` requires verified KYC and available/published DSL,
@@ -198,7 +198,7 @@ describe('Step 8a — effectiveMinStake, step validation, and quote calculation'
 })
 
 describe('Step 8a — document compilation and acceptance gate', () => {
-  it('compiles PDS and SA with account.fullName and enforces all four SA declarations', async () => {
+  it('compiles PDS and SA with account.fullName and enforces all seven SA declarations', async () => {
     const store = createInMemoryPurchaseStore()
     const { dsl } = await seedAvailableDsl(store)
     const account = await store.insertAccount({
@@ -218,12 +218,26 @@ describe('Step 8a — document compilation and acceptance gate', () => {
     expect(compiled.value.pack.sa.markdown).toContain('Aroha Williams')
     expect(compiled.value.pack.pds.hash).toMatch(/^[a-f0-9]{64}$/)
     expect(compiled.value.pack.sa.hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(SA_DECLARATIONS).toEqual([
+      'I am at least 18 years of age.',
+      'I am not subject to any racing disqualification, exclusion order, or ban under NZTR rules.',
+      'I am acquiring the stake as the true beneficial owner.',
+      'I accept Evolution Stables Ltd as the syndicate manager and agree to be bound by the NZTR Rules of Racing and Welfare Guidelines.',
+      'I understand that participation is a fixed-term leasehold interest and does not confer direct equity ownership.',
+      'I will complete identity verification before payment.',
+      'I will provide proof of address when requested by the Syndicate Manager.',
+    ])
+    for (const declaration of SA_DECLARATIONS) {
+      expect(compiled.value.pack.sa.markdown).toContain(declaration)
+    }
+    expect(compiled.value.pack.sa.markdown).not.toContain('Have provided verified identity')
 
     // Missing one declaration fails
     const missingDecl = verifyDocumentAcceptance({
       pdsAccepted: true,
       saAccepted: true,
       declarationsAccepted: SA_DECLARATIONS.slice(0, 3),
+      typedSignature: 'Test Investor',
     })
     expect(missingDecl.ok).toBe(false)
 
@@ -232,6 +246,7 @@ describe('Step 8a — document compilation and acceptance gate', () => {
       pdsAccepted: true,
       saAccepted: true,
       declarationsAccepted: [...SA_DECLARATIONS],
+      typedSignature: 'Test Investor',
     })
     expect(allAccepted.ok).toBe(true)
   })
@@ -242,6 +257,7 @@ describe('Step 8a — Identity and Checkout gates', () => {
     pdsAccepted: true,
     saAccepted: true,
     declarationsAccepted: [...SA_DECLARATIONS],
+    typedSignature: 'Test Investor',
   }
 
   it('starts Stripe Identity for unverified accounts, skips when verified, and refuses when failed', async () => {
@@ -375,9 +391,20 @@ describe('Step 8a — Identity and Checkout gates', () => {
       emailSender,
     )
     expect(opened.ok).toBe(true)
+    if (!opened.ok) return
     expect(stripe.checkoutCalls).toBe(1)
     expect(store.dump().sales).toHaveLength(0)
     expect(emailSender.sent).toHaveLength(0)
+
+    const checkout = await store.findCheckoutSessionByStripeSessionId(
+      opened.value.checkoutSessionId,
+    )
+    expect(checkout?.acceptance).not.toBeNull()
+    expect(checkout?.acceptance?.declarationsAccepted).toEqual(SA_DECLARATIONS)
+    expect(checkout?.acceptance?.typedSignature).toBe('Test Investor')
+    expect(checkout?.acceptance?.pdsAcceptedAt).toMatch(/T/)
+    expect(checkout?.acceptance?.saAcceptedAt).toMatch(/T/)
+    expect(checkout?.acceptance?.acceptanceRecordedAt).toMatch(/T/)
   })
 })
 
@@ -402,6 +429,7 @@ describe('ruling 26 — checkout does not read the bucket', () => {
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         successUrl: 'https://example.test/ok',
         cancelUrl: 'https://example.test/cancel',
@@ -442,6 +470,7 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         executedDate: '2026-10-21',
         successUrl: 'https://example.test/ok',
@@ -540,6 +569,7 @@ describe('Step 8a — frozen sale documents survive later horse rename and DSL e
           pdsAccepted: true,
           saAccepted: true,
           declarationsAccepted: [...SA_DECLARATIONS],
+          typedSignature: 'Test Investor',
         },
         executedDate: '2026-10-21',
         successUrl: 'https://example.test/ok',

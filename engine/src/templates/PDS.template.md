@@ -2,7 +2,6 @@
 
 ## {{syndicate.name}}
 
-**Campaign:** {{dsl.campaign_slug}}  
 **Version:** {{syndicate.version}}  
 **Effective Date:** {{dsl.term_start}}  
 **Contract ID:** {{contract.id}}
@@ -78,7 +77,7 @@ This Product Disclosure Statement relates to the {{syndicate.name}}, managed by 
 | Sire | {{horse.sire_name}} |
 | Dam | {{horse.dam_name}} |
 | Microchip | {{horse.microchip}} |
-| Owner / Lessor | {{owner.entity_name}} |
+| Owner | {{owner.entity_name}} |
 | Trainer | {{trainer.name}} ({{trainer.location}}) |
 
 ### 2.3 Racing Outlook & Pedigree
@@ -98,29 +97,33 @@ This syndicate operates on a fixed rate of {{pricing.monthly_lease_payment_unit_
 Participation operates under one of two payment structures:
 
 - **Subscription Float Model:**
-  - An initial payment representing 5 months of the stake rate (3 months security deposit reserve + 2 months prepaid: current calendar month and 1 month in advance).
-  - Ongoing monthly payments of {{pricing.monthly_lease_payment_unit_nzd}} per 1% stake billed on the 1st of each month commencing on the 1st of the month following join (paying for Month 3 in advance), maintaining a 5-month float buffer, drawn down in the final months of the term.
+  - **Initial payment:** 5 months of the stake rate (3 months security deposit reserve + 2 months prepaid: current calendar month and 1 month in advance).
+  - **Ongoing monthly payments:** {{pricing.monthly_lease_payment_unit_nzd}} per 1% stake billed on the 1st of each month commencing on the 1st of the month following join (paying for Month 3 in advance), maintaining a 5-month float buffer, drawn down in the final months of the term.
 - **Upfront Model:** 100% of the lease term payment collected at checkout with zero subsequent charges.
 
 All amounts stated in this document are inclusive of GST at 15%. No additional GST is charged at checkout and no GST item is added to a payment.
 
+Billing and refunds use whole calendar months only; part months are not apportioned.
+
 ---
 
 ## 5. Investor Return & Stakes Allocation
-5.1. **Calculation:** Derived strictly from official NZTR gross stakes published on loveracing.nz.  
-5.2. **Allocation:** {{dsl.investor_split}}% of gross stakes is distributed pro-rata to Shareholders. The remaining {{dsl.owner_retention_split}}% is retained by the Owner. Shareholders have no secondary billing or liability for race-day deductions.  
-5.3. **Schedule:** {{dsl.distribution_schedule}}.  
-5.4. **Qualification:** Investors must be fully paid up for two (2) full calendar months prior to a race date to qualify for distributions from that race.  
-5.5. **Remittance:** Distributed via direct bank transfer or verified card payment upon completed AML/CFT verification. Pending verification funds are held in trust without forfeiture.
+**5.1 Calculation:** Derived from official NZTR gross stakes published on loveracing.nz.
+
+**5.2 Allocation:** {{dsl.investor_split}}% of gross stakes is distributed pro-rata to Investors. The remaining {{dsl.owner_retention_split}}% is retained by the Owner. Investors have no secondary billing or liability for race-day deductions.
+
+**5.3 Schedule:** {{dsl.distribution_schedule}}
+
+**5.4 Qualification:** Investors must be fully paid up for two (2) full calendar months prior to a race date to qualify for distributions from that race.
+
+**5.5 Remittance:** Distributed via direct bank transfer or verified card payment upon completed AML/CFT verification. Pending verification funds are held in trust without forfeiture.
 
 ---
 
-## 6. Exit, Default & Forfeiture
-**Voluntary Investor Exit:** An investor may give written notice of voluntary exit only when the account has no arrears and at least five full calendar months remain after the month in which notice is given. The scheduled payment due on the next 1st remains payable. After that payment, recurring billing stops and the one-month advance and three-month deposit reserve are applied at the monthly rate over the following four months. The investor retains participation and distribution rights while the account remains funded, and all winnings in that period are distributed normally. The account and stake end with a zero balance at the end of that fifth month. Voluntary exit is unavailable when fewer than five full calendar months remain, in which case participation continues to the fixed expiry.
+## 6. Individual Exit, Default & Forfeiture
+**6.1 Voluntary Exit (Subscription Float only):** Voluntary Exit is available only to Subscription Float Investors with no arrears and at least five full calendar months remaining after the notice month. The Investor may give Evolution Stables written notice to exit. The next scheduled payment remains due. Billing then stops, and the one-month advance plus three-month reserve fund the following four months. Distribution rights continue while the account is funded. The stake ends at zero after the fifth month.
 
-{{pds.close_style_block}}
-
-**Default & Forfeiture:** If a scheduled payment due on the 1st is missed, Evolution Stables Ltd will send written notice to the investor during that month. The investor may cure the arrears by the end of that month. If the account is not restored, default takes effect on the 1st of the next month. At default, any already earned but unpaid winnings are distributed to the investor. The three-month deposit reserve and the stake are forfeited to the Owner, and the investor's future distribution and ownership rights cease from the default date. Evolution Stables Ltd receives no financial benefit from a default.
+**6.2 Default & Forfeiture:** If a scheduled payment due on the 1st is missed, Evolution Stables Ltd will send written notice to the Investor during that month. The Investor may cure the arrears by the end of that month. If the account is not restored, default takes effect on the 1st of the next month. At default, already earned but unpaid winnings are distributed to the Investor. The three-month deposit reserve and the stake are forfeited to the Owner, and future distribution and ownership rights cease from the default date. Evolution Stables Ltd receives no financial benefit from a default.
 
 ---
 
@@ -134,14 +137,16 @@ This syndicate is a leasehold interest, not equity ownership. Leaseholders hold 
 
 ---
 
-## 9. Early Termination & Refunds
-If the horse is retired or the lease ends early, the syndicate winds down. Once all trailing expenses and care costs are settled with the owner:
-- **Upfront Leases:** You receive a pro-rata refund of the lease fee for any full months remaining.
-- **Monthly Leases:** Monthly billing stops, and any unused prepaid payments and deposit reserve are refunded.
+## 9. Early Termination, Refunds & Expiry
+{{pds.close_style_block}}
 
-All refunds are calculated strictly in full calendar months. No day-count apportionments apply.
+**9.2 Horse Retired from Racing:** If the horse is retired from racing, the Syndicate winds up.
 
-At the fixed expiry, the Syndicate is automatically wound up. The lease does not roll over unless the Manager offers a renewal and the participant opts into new terms. Post-racing arrangements remain the responsibility of the horse's connections and must comply with NZTR welfare requirements.
+**9.3 Settlement and Refunds:** Racing may end before the horse's care and rehoming are complete. Refunds are paid as soon as practicable after the Owner's final care and rehoming accounts are settled.
+- **Upfront Leases:** Receive a pro-rata refund of the lease fee for unused months remaining.
+- **Monthly Leases:** Billing stops, and unused prepaid payments and the deposit reserve are refunded.
+
+**9.4 Fixed Expiry:** At fixed expiry, the Syndicate winds up automatically and no further monthly obligations arise. If Evolution Stables offers a new lease, existing Investors have a right of first refusal. Evolution Stables will email the key terms and a reply date before offering the lease elsewhere. Participation requires a new agreement and Investor opt-in. Post-racing care and rehoming follow NZTR welfare requirements.
 
 ---
 
@@ -162,10 +167,14 @@ Evolution Stables Ltd receives a 5.0% margin included in the listed price to cov
 
 ## 13. Risk Disclosure
 Participation is speculative:
-13.1. **Performance:** Prize money is variable and not guaranteed.  
-13.2. **Health:** Injury or illness may delay racing or end the lease early.  
-13.3. **Liquidity:** Leasehold stakes cannot be sold on an open public exchange.  
-13.4. **Capital Loss:** You may lose your entire investment.
+
+**13.1 Performance:** Prize money is variable and not guaranteed.
+
+**13.2 Health:** Injury or illness may delay racing or end the lease early.
+
+**13.3 Liquidity:** Leasehold stakes cannot be sold on an open public exchange.
+
+**13.4 Capital Loss:** You may lose your entire investment.
 
 ---
 
@@ -202,14 +211,15 @@ Transfers require the written approval of Evolution Stables Ltd and NZTR complia
 By executing this agreement online, the subscriber confirms on {{sale.executed_date}} that they:
 1. Have received, read, and understood this Product Disclosure Statement and the Syndicate Agreement;
 2. Agree to be bound by the Syndicate Agreement and NZTR Rules of Racing;
-3. Understand participation is strictly a leasehold interest with no equity ownership in the horse;
+3. Understand participation is a leasehold interest with no equity ownership in the horse;
 4. Accept the investment risks outlined; and
 5. Consent to identity verification under New Zealand AML/CFT requirements;
-6. Am 18 years of age or older; and
-7. Am not prohibited under the NZTR Rules of Racing from owning or leasing a racehorse.
+6. Are 18 years of age or older; and
+7. Are not prohibited under the NZTR Rules of Racing from owning or leasing a racehorse.
 
-**Subscriber:** {{account.full_name}}  
-**Date:** {{sale.executed_date}}  
+| Signatory | Capacity | Date |
+| :--- | :--- | :--- |
+| {{account.full_name}} | Investor | {{sale.executed_date}} |
 
 ---
 
@@ -218,5 +228,6 @@ I, Alex Baddeley, declare that the information provided in this Product Disclosu
 
 Evolution Stables Ltd is an Authorised Syndicator under the NZTR Code of Practice. NZTR does not endorse, guarantee, or take responsibility for this offer.
 
-Alex Baddeley  
-Director, Evolution Stables Ltd
+| Signatory | Capacity | Date |
+| :--- | :--- | :--- |
+| Alex Baddeley | Director, Evolution Stables Ltd | {{sale.executed_date}} |

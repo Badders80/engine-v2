@@ -107,7 +107,7 @@ function assertNoBannedProse(document: string, name: string): void {
 }
 
 /**
- * Compile one legal pack.
+ * Compile one Investor Pack (PDS + SA).
  *
  * The payment-model rule is re-checked here independently of the save gate and
  * the database trigger, because a document is the last place an illegal

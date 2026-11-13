@@ -17,7 +17,7 @@ import { paymentModelAllowed, termMonthsBetween } from '../term'
 import type { CloseStyle, PaymentModel } from '../dslStore'
 
 /** The pack version printed on every document. One constant, bumped by hand. */
-export const LEGAL_PACK_VERSION = '1.0.2'
+export const LEGAL_PACK_VERSION = '1.0.4'
 
 export type LegalPackInput = {
   account: { fullName: string }
@@ -69,7 +69,6 @@ export type BlockKey = (typeof BLOCK_KEYS)[number]
 export const SCALAR_KEYS = [
   'account.full_name',
   'contract.id',
-  'dsl.campaign_slug',
   'dsl.distribution_schedule',
   'dsl.end_date',
   'dsl.investor_split',
@@ -143,6 +142,11 @@ export function pct(value: number): string {
   return Number(value.toFixed(2)).toString()
 }
 
+function formatSentence(value: string): string {
+  const trimmed = value.trim().replace(/[.!?]+$/, '')
+  return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}.`
+}
+
 /** `2026-05-31` unchanged. The format is the contract, so a bad value throws. */
 export function isoDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -199,9 +203,8 @@ export const RESOLVERS: Record<ScalarKey, (input: LegalPackInput) => string> = {
     return id === '' ? 'DRAFT — NOT ASSIGNED' : id
   },
 
-  'dsl.campaign_slug': (input) => required(input.horse.slug, 'horse.slug'),
   'dsl.distribution_schedule': (input) =>
-    required(input.dsl.distributionSchedule, 'dsl.distribution_schedule'),
+    formatSentence(required(input.dsl.distributionSchedule, 'dsl.distribution_schedule')),
   'dsl.end_date': (input) => isoDate(input.dsl.endDate),
   'dsl.investor_split': (input) => pct(investorSplit(input)),
   'dsl.listed_stake': (input) => pct(input.dsl.listedStake),

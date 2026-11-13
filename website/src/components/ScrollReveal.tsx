@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 const REVEAL_QUERY = '[data-reveal]'
 const OBSERVER_OPTIONS: IntersectionObserverInit = {
@@ -9,6 +10,8 @@ const OBSERVER_OPTIONS: IntersectionObserverInit = {
 }
 
 export function ScrollReveal() {
+  const pathname = usePathname()
+
   useEffect(() => {
     const root = document.documentElement
     const nodes = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_QUERY))
@@ -58,7 +61,7 @@ export function ScrollReveal() {
       root.removeAttribute('data-reveal-ready')
       for (const node of nodes) node.removeAttribute('data-reveal')
     }
-  }, [])
+  }, [pathname])
 
   return null
 }

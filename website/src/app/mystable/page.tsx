@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 
+import { PageContainer, PageIntro, PageShell } from '../../components/PagePrimitives'
 import { AUTH_TOKEN_COOKIE } from '../../lib/auth'
 import { readMyStable, type SaleRecord } from '../../lib/mystable'
 
@@ -99,30 +100,31 @@ export default async function MyStablePage({
   })
 
   return (
-    <main className="min-h-screen bg-canvas text-ink">
-      <section className="mx-auto w-full max-w-6xl px-12 pt-32 pb-32 md:px-16 lg:px-20">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/marketplace" className="label-action text-muted-foreground hover:text-heading">
-            Marketplace
-          </Link>
-          {!view.account ? (
-            <Link
-              href="/login?next=%2Fmystable"
-              className="label-action min-h-11 inline-flex items-center rounded-pill border border-border bg-surface px-5 py-2 text-heading"
-            >
-              Sign in
+    <PageShell>
+      <PageIntro
+        title="MyStable"
+        actions={
+          <>
+            <Link href="/marketplace" className="label-action text-muted-foreground hover:text-heading">
+              Marketplace
             </Link>
-          ) : (
-            <span className="label-spec text-muted-foreground">
-              {view.account.fullName} · KYC: {view.account.kycStatus}
-            </span>
-          )}
-        </div>
+            {!view.account ? (
+              <Link
+                href="/login?next=%2Fmystable"
+                className="label-action min-h-11 inline-flex items-center rounded-pill border border-border bg-surface px-5 py-2 text-heading"
+              >
+                Sign in
+              </Link>
+            ) : (
+              <span className="label-spec text-muted-foreground">
+                {view.account.fullName} · KYC: {view.account.kycStatus}
+              </span>
+            )}
+          </>
+        }
+      />
 
-        <h1 className="mt-8 text-display leading-display tracking-display text-heading">
-          MyStable
-        </h1>
-
+      <PageContainer className="pb-32">
         {view.pendingNotice ? (
           <div
             role="status"
@@ -151,7 +153,7 @@ export default async function MyStablePage({
         {view.sales.map((sale) => (
           <FrozenSaleCard key={sale.id} sale={sale} />
         ))}
-      </section>
-    </main>
+      </PageContainer>
+    </PageShell>
   )
 }

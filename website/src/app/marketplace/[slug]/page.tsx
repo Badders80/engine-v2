@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import BuyFlowModal from '../../../components/BuyFlowModal'
+import { PageContainer, PageSection, PageShell } from '../../../components/PagePrimitives'
 import StatusBadge from '../../../components/StatusBadge'
 import { AUTH_TOKEN_COOKIE } from '../../../lib/auth'
 import {
@@ -236,13 +237,13 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
   }
 
   return (
-    <main className="bg-canvas text-ink">
+    <PageShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      <section className="mx-auto w-full max-w-6xl px-12 pt-32 pb-16 md:px-16 lg:px-20">
+      <PageSection className="pt-32 pb-16">
         <Link href="/marketplace" className="label-action text-muted-foreground">
           Marketplace
         </Link>
@@ -285,15 +286,15 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
             ))}
           </ul>
         ) : null}
-      </section>
+      </PageSection>
 
-      <div className="mx-auto w-full max-w-6xl px-12 pb-32 md:px-16 lg:px-20">
+      <PageContainer className="pb-32">
         {/* More than one block is a legal state, not a data error: one horse may
             carry a separate DSL per end date (`PLAN.md:297`). */}
         {listings.map((listing) => (
           <DslBlock key={listing.id} listing={listing} account={account} />
         ))}
-      </div>
-    </main>
+      </PageContainer>
+    </PageShell>
   )
 }

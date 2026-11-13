@@ -10,6 +10,7 @@ const componentSource = readFileSync(
   'utf8',
 )
 const pageSource = readFileSync(resolve(APP_ROOT, 'src/app/page.tsx'), 'utf8')
+const layoutSource = readFileSync(resolve(APP_ROOT, 'src/app/layout.tsx'), 'utf8')
 const cssSource = readFileSync(resolve(APP_ROOT, 'src/app/globals.css'), 'utf8')
 
 describe('landing scroll reveal', () => {
@@ -18,6 +19,8 @@ describe('landing scroll reveal', () => {
     expect(componentSource).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(componentSource).toContain("!('IntersectionObserver' in window)")
     expect(componentSource).toContain('observer.unobserve(entry.target)')
+    expect(componentSource).toContain('usePathname')
+    expect(componentSource).toContain('[pathname]')
     expect(componentSource).not.toMatch(/gsap|ScrollTrigger/)
   })
 
@@ -25,7 +28,10 @@ describe('landing scroll reveal', () => {
     expect(componentSource).toContain("root.setAttribute('data-reveal-ready', '')")
     expect(cssSource).toContain("html[data-reveal-ready] [data-reveal='armed']")
     expect(cssSource).toContain('translate: 0 var(--reveal-travel, 12px)')
-    expect(cssSource).toContain('750ms')
+    expect(cssSource).toContain('var(--duration-reveal)')
+    expect(cssSource).toContain('--duration-reveal: 750ms')
+    expect(layoutSource).toContain('<ScrollReveal />')
+    expect(pageSource).not.toContain('<ScrollReveal />')
   })
 
   it('keeps the hero static and reveals selected landing groups only', () => {

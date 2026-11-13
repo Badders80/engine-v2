@@ -89,6 +89,7 @@ motion:
   duration-hover: 200ms
   duration-step: 220ms
   duration-collapse: 300ms
+  duration-reveal: 750ms
   duration-modal-enter: 240ms
   duration-modal-exit: 160ms
   duration-shimmer: 2000ms
@@ -733,13 +734,14 @@ cannot.
 | `--duration-hover` | `200ms` | Hover and state changes |
 | `--duration-step` | `220ms` | Step transitions and panel crossfades between modal steps |
 | `--duration-collapse` | `300ms` | Collapse and structural movement |
+| `--duration-reveal` | `750ms` | Reveal-once scroll entrances |
 | `--duration-modal-enter` | `240ms` | Dialog entrance |
 | `--duration-modal-exit` | `160ms` | Dialog exit — deliberately faster than the entrance |
 | `--duration-shimmer` | `2000ms` | The shimmer animation |
 | `--scale-press` | `0.98` | Pointer-down feedback |
 | `--scale-lift` | `1.02` | The hover lift, on the label only |
 
-**A duration is never hand-typed.** These eleven are the vocabulary. Everything above 30ms is a
+**A duration is never hand-typed.** These twelve are the vocabulary. Everything above 30ms is a
 decision; nothing moves at a speed nobody chose.
 
 ### What moves
@@ -894,6 +896,13 @@ by real network and API responses.**
 *Drift:* the legacy purchase flow enforced a mandatory 1400ms timer on every step, degrading conversion
 under the guise of readability. Readability is solved by the entrance transition, not by holding the
 user hostage. Elapsed time is bounded by the API, never by a clock we invented.
+
+### 10.7 Page composition
+
+**25 · Don't draw a rule between page-level sections. Do create separation with rhythm, whitespace and
+content hierarchy.**
+*Drift:* full-width `border-t` separators cut the landing page into stacked panels and visually detached
+the FAQ from the footer. Borders remain valid inside controls and data rows, but never as page chrome.
 
 ---
 

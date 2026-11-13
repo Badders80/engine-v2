@@ -6,6 +6,7 @@ import './globals.css'
 
 import { Footer } from '../components/Footer'
 import { NavBar } from '../components/NavBar'
+import { ScrollReveal } from '../components/ScrollReveal'
 import { OG_IMAGE, SITE_URL } from '../lib/site'
 
 // Geist Mono — financials, hashes, countdowns, tabular figures, and the
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${geistMono.variable} ${instrumentSerif.variable}`}>
       <body className="flex min-h-screen flex-col bg-canvas text-ink">
+        <ScrollReveal />
         <NavBar />
         <div className="flex-1">{children}</div>
         <Footer />

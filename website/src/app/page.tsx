@@ -4,7 +4,6 @@ import type { CSSProperties } from 'react'
 
 import { FaqAccordion, type FaqItem } from '../components/FaqAccordion'
 import { PhotographicDivider } from '../components/PhotographicDivider'
-import { ScrollReveal } from '../components/ScrollReveal'
 import { SITE_URL } from '../lib/site'
 
 type AudienceCard = {
@@ -177,7 +176,6 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <ScrollReveal />
 
       <section
         id="hero"

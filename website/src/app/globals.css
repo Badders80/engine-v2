@@ -116,6 +116,9 @@
   /* Eases */
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Reveal */
+  --duration-reveal: 750ms;
 }
 
 /* ---------------------------------------------------------------------------
@@ -154,6 +157,10 @@
 }
 @utility duration-collapse {
   transition-duration: 300ms;
+}
+@utility duration-reveal {
+  transition-duration: var(--duration-reveal);
+  animation-duration: var(--duration-reveal);
 }
 @utility duration-modal-enter {
   transition-duration: 240ms;
@@ -265,8 +272,8 @@
     opacity: 1;
     translate: 0 0;
     transition:
-      opacity 750ms var(--ease-enter) var(--reveal-delay, 0ms),
-      translate 750ms var(--ease-enter) var(--reveal-delay, 0ms);
+      opacity var(--duration-reveal) var(--ease-enter) var(--reveal-delay, 0ms),
+      translate var(--duration-reveal) var(--ease-enter) var(--reveal-delay, 0ms);
   }
 
   html[data-reveal-ready] [data-reveal-mode='fade'] {

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { PageContainer, PageIntro, PageSection, PageShell } from '../../components/PagePrimitives'
 import StatusBadge from '../../components/StatusBadge'
 import { listPublishedListings, sortForMarketplace, type Listing } from '../../lib/listings'
 import { heroImageUrl, OG_IMAGE, R2_PUBLIC_URL_ENV, SITE_URL } from '../../lib/site'
@@ -52,8 +53,6 @@ export const metadata: Metadata = {
     images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: 'Evolution Stables' }],
   },
 }
-
-const SHELL = 'mx-auto w-full max-w-6xl px-12 md:px-16 lg:px-20'
 
 /**
  * One card. DESIGN.md's listing-card anatomy: badge over the image frame, the
@@ -109,19 +108,18 @@ export default async function MarketplacePage() {
   const listings = sortForMarketplace(await listPublishedListings())
 
   return (
-    <main className="bg-canvas text-ink">
-      <section className={`${SHELL} pt-32 pb-16`}>
-        <p className="label-eyebrow text-muted-foreground">Marketplace</p>
-        <h1 className="mt-6 max-w-3xl text-display leading-display tracking-display text-heading">
-          The <span className="type-accent text-gold">Marketplace</span>
-        </h1>
-        <p className="mt-8 max-w-xl text-body-small leading-body text-muted-foreground">
-          Every offer below is a published stake. Read the rate, the term and the split before you
-          commit to anything.
-        </p>
-      </section>
+    <PageShell>
+      <PageIntro
+        eyebrow="Marketplace"
+        title={
+          <>
+            The <span className="type-accent text-gold">Marketplace</span>
+          </>
+        }
+        description="Every offer below is a published stake. Read the rate, the term and the split before you commit to anything."
+      />
 
-      <section className={`${SHELL} border-t border-border py-16`}>
+      <PageSection className="py-16">
         {listings.length === 0 ? (
           // An empty grid is a real state, not an error: a horse exists only once
           // it is registered and its DSL is published. Saying so is better than an
@@ -138,13 +136,15 @@ export default async function MarketplacePage() {
             ))}
           </ul>
         )}
-      </section>
+      </PageSection>
 
-      <footer className={`${SHELL} border-t border-border py-16`}>
-        <p className="label-spec text-muted-foreground">
-          Evolution Stables · {SITE_URL.replace(/^https?:\/\//, '')}
-        </p>
+      <footer>
+        <PageContainer className="py-16">
+          <p className="label-spec text-muted-foreground">
+            Evolution Stables · {SITE_URL.replace(/^https?:\/\//, '')}
+          </p>
+        </PageContainer>
       </footer>
-    </main>
+    </PageShell>
   )
 }

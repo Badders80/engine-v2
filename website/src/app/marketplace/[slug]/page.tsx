@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import BuyFlowModal from '../../../components/BuyFlowModal'
+import { HorseFixturePage } from '../../../components/HorseFixturePage'
 import { PageContainer, PageSection, PageShell } from '../../../components/PagePrimitives'
 import StatusBadge from '../../../components/StatusBadge'
 import { AUTH_TOKEN_COOKIE } from '../../../lib/auth'
@@ -16,6 +17,7 @@ import {
   WEBSITE_BUY_ENABLED_ENV,
   WEBSITE_ENGINE_URL_ENV,
 } from '../../../lib/engineClient'
+import { getHorsePageFixture } from '../../../lib/horsePageFixture'
 import { getListingsBySlug, type Listing } from '../../../lib/listings'
 import { readMyStable, type AccountProfile } from '../../../lib/mystable'
 import {
@@ -68,6 +70,28 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
+  const fixtureHorse =
+    process.env.WEBSITE_MARKETPLACE_FIXTURE === 'true' ? getHorsePageFixture(slug) : null
+
+  if (fixtureHorse) {
+    const title = `${fixtureHorse.legalName} — Evolution Stables`
+    const description = `${fixtureHorse.legalName} on the Evolution Stables Marketplace. View the campaign story, pedigree, trainer, race record and current ownership terms.`
+
+    return {
+      title,
+      description,
+      alternates: { canonical: `/marketplace/${fixtureHorse.slug}` },
+      openGraph: {
+        type: 'website',
+        url: `/marketplace/${fixtureHorse.slug}`,
+        siteName: 'Evolution Stables',
+        title,
+        description,
+        images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: fixtureHorse.legalName }],
+      },
+    }
+  }
+
   const listings = await readListings(slug)
   const first = listings.at(0)
 
@@ -187,6 +211,13 @@ async function DslBlock({
 
 export default async function HorsePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+
+  if (process.env.WEBSITE_MARKETPLACE_FIXTURE === 'true') {
+    const fixtureHorse = getHorsePageFixture(slug)
+    if (!fixtureHorse) notFound()
+    return <HorseFixturePage horse={fixtureHorse} />
+  }
+
   const listings = await readListings(slug)
   const first = listings.at(0)
 

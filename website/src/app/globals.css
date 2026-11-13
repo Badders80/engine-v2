@@ -289,6 +289,12 @@ body {
   line-height: var(--leading-body);
 }
 
+@media (max-width: 767px) {
+  body.has-horse-conversion-bar {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

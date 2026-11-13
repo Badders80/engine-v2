@@ -2,10 +2,10 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** founder visual walk of the Marketplace checkpoint on
-`marketplace-parity-2026-11-14`. Evidence lives at
-`/home/evo/sandbox/mvp/audits/marketplace-parity-2026-11-14/`; accept or redirect
-the visual direction before Session 2 begins.
+**Next action:** founder visual walk of the Mulan horse-page checkpoint on
+`horse-page-parity-2026-11-14`. Evidence lives at
+`/home/evo/sandbox/mvp/audits/horse-page-parity-2026-11-14/`; accept or redirect
+the page before checkout implementation begins.
 
 ## State — 2026-11-14
 
@@ -16,8 +16,17 @@ the visual direction before Session 2 begins.
 - Gate: engine 401 passed / 1 skipped, website 66 passed, both builds. Desktop
   and mobile axe walks have zero violations; filters, keyboard order, 44px page
   controls and reduced motion pass.
-- Founder visual acceptance remains pending. Do not merge or start the horse
-  page before that ruling.
+- Marketplace visual acceptance is **approved**.
+- Marketplace horse-page Session 2 is built on
+  `horse-page-parity-2026-11-14` from Marketplace commit `ec725c1`, using a
+  local Mulan fixture and no database writes or publish.
+- Horse page includes the gallery and full-screen viewer, horse facts, story,
+  five detail tabs, public offer rail and fixed mobile ownership action.
+- Gate: engine 401 passed / 1 skipped, website 69 passed, both builds. Desktop
+  and mobile axe walks have zero violations; gallery, tabs, keyboard, 44px
+  controls, reduced motion and conversion-bar/footer clearance pass.
+- Horse-page founder visual acceptance remains pending. Checkout remains next
+  only after that ruling.
 
 ## State — 2026-11-13
 
@@ -106,6 +115,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-14 | Marketplace horse-page audit and V2 Mulan fixture implementation | engine_v2/website | branch `horse-page-parity-2026-11-14` | founder walk pending |
 | 2026-11-14 | Marketplace production audit and V2 local-fixture implementation | engine_v2/website | branch `marketplace-parity-2026-11-14` | founder walk pending |
 | 2026-11-13 | Landing parity merged; shared page foundation locked | engine_v2/website | `03ea397`, `ade0cc3` | done; pushed |
 | 2026-11-13 | Legal pack 1.0.4 aligned SA and checkout declarations; KYC and proof of address deferred as future obligations | engine_v2/website | — | done |

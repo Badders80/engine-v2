@@ -333,6 +333,7 @@ export function DslWizard({
           racingOutlookAndPedigree: horse.racingOutlookAndPedigree,
           raceExpectation: horse.raceExpectation,
           imageCount: horse.facts.imageCount,
+          imageOrder: [],
           raceRecord: {},
         }
 

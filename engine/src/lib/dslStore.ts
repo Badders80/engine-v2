@@ -79,11 +79,13 @@ export type NewHorse = {
   racingOutlookAndPedigree: string | null
   raceExpectation: string | null
   imageCount: number
+  /** Image numbers in display order; the first is the cover. Empty is natural order. */
+  imageOrder?: number[]
   raceRecord: Record<string, unknown>
   pedigree?: PedigreeSnapshot | null
 }
 
-export type HorseRow = NewHorse & { id: string }
+export type HorseRow = NewHorse & { id: string; imageOrder: number[] }
 
 /**
  * A DSL row. The commercial and term fields are nullable on purpose: a DSL
@@ -281,7 +283,7 @@ export function createInMemoryDslStore(): InMemoryDslStore {
       return horses.find((row) => row.id === id) ?? null
     },
     async insertHorse(row) {
-      const created = { ...row, id: newId() }
+      const created = { ...row, id: newId(), imageOrder: row.imageOrder ?? [] }
       horses.push(created)
       return created
     },

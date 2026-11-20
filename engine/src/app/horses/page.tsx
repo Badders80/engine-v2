@@ -1,14 +1,24 @@
 import Link from 'next/link'
 
+import { effectiveImageOrder } from '@/lib/imageOrder'
 import { imageKey, publicImageUrl } from '@/lib/storage'
 
 import { recordStore } from '../records/store'
 
 export const dynamic = 'force-dynamic'
 
-function HeroImage({ slug, imageCount }: { slug: string; imageCount: number }) {
+function HeroImage({
+  slug,
+  imageCount,
+  imageOrder,
+}: {
+  slug: string
+  imageCount: number
+  imageOrder: number[]
+}) {
   const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
-  const showable = imageCount > 0 && publicUrlBase.startsWith('https://')
+  const coverImageNumber = effectiveImageOrder(imageOrder, imageCount)[0]
+  const showable = coverImageNumber !== undefined && publicUrlBase.startsWith('https://')
 
   return (
     <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-sm border border-line bg-raised">
@@ -17,7 +27,7 @@ function HeroImage({ slug, imageCount }: { slug: string; imageCount: number }) {
         // configured for it, so a plain img is correct here.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={publicImageUrl(imageKey(slug, 1), publicUrlBase)}
+          src={publicImageUrl(imageKey(slug, coverImageNumber), publicUrlBase)}
           alt=""
           width={480}
           height={360}
@@ -76,7 +86,11 @@ export default async function Page() {
             href={`/horses/${horse.id}`}
             className="grid gap-3 rounded-md border border-line bg-panel p-3 hover:border-line-strong"
           >
-            <HeroImage slug={horse.slug} imageCount={horse.imageCount} />
+            <HeroImage
+              slug={horse.slug}
+              imageCount={horse.imageCount}
+              imageOrder={horse.imageOrder}
+            />
 
             <div className="grid gap-2">
               <p className="truncate text-body text-ink">{horse.legalName}</p>

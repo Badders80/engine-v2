@@ -28,6 +28,11 @@ import {
 import type { DslRow, HorseRow, NarrativeOverrideMeta } from '@/lib/dslStore'
 import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
 import {
+  effectiveImageOrder,
+  imageOrderError,
+  remapImageOrderAfterDelete,
+} from '@/lib/imageOrder'
+import {
   carryDismissals,
   fullSignoff,
   missingNarrativeSlots,
@@ -282,7 +287,13 @@ export async function uploadHorseImageAction(form: FormData): Promise<void> {
     })
 
     const images = await listPublicImages({ slug: horse.slug })
-    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
+    return {
+      ok: true,
+      value: await store().updateHorse(horse.id, {
+        imageCount: images.length,
+        imageOrder: effectiveImageOrder(horse.imageOrder, images.length),
+      }),
+    }
   })
 
   if (!uploaded.ok) redirect(`${back}?error=${encodeURIComponent(uploaded.reason)}`)
@@ -309,7 +320,16 @@ export async function deleteHorseImageAction(form: FormData): Promise<void> {
     const { horse } = target.value
     await deletePublicImage({ slug: horse.slug, imageNumber })
     const images = await listPublicImages({ slug: horse.slug })
-    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
+    return {
+      ok: true,
+      value: await store().updateHorse(horse.id, {
+        imageCount: images.length,
+        imageOrder: effectiveImageOrder(
+          remapImageOrderAfterDelete(horse.imageOrder, horse.imageCount, imageNumber),
+          images.length,
+        ),
+      }),
+    }
   })
 
   if (!deleted.ok) redirect(`${back}?error=${encodeURIComponent(deleted.reason)}`)
@@ -330,10 +350,46 @@ export async function recountHorseImagesAction(form: FormData): Promise<void> {
 
     const { horse } = target.value
     const images = await listPublicImages({ slug: horse.slug })
-    return { ok: true, value: await store().updateHorse(horse.id, { imageCount: images.length }) }
+    return {
+      ok: true,
+      value: await store().updateHorse(horse.id, {
+        imageCount: images.length,
+        imageOrder: effectiveImageOrder(horse.imageOrder, images.length),
+      }),
+    }
   })
 
   if (!recounted.ok) redirect(`${back}?error=${encodeURIComponent(recounted.reason)}`)
+
+  revalidatePath(back)
+  redirect(back)
+}
+
+/**
+ * Save the display order. Position one is the cover, and every current image
+ * must appear once. R2 keys are untouched; the order is horse metadata.
+ */
+export async function saveHorseImageOrderAction(form: FormData): Promise<void> {
+  const back = imageBack(form)
+  const order = form
+    .getAll('order')
+    .map((value) => Number(typeof value === 'string' ? value.trim() : value))
+
+  const saved = await attempt<HorseRow>(async () => {
+    const target = await imageTarget(form)
+    if (!target.ok) return { ok: false, reason: target.reason }
+
+    const { horse } = target.value
+    const error = imageOrderError(order, horse.imageCount)
+    if (error !== null) return { ok: false, reason: error }
+
+    return {
+      ok: true,
+      value: await store().updateHorse(horse.id, { imageOrder: order }),
+    }
+  })
+
+  if (!saved.ok) redirect(`${back}?error=${encodeURIComponent(saved.reason)}`)
 
   revalidatePath(back)
   redirect(back)

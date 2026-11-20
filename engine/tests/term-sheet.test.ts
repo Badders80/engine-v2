@@ -55,6 +55,7 @@ const HORSE = {
   racingOutlookAndPedigree: 'Outlook.',
   raceExpectation: 'Expectation.',
   imageCount: 3,
+  imageOrder: [1, 2, 3],
   raceRecord: {},
 } as HorseRow
 

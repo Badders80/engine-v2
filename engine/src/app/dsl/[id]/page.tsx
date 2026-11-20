@@ -19,7 +19,8 @@ import { notFound } from 'next/navigation'
 import { missingNarrativeSlots, resolveNarrative } from '@/lib/narrative'
 import { staleOverrideSlots } from '@/lib/narrativeHash'
 import { checkDslReadiness, readinessReason } from '@/lib/readiness'
-import { imageKeys, publicImageUrl } from '@/lib/storage'
+import { effectiveImageOrder } from '@/lib/imageOrder'
+import { imageKey, publicImageUrl } from '@/lib/storage'
 import { buildTermSheet } from '@/lib/termSheet'
 
 import {
@@ -76,11 +77,14 @@ export default async function Page({
   // the bucket by the upload, delete, and recount actions.
   const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
   const images = publicUrlBase.startsWith('https://')
-    ? imageKeys(horse.slug, horse.imageCount).map((key, index) => ({
-        key,
-        imageNumber: index + 1,
-        url: publicImageUrl(key, publicUrlBase),
-      }))
+    ? effectiveImageOrder(horse.imageOrder, horse.imageCount).map((imageNumber) => {
+        const key = imageKey(horse.slug, imageNumber)
+        return {
+          key,
+          imageNumber,
+          url: publicImageUrl(key, publicUrlBase),
+        }
+      })
     : []
 
   return (

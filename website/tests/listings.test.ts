@@ -61,6 +61,7 @@ const ROW: ListingRow = {
     legal_name: 'Lady Ketchikan',
     registered: true,
     image_count: 4,
+    image_order: [3, 1, 4, 2],
   },
 }
 
@@ -85,6 +86,7 @@ describe('the listing projection', () => {
         legalName: 'Lady Ketchikan',
         registered: true,
         imageCount: 4,
+        imageOrder: [3, 1, 4, 2],
       },
     })
   })

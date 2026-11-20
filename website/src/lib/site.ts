@@ -91,6 +91,34 @@ export function imageKey(slug: string, imageNumber: number): string {
   return `${slug}/${String(imageNumber).padStart(IMAGE_NUMBER_DIGITS, '0')}`
 }
 
+/** The saved display order, reconciled against the bucket's current 01..NN run. */
+export function effectiveImageOrder(
+  order: readonly number[] | null | undefined,
+  imageCount: number,
+): number[] {
+  if (!Number.isInteger(imageCount) || imageCount < 0) {
+    throw new Error(`image count must be a whole number from 0 upward (received ${String(imageCount)})`)
+  }
+
+  const seen = new Set<number>()
+  const result: number[] = []
+  for (const imageNumber of order ?? []) {
+    if (
+      Number.isInteger(imageNumber) &&
+      imageNumber >= 1 &&
+      imageNumber <= imageCount &&
+      !seen.has(imageNumber)
+    ) {
+      seen.add(imageNumber)
+      result.push(imageNumber)
+    }
+  }
+  for (let imageNumber = 1; imageNumber <= imageCount; imageNumber += 1) {
+    if (!seen.has(imageNumber)) result.push(imageNumber)
+  }
+  return result
+}
+
 /**
  * The public URL for an image key.
  *
@@ -122,23 +150,29 @@ export function publicImageUrl(key: string, publicUrlBase: string): string {
  * The horse's hero image, or null when there is none to show.
  *
  * Null is not a fallback for an error — it is the two states the data actually
- * has. `image_count` is the only image fact in the database (`OUTCOME.md:68`) and
- * it is zero for a horse whose profile has no images yet, which DESIGN.md's card
- * anatomy already handles as the no-photo placeholder. An unset origin is a
- * configuration absence, not a malformed value: it produces the same placeholder
- * rather than a hard failure, so a build and a CI run need no R2 credentials.
+ * has. `image_count` is zero for a horse whose profile has no images yet and the
+ * optional order names the cover first; DESIGN.md's card anatomy already handles
+ * the no-photo state as a placeholder. An unset origin is a configuration
+ * absence, not a malformed value: it produces the same placeholder rather than a
+ * hard failure, so a build and a CI run need no R2 credentials.
  *
  * A malformed origin — one that IS set and is not an https origin — still throws,
  * through `publicImageUrl`. That distinction is the whole reason this function
  * exists separately.
  */
-export function heroImageUrl(slug: string, imageCount: number, publicUrlBase?: string): string | null {
+export function heroImageUrl(
+  slug: string,
+  imageCount: number,
+  publicUrlBase?: string,
+  imageOrder?: readonly number[] | null,
+): string | null {
   if (!Number.isInteger(imageCount) || imageCount < 1) return null
 
   const base = (publicUrlBase ?? '').trim()
   if (base === '') return null
 
-  return publicImageUrl(imageKey(slug, 1), base)
+  const coverImageNumber = effectiveImageOrder(imageOrder, imageCount)[0]
+  return coverImageNumber === undefined ? null : publicImageUrl(imageKey(slug, coverImageNumber), base)
 }
 
 /**
@@ -149,25 +183,25 @@ export function heroImageUrl(slug: string, imageCount: number, publicUrlBase?: s
 export const WEBSITE_IMAGE_CAP = 8
 
 /**
- * The gallery: images two onward, in key order, capped.
+ * The gallery: every ordered image after the cover, capped.
  *
- * Image `01` is the hero and is rendered separately, so it is excluded here.
- * Order is the key number — there is no stored ordering anywhere else.
+ * The first saved order entry is the hero and is excluded here. With no saved
+ * order this is the natural `02..NN` sequence.
  */
 export function galleryImageUrls(
   slug: string,
   imageCount: number,
   publicUrlBase?: string,
+  imageOrder?: readonly number[] | null,
 ): string[] {
   if (!Number.isInteger(imageCount) || imageCount < 2) return []
 
   const base = (publicUrlBase ?? '').trim()
   if (base === '') return []
 
-  const shown = Math.min(imageCount, WEBSITE_IMAGE_CAP)
-  return Array.from({ length: Math.max(0, shown - 1) }, (_, index) =>
-    publicImageUrl(imageKey(slug, index + 2), base),
-  )
+  return effectiveImageOrder(imageOrder, imageCount)
+    .slice(1, WEBSITE_IMAGE_CAP)
+    .map((imageNumber) => publicImageUrl(imageKey(slug, imageNumber), base))
 }
 
 /**

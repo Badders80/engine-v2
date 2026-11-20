@@ -14,10 +14,12 @@ import { describe, expect, it } from 'vitest'
 const ACTIONS = new URL('../src/app/dsl/actions.ts', import.meta.url)
 const DETAIL = new URL('../src/app/dsl/[id]/page.tsx', import.meta.url)
 const HORSE = new URL('../src/app/horses/[id]/page.tsx', import.meta.url)
+const EDITOR = new URL('../src/app/horses/[id]/ImageOrderEditor.tsx', import.meta.url)
 
 const actions = readFileSync(ACTIONS, 'utf8')
 const detail = readFileSync(DETAIL, 'utf8')
 const horse = readFileSync(HORSE, 'utf8')
+const editor = readFileSync(EDITOR, 'utf8')
 
 describe('the upload action exists and goes through the storage module', () => {
   it('exports the action Records posts to', () => {
@@ -37,21 +39,39 @@ describe('the upload action exists and goes through the storage module', () => {
     expect(args).not.toMatch(/\bkey:/)
   })
 
-  it('persists the advanced count on the horse', () => {
-    expect(actions).toMatch(/updateHorse\(horse\.id, \{ imageCount: images\.length \}\)/)
+  it('persists the count and reconciled display order on the horse', () => {
+    expect(actions).toMatch(/imageCount: images\.length/)
+    expect(actions).toMatch(/imageOrder: effectiveImageOrder\(horse\.imageOrder, images\.length\)/)
   })
 })
 
-describe('the horse Records page carries the control', () => {
-  it('posts upload, recount and delete', () => {
+describe('the horse Records page carries the controls', () => {
+  it('posts upload and recount, and mounts the image editor', () => {
     expect(horse).toMatch(/action=\{uploadHorseImageAction\}/)
     expect(horse).toMatch(/action=\{recountHorseImagesAction\}/)
-    expect(horse).toMatch(/action=\{deleteHorseImageAction\}/)
+    expect(horse).toMatch(/<ImageOrderEditor/)
   })
 
   it('sends the horse id and accepts only images', () => {
     expect(horse).toMatch(/name="horseId"/)
     expect(horse).toMatch(/type="file" accept="image\/\*"/)
+  })
+
+  it('edits image positions by drag and by accessible arrow controls', () => {
+    expect(editor).toMatch(/Edit positions/)
+    expect(editor).toMatch(/draggable=\{editing\}/)
+    expect(editor).toMatch(/Move image \$\{image\.number\} earlier/)
+    expect(editor).toMatch(/Move image \$\{image\.number\} later/)
+  })
+
+  it('saves the repeated order fields and still posts deletion', () => {
+    expect(editor).toMatch(/action=\{saveHorseImageOrderAction\}/)
+    expect(editor).toMatch(/name="order"/)
+    expect(editor).toMatch(/action=\{deleteHorseImageAction\}/)
+  })
+
+  it('disables colour transitions when reduced motion is requested', () => {
+    expect(editor).toMatch(/motion-reduce:transition-none/)
   })
 })
 

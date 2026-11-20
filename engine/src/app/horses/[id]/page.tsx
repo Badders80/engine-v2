@@ -2,16 +2,15 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import type { DslRow } from '@/lib/dslStore'
+import { effectiveImageOrder } from '@/lib/imageOrder'
 import { imageKeys, publicImageUrl } from '@/lib/storage'
 
 import { SummaryRow } from '../../_components/forms'
-import {
-  deleteHorseImageAction,
-  recountHorseImagesAction,
-  uploadHorseImageAction,
-} from '../../dsl/actions'
+import { recountHorseImagesAction, uploadHorseImageAction } from '../../dsl/actions'
 import { updateSoftContentAction } from '../../records/actions'
 import { recordStore } from '../../records/store'
+
+import { ImageOrderEditor } from './ImageOrderEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,10 +23,10 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ warning?: string }>
+  searchParams: Promise<{ warning?: string; error?: string }>
 }) {
   const { id } = await params
-  const { warning = '' } = await searchParams
+  const { warning = '', error = '' } = await searchParams
   const store = recordStore()
 
   const horse = await store.findHorseById(id)
@@ -64,6 +63,7 @@ export default async function Page({
         url: publicImageUrl(key, publicUrlBase),
       }))
     : []
+  const orderedNumbers = effectiveImageOrder(horse.imageOrder, horse.imageCount)
 
   return (
     <main className="grid gap-8">
@@ -251,6 +251,11 @@ export default async function Page({
         <p className="mb-3 text-body text-low">
           Images never block a listing. The public card shows a placeholder until one is uploaded.
         </p>
+        {error === '' ? null : (
+          <p role="alert" className="mb-3 rounded-sm border border-line px-3 py-2 text-body text-muted">
+            {error}
+          </p>
+        )}
 
         {images.length === 0 ? (
           <p className="text-body text-low">
@@ -259,26 +264,12 @@ export default async function Page({
               : 'The public image host is not configured in this environment.'}
           </p>
         ) : (
-          <ol className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
-            {images.map((image) => (
-              <li key={image.key} className="overflow-hidden rounded-sm border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image.url}
-                  alt={`${horse.legalName} image ${String(image.number)}`}
-                  width={240}
-                  height={180}
-                  className="h-full w-full object-cover"
-                />
-                <form action={deleteHorseImageAction} className="p-2">
-                  <input type="hidden" name="horseId" value={horse.id} />
-                  <input type="hidden" name="back" value={`/horses/${horse.id}`} />
-                  <input type="hidden" name="imageNumber" value={image.number} />
-                  <button type="submit">Remove {image.number}</button>
-                </form>
-              </li>
-            ))}
-          </ol>
+          <ImageOrderEditor
+            horseId={horse.id}
+            back={`/horses/${horse.id}`}
+            images={images}
+            initialOrder={orderedNumbers}
+          />
         )}
 
         <form action={uploadHorseImageAction} className="mt-3 grid max-w-md gap-2">

@@ -303,6 +303,7 @@ export async function createHorseAction(form: FormData): Promise<void> {
     racingOutlookAndPedigree: null,
     raceExpectation: null,
     imageCount: 0,
+    imageOrder: [],
     raceRecord: record.value,
     pedigree: pedigree.value,
   })

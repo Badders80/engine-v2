@@ -48,6 +48,7 @@ export type ListingRow = {
     legal_name: string
     registered: boolean
     image_count: number
+    image_order: number[]
   }
 }
 
@@ -70,6 +71,7 @@ export type Listing = {
     legalName: string
     registered: boolean
     imageCount: number
+    imageOrder: number[]
   }
 }
 
@@ -92,7 +94,7 @@ const LISTING_SELECT = [
   'step',
   'stake_remaining',
   'retail_monthly_per_percent',
-  'horses!inner(id, slug, legal_name, registered, image_count)',
+  'horses!inner(id, slug, legal_name, registered, image_count, image_order)',
 ].join(', ')
 
 /**
@@ -120,6 +122,7 @@ export function toListing(row: ListingRow): Listing {
       legalName: row.horses.legal_name,
       registered: row.horses.registered,
       imageCount: row.horses.image_count,
+      imageOrder: row.horses.image_order,
     },
   }
 }

@@ -95,6 +95,15 @@ function blobOrNull(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>
 }
 
+/** `image_order` is a smallint[]; anything malformed is a data fault, not a default. */
+function imageOrder(value: unknown): number[] {
+  if (value === null || value === undefined) return []
+  if (!Array.isArray(value) || !value.every((entry) => Number.isInteger(entry))) {
+    throw new Error('horses.image_order is not an array of whole image numbers')
+  }
+  return value.map(Number)
+}
+
 /** `links` is a jsonb array of { label, url }; anything else reads as empty. */
 function linkEntries(value: unknown): LinkEntry[] {
   if (!Array.isArray(value)) return []
@@ -171,6 +180,7 @@ function toHorse(value: unknown): HorseRow {
     racingOutlookAndPedigree: strOrNull(row.racing_outlook_and_pedigree),
     raceExpectation: strOrNull(row.race_expectation),
     imageCount: num(row.image_count),
+    imageOrder: imageOrder(row.image_order),
     raceRecord: blob(row.race_record),
     pedigree: isCompletePedigreeSnapshot(row.pedigree) ? row.pedigree : null,
   }
@@ -257,6 +267,7 @@ function horseColumns(row: Partial<NewHorse>) {
     racing_outlook_and_pedigree: row.racingOutlookAndPedigree,
     race_expectation: row.raceExpectation,
     image_count: row.imageCount,
+    image_order: row.imageOrder,
     race_record: row.raceRecord,
     pedigree: row.pedigree,
   })

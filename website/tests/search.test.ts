@@ -117,6 +117,12 @@ describe('the hero image', () => {
     )
   })
 
+  it('uses the first saved order entry as the cover', () => {
+    expect(heroImageUrl('lady-ketchikan', 4, 'https://cdn.example.com', [3, 1, 4, 2])).toBe(
+      'https://cdn.example.com/lady-ketchikan/03',
+    )
+  })
+
   it('still throws on an origin that is set and wrong', () => {
     // The distinction the function exists for: unset is "not configured yet" and
     // renders a placeholder; malformed is a configuration error and says so.
@@ -176,12 +182,21 @@ describe('the plurality fence', () => {
 })
 
 describe('the gallery cap', () => {
-  it('shows images two onward, in key order, and not the hero', () => {
+  it('shows natural order after the cover when no custom order is saved', () => {
     const urls = galleryImageUrls('lady-ketchikan', 4, 'https://cdn.example.com')
     expect(urls).toEqual([
       'https://cdn.example.com/lady-ketchikan/02',
       'https://cdn.example.com/lady-ketchikan/03',
       'https://cdn.example.com/lady-ketchikan/04',
+    ])
+  })
+
+  it('shows the saved order after the cover', () => {
+    const urls = galleryImageUrls('lady-ketchikan', 4, 'https://cdn.example.com', [3, 1, 4, 2])
+    expect(urls).toEqual([
+      'https://cdn.example.com/lady-ketchikan/01',
+      'https://cdn.example.com/lady-ketchikan/04',
+      'https://cdn.example.com/lady-ketchikan/02',
     ])
   })
 

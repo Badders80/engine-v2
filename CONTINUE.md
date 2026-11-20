@@ -6,6 +6,21 @@
 three missing soft-content blocks in a separate chat. Paste the returned blocks
 through the horse profile preflight; do not hand-write them into the DB.
 
+## State — 2026-11-21
+
+- **Horse image cover and gallery order are implemented locally.** Migration
+  `00033` stores `horses.image_order`; position 1 is the cover. The Records image
+  section has an explicit edit mode with drag-and-drop cards plus arrow controls
+  for touch and keyboard, and the engine cards, DSL term sheet, Marketplace hero
+  and Marketplace gallery consume the saved sequence. R2 keys remain immutable
+  `01..NN`; upload appends, delete remaps and recount reconciles.
+- **Gate:** `pnpm verify` exit 0; engine **426 passed / 1 skipped**, website
+  **66 passed**, both builds. `just verify-db` passes schema `00033` and its new
+  image-order probe.
+- **Founder Prudentia ordering walk passed on 2026-11-21.** The saved vector is
+  `{5,2,3,1,4}`: image 5 is the cover, followed by images 2, 3, 1 and 4. The local
+  dev engine is served against local Supabase at `http://127.0.0.1:3001`.
+
 ## State — 2026-11-20
 
 - **Horse intake is merged and pushed on `dsl-sidequest`.** A Loveracing Stud Book
@@ -22,11 +37,11 @@ through the horse profile preflight; do not hand-write them into the DB.
 - **Local v2 proof database:** three horse rows and zero DSLs. Mulan has 15
   pedigree nodes and 3 active R2 images; Lady Ketchikan has 15 nodes, 0-start race
   summary, 6 images and all three soft blocks saved; Prudentia has 15 nodes, 10
-  starts / 2 wins / NZ$36,585, 4 images and all three soft blocks saved. Mulan's
+  starts / 2 wins / NZ$36,585, 5 images and all three soft blocks saved. Mulan's
   three soft blocks are still empty and its local `race_record` predates the new
   summary shape.
 - **R2 is clean for the active slugs:** `mulan-the-brave/01..03`,
-  `lady-ketchikan/01..06`, `prudentia/01..04`. The obsolete
+  `lady-ketchikan/01..06`, `prudentia/01..05`. The obsolete
   `mulan-the-brave-nz/01..03` objects were permanently removed.
 - **Local trainer proof exists but is on hold:** Barbara Kennedy, the joint
   Wexford partnership of Lance O'Sullivan & Andrew Scott, and Stephen Gray exist
@@ -153,6 +168,8 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-21 | Horse image cover/order vector: migration `00033`, drag-and-drop edit mode, accessible arrows, engine and public hero/gallery consumption | engine_v2/website | local uncommitted | done; founder walk passed with Prudentia `{5,2,3,1,4}` |
+| 2026-11-21 | Prudentia fifth-image upload founder-walked; local DB count and public R2 object verified | engine_v2/website | local DB/R2 | done |
 | 2026-11-20 | Horse intake end-to-end: pedigree + race summary, soft-content brief/preflight, three local horse proofs and clean R2 image sets | engine_v2/website | `8432fd4`, `7b55702`; local DB/R2 | done; hosted replay pending |
 | 2026-11-13 | Four-generation Loveracing pedigree capture, storage and live Mulan proof | engine_v2/website | — | done; uncommitted branch |
 | 2026-11-13 | Legal pack 1.0.4, Investor Pack presentation and checkout acceptance persistence | engine_v2/website | `dbd0184` | committed |

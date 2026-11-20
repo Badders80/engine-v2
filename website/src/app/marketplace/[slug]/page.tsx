@@ -213,8 +213,18 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
   }
 
   const { horse } = first
-  const hero = heroImageUrl(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
-  const gallery = galleryImageUrls(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
+  const hero = heroImageUrl(
+    horse.slug,
+    horse.imageCount,
+    process.env[R2_PUBLIC_URL_ENV],
+    horse.imageOrder,
+  )
+  const gallery = galleryImageUrls(
+    horse.slug,
+    horse.imageCount,
+    process.env[R2_PUBLIC_URL_ENV],
+    horse.imageOrder,
+  )
 
   /**
    * The horse, at its real page (`PLAN.md:85` — the current site points structured

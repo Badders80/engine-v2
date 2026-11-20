@@ -71,7 +71,12 @@ export const metadata: Metadata = {
  */
 function ListingCard({ listing }: { listing: Listing }) {
   const { horse } = listing
-  const hero = heroImageUrl(horse.slug, horse.imageCount, process.env[R2_PUBLIC_URL_ENV])
+  const hero = heroImageUrl(
+    horse.slug,
+    horse.imageCount,
+    process.env[R2_PUBLIC_URL_ENV],
+    horse.imageOrder,
+  )
   const href = `/marketplace/${horse.slug}`
 
   return (

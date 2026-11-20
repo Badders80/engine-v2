@@ -28,6 +28,7 @@ export default async function Page({
   const horse = loaded !== null && loaded.ok ? loaded.value.horse : null
   const raceRecordJson =
     loaded !== null && loaded.ok ? JSON.stringify(loaded.value.raceRecord, null, 2) : '{}'
+  const raceSummary = loaded !== null && loaded.ok ? loaded.value.raceRecord.summary : null
   const pedigree = loaded !== null && loaded.ok ? loaded.value.pedigree : null
   const pedigreeJson = pedigree === null ? '' : JSON.stringify(pedigree)
 
@@ -68,11 +69,21 @@ export default async function Page({
         ) : null}
 
         {loaded !== null && loaded.ok ? (
-          <p className="mt-4 text-body text-muted">
-            Loaded {loaded.value.horse.legalName}, foaled {loaded.value.horse.foalingDate}, with
-            a 15-node pedigree (1 horse, 2 parents, 4 grandparents, 8 great-grandparents).
-            Correct anything that is wrong before saving.
-          </p>
+          <div className="mt-4 grid gap-2 text-body text-muted">
+            <p>
+              Loaded {loaded.value.horse.legalName}, foaled {loaded.value.horse.foalingDate}, with
+              a 15-node pedigree (1 horse, 2 parents, 4 grandparents, 8 great-grandparents).
+              Correct anything that is wrong before saving.
+            </p>
+            {raceSummary === null ? null : (
+              <p>
+                NZTR race summary: {raceSummary.starts} starts, {raceSummary.wins} wins,{' '}
+                {raceSummary.seconds} seconds, {raceSummary.thirds} thirds, $
+                {raceSummary.stakesNzd.toLocaleString('en-NZ')} stakes. Runner-by-runner result
+                lines are not imported yet.
+              </p>
+            )}
+          </div>
         ) : null}
 
         {pedigree === null ? null : (

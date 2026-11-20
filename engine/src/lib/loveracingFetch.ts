@@ -27,12 +27,14 @@ import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 
 import {
+  parseLoveracingRaceSummary,
   parseLoveracingPage,
   parseLoveracingParents,
   type LoveracingHorse,
   type LoveracingParent,
   type LoveracingParents,
   type RaceRecord,
+  type RaceSummary,
 } from './loveracing'
 import {
   PEDIGREE_PATHS,
@@ -48,6 +50,9 @@ import {
 export const LOVERACING_HOSTS = ['loveracing.nz', 'www.loveracing.nz'] as const
 
 export const LOVERACING_TIMEOUT_MS = 8000
+
+export const LOVERACING_RACE_SUMMARY_URL =
+  'https://loveracing.nz/Common/ServerScript/Breeding.aspx/GetHorsePedigree'
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -80,11 +85,22 @@ export function loveracingFetcherScript(): string {
  */
 export function curlCffiFetch(input: string, init?: RequestInit): Promise<Response> {
   const script = loveracingFetcherScript()
+  const args = [script, input]
+  const method = init?.method?.toUpperCase() ?? 'GET'
+
+  if (method === 'POST') {
+    if (typeof init?.body !== 'string') {
+      return Promise.reject(new Error('the Loveracing POST body must be a JSON string'))
+    }
+    args.push('--json', init.body)
+  } else if (method !== 'GET') {
+    return Promise.reject(new Error(`unsupported Loveracing method ${method}`))
+  }
 
   return new Promise<Response>((resolve, reject) => {
     execFile(
       process.env.PYTHON ?? 'python3',
-      [script, input],
+      args,
       {
         timeout: LOVERACING_TIMEOUT_MS + 12000,
         maxBuffer: 8 * 1024 * 1024,
@@ -101,6 +117,39 @@ export function curlCffiFetch(input: string, init?: RequestInit): Promise<Respon
       },
     )
   })
+}
+
+async function loadRaceSummary(
+  horseId: string,
+  fetchImpl: FetchLike,
+): Promise<{ ok: true; value: RaceSummary } | { ok: false; reason: string }> {
+  try {
+    const response = await fetchImpl(LOVERACING_RACE_SUMMARY_URL, {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(LOVERACING_TIMEOUT_MS),
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ horseID: horseId, recordCount: '' }),
+    })
+
+    if (!response.ok) {
+      return { ok: false, reason: `the race summary request answered ${response.status}` }
+    }
+
+    return parseLoveracingRaceSummary(
+      await response.text(),
+      horseId,
+      new Date().toISOString(),
+    )
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `the race summary request failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+    }
+  }
 }
 
 /**
@@ -293,19 +342,27 @@ export async function loadLoveracingPage(
   const parsed = parseLoveracingPage(page.value.html, horseId)
   if (!parsed.ok) return parsed
 
-  const pedigree = await loadPedigree(
-    {
-      name: parsed.value.horse.legalName,
-      horseId,
-      url: page.value.url,
-    },
-    parsed.value.parents,
-    fetchImpl,
-  )
+  const [pedigree, summary] = await Promise.all([
+    loadPedigree(
+      {
+        name: parsed.value.horse.legalName,
+        horseId,
+        url: page.value.url,
+      },
+      parsed.value.parents,
+      fetchImpl,
+    ),
+    loadRaceSummary(horseId, fetchImpl),
+  ])
   if (!pedigree.ok) return pedigree
+  if (!summary.ok) return summary
 
   return {
     ok: true,
-    value: { ...parsed.value, pedigree: pedigree.value },
+    value: {
+      ...parsed.value,
+      raceRecord: { summary: summary.value, resultLines: [] },
+      pedigree: pedigree.value,
+    },
   }
 }

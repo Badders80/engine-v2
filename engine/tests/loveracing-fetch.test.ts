@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   LOVERACING_HOSTS,
+  LOVERACING_RACE_SUMMARY_URL,
   loadLoveracingPage,
   loveracingUrlOrNull,
   type FetchLike,
@@ -88,11 +89,23 @@ describe('the load reads the guarded seed and follows its ancestry', () => {
       fetchImpl,
     )
 
-    expect(fetchImpl).toHaveBeenCalledTimes(7)
+    expect(fetchImpl).toHaveBeenCalledTimes(8)
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.reason)
     expect(result.value.horse.legalName).toBe('Mulan The Brave (NZ)')
-    expect(result.value.raceRecord.starts).toBe(0)
+    expect(result.value.raceRecord).toEqual({
+      summary: {
+        source: 'loveracing_nz',
+        sourceHorseId: '460867',
+        retrievedAt: expect.any(String),
+        starts: 1,
+        wins: 0,
+        seconds: 0,
+        thirds: 0,
+        stakesNzd: 370,
+      },
+      resultLines: [],
+    })
     expect(result.value.pedigree.nodes).toHaveLength(15)
   })
 
@@ -217,6 +230,46 @@ describe('the load reads the guarded seed and follows its ancestry', () => {
     expect(result.reason).toMatch(/pedigree/i)
     expect(result.reason).toMatch(/grandparent page unavailable/)
   })
+
+  it('requests and captures the NZTR race summary', async () => {
+    const fetchImpl = pedigreeFetch()
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
+    if (!result.ok) throw new Error(result.reason)
+
+    const summaryCall = fetchImpl.mock.calls.find(
+      ([input]) => input === LOVERACING_RACE_SUMMARY_URL,
+    )
+    expect(summaryCall).toBeDefined()
+    expect(summaryCall?.[1]?.method).toBe('POST')
+    expect(JSON.parse(String(summaryCall?.[1]?.body))).toEqual({
+      horseID: '460867',
+      recordCount: '',
+    })
+    expect(result.value.raceRecord.summary?.stakesNzd).toBe(370)
+  })
+
+  it('refuses the import when the race summary is unavailable', async () => {
+    const complete = pedigreeFetch()
+    const fetchImpl = vi.fn<FetchLike>(async (input, init) => {
+      if (input === LOVERACING_RACE_SUMMARY_URL) {
+        return new Response('summary unavailable', { status: 503 })
+      }
+      return complete(input, init)
+    })
+
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a missing summary to be refused')
+    expect(result.reason).toMatch(/race summary/i)
+    expect(result.reason).toMatch(/503/)
+  })
 })
 
 const ANCESTOR_PAGES: Record<string, string> = {
@@ -257,7 +310,29 @@ function ancestorPage(
 }
 
 function pedigreeFetch() {
-  return vi.fn<FetchLike>(async (input) => {
+  return vi.fn<FetchLike>(async (input, init) => {
+    if (input === LOVERACING_RACE_SUMMARY_URL) {
+      expect(init?.method).toBe('POST')
+      return new Response(
+        JSON.stringify({
+          d: JSON.stringify({
+            rows: [
+              {
+                HorseID: 460867,
+                Level: 0,
+                Starts: 1,
+                Wins: 0,
+                Seconds: 0,
+                Thirds: 0,
+                Stakes: 370,
+              },
+            ],
+          }),
+        }),
+        { status: 200 },
+      )
+    }
+
     const url = new URL(input)
     if (url.pathname.includes('460867')) return new Response(REGISTERED, { status: 200 })
 

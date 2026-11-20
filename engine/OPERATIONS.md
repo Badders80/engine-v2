@@ -71,7 +71,7 @@ KYC files and proof-of-address files stay in private Supabase Storage. They do n
 
 The only operator screen is the DSL page on the engine. Horse, trainer, and owner do not get their own screens. The engine writes those rows, and the DSL page picks them.
 
-A registered horse starts from a loveracing.nz link: load, confirm or edit, save, then fill the three soft slots (`aboutHorse`, `racingOutlookAndPedigree`, `raceExpectation`). The race record comes from that page and is stored as one blob. An unregistered horse is typed by hand. It cannot be published past Coming Soon.
+A registered horse starts from a loveracing.nz link: load, confirm or edit, save, then fill the three soft slots (`aboutHorse`, `racingOutlookAndPedigree`, `raceExpectation`). The load also captures NZTR's aggregate race summary — starts, wins, seconds, thirds and stakes — and stores it inside `race_record`. Runner-by-runner result lines come from the Performance Profile and remain deferred. An unregistered horse is typed by hand. It cannot be published past Coming Soon.
 
 The slug is derived from the legal name when the horse is saved. A second horse that produces the same slug is refused. A rename changes the slug and the image folder. There is no redirect table. The legal-name slug is chosen before a horse is first published.
 

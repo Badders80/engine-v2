@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { parseLoveracingPage } from '../src/lib/loveracing'
+import { parseLoveracingPage, parseLoveracingRaceSummary } from '../src/lib/loveracing'
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
@@ -84,12 +84,10 @@ describe('the real Stud Book page loads its hard facts', () => {
     expect(result.value.horse.registered).toBe(true)
   })
 
-  it('returns an empty race record rather than guessing one', () => {
-    // The identity page carries no race table; the Performance Profile does.
+  it('returns no race summary from the identity page rather than guessing one', () => {
+    // The summary comes from NZTR's pedigree endpoint in the network loader.
     expect(result.value.raceRecord).toEqual({
-      starts: 0,
-      wins: 0,
-      places: 0,
+      summary: null,
       resultLines: [],
     })
   })
@@ -99,6 +97,85 @@ describe('the real Stud Book page loads its hard facts', () => {
     expect(keys).not.toContain('aboutHorse')
     expect(keys).not.toContain('racingOutlookAndPedigree')
     expect(keys).not.toContain('raceExpectation')
+  })
+})
+
+describe('the NZTR pedigree endpoint supplies the race summary', () => {
+  const source = JSON.stringify({
+    d: JSON.stringify({
+      rows: [
+        {
+          HorseID: 460867,
+          Level: 0,
+          Starts: 1,
+          Wins: 0,
+          Seconds: 0,
+          Thirds: 0,
+          Stakes: 370,
+        },
+      ],
+    }),
+  })
+
+  it('reads the exact summary fields and provenance', () => {
+    const result = parseLoveracingRaceSummary(
+      source,
+      '460867',
+      '2026-11-20T03:00:00.000Z',
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        source: 'loveracing_nz',
+        sourceHorseId: '460867',
+        retrievedAt: '2026-11-20T03:00:00.000Z',
+        starts: 1,
+        wins: 0,
+        seconds: 0,
+        thirds: 0,
+        stakesNzd: 370,
+      },
+    })
+  })
+
+  it('refuses a response without the root horse instead of returning zeroes', () => {
+    const result = parseLoveracingRaceSummary(
+      JSON.stringify({ d: JSON.stringify({ rows: [] }) }),
+      '460867',
+      '2026-11-20T03:00:00.000Z',
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a refusal')
+    expect(result.reason).toMatch(/root horse/)
+  })
+
+  it('refuses malformed summary values instead of coercing them', () => {
+    const malformed = JSON.stringify({
+      d: JSON.stringify({
+        rows: [
+          {
+            HorseID: 460867,
+            Level: 0,
+            Starts: 'one',
+            Wins: 0,
+            Seconds: 0,
+            Thirds: 0,
+            Stakes: 370,
+          },
+        ],
+      }),
+    })
+    const result = parseLoveracingRaceSummary(
+      malformed,
+      '460867',
+      '2026-11-20T03:00:00.000Z',
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a refusal')
+    expect(result.reason).toMatch(/Starts/)
   })
 })
 

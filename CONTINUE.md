@@ -2,11 +2,44 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open
-`/home/evo/sandbox/mvp/sessions/active/2026-11-13-checkout-scroll-mapping.md` in a
-clean worktree from local `dsl-sidequest` after this wrap. Review the purchase
-flow prototype and map PDS/SA scroll locks and the post-sale pack/email to the
-current acceptance contract. Do not work in the shared checkout.
+**Next action:** open `engine/public/soft-content-guide.md` and draft Mulan's
+three missing soft-content blocks in a separate chat. Paste the returned blocks
+through the horse profile preflight; do not hand-write them into the DB.
+
+## State — 2026-11-20
+
+- **Horse intake is merged and pushed on `dsl-sidequest`.** A Loveracing Stud Book
+  URL now captures the horse record, a strict 15-node four-generation pedigree and
+  the NZTR aggregate race summary. The summary stores starts, wins, seconds,
+  thirds, stakes, source and retrieval time; the full Performance Profile remains
+  deferred. A missing or malformed summary refuses the import rather than writing
+  false zeroes. Merge `8432fd4`; branch proof `00af8a7` and `38fdf02` are pushed.
+- **Soft-content authoring is integrated at `7b55702`.** The reusable brief is
+  `engine/public/soft-content-guide.md` and is linked from every horse profile.
+  Saves block empty fields, Markdown and the legal compiler's banned terms;
+  section-length targets are non-blocking warnings. The engine stores and gates
+  the prose but never generates it.
+- **Local v2 proof database:** three horse rows and zero DSLs. Mulan has 15
+  pedigree nodes and 3 active R2 images; Lady Ketchikan has 15 nodes, 0-start race
+  summary, 6 images and all three soft blocks saved; Prudentia has 15 nodes, 10
+  starts / 2 wins / NZ$36,585, 4 images and all three soft blocks saved. Mulan's
+  three soft blocks are still empty and its local `race_record` predates the new
+  summary shape.
+- **R2 is clean for the active slugs:** `mulan-the-brave/01..03`,
+  `lady-ketchikan/01..06`, `prudentia/01..04`. The obsolete
+  `mulan-the-brave-nz/01..03` objects were permanently removed.
+- **Local trainer proof exists but is on hold:** Barbara Kennedy, the joint
+  Wexford partnership of Lance O'Sullivan & Andrew Scott, and Stephen Gray exist
+  in local `parties` + `party_roles` with bios. They are manual test data, not a
+  migration, and do not exist in hosted v2.
+- **Gate:** `pnpm verify` exit 0 at the soft-content commit; engine **417 passed
+  / 1 skipped**, website **64 passed**, both builds. `just verify-db` passed at
+  schema `00032`.
+- **Hosted v2 was not updated:** the target Supabase hostname cannot be resolved
+  from this environment. All horse, trainer, soft-content and image-count work in
+  that target still needs a deliberate replay/verification.
+- Unrelated local work remains preserved: modified `engine/tsconfig.json` and
+  untracked `website/.impeccable/`.
 
 ## State — 2026-11-13
 
@@ -40,8 +73,8 @@ current acceptance contract. Do not work in the shared checkout.
 - The shared checkout still contains unrelated uncommitted legal/checkout work;
   preserve it and isolate new website work in a separate worktree.
 
-**The DSL side quest is closed on `dsl-sidequest`.** `main` untouched; nothing
-pushed.
+**The original DSL side quest closed on `dsl-sidequest`; it is now pushed and
+continues through the horse-intake work above.**
 
 - **Chunk 4 — ledger — done** (`be5b3d4`, merged `72d7335`, audit 12/12 PASS):
   one atomic `record_sale_atomically`; the sale stores the executed snapshot and
@@ -120,6 +153,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-20 | Horse intake end-to-end: pedigree + race summary, soft-content brief/preflight, three local horse proofs and clean R2 image sets | engine_v2/website | `8432fd4`, `7b55702`; local DB/R2 | done; hosted replay pending |
 | 2026-11-13 | Four-generation Loveracing pedigree capture, storage and live Mulan proof | engine_v2/website | — | done; uncommitted branch |
 | 2026-11-13 | Legal pack 1.0.4, Investor Pack presentation and checkout acceptance persistence | engine_v2/website | `dbd0184` | committed |
 | 2026-11-13 | Checkout scroll-mapping next-session plan created | sandbox/mvp | — | ready |
@@ -149,6 +183,16 @@ pushed.
 | 2026-11-09 | Wrap | engine_v2/website | — | done |
 
 ## Blocked
+
+- **Hosted v2 replay** — `rkcptsghxovoeaycabah.supabase.co` is unreachable from
+  this environment. Re-run migrations and verify the three horse rows, R2 counts,
+  soft content and trainer parties against the hosted target before relying on it.
+- **Local proof data is not migration-backed** — horse rows, trainer parties and
+  saved soft content live in local Supabase only. A reset removes them; preserve
+  them in an idempotent seed or re-enter through the operator UI.
+- **Trainer rollout is on hold** by founder decision. Resolve duplicate matching
+  and hosted-v2 access before turning the three local trainer profiles into a
+  durable seed.
 
 - **Cloudflare Access** on the engine host — `/sales` has no in-app auth; do not
   expose the host without it.

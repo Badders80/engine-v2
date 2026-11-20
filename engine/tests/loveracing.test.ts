@@ -65,6 +65,21 @@ describe('the real Stud Book page loads its hard facts', () => {
     expect(withoutUrl.value.horse.loveracingId).toBeNull()
   })
 
+  it('reads the linked sire and dam HorseIDs from the page', () => {
+    expect(result.value.parents).toEqual({
+      sire: {
+        name: 'TURN ME LOOSE (NZ) 2011',
+        horseId: '290223',
+        href: '/Common/SystemTemplates/Modal/EntryDetail.aspx?HorseID=290223&DisplayContext=Modal',
+      },
+      dam: {
+        name: 'YEARN (NZ) 2013',
+        horseId: '317105',
+        href: '/Common/SystemTemplates/Modal/EntryDetail.aspx?HorseID=317105&DisplayContext=Modal',
+      },
+    })
+  })
+
   it('marks a horse with a life number as registered', () => {
     expect(result.value.horse.registered).toBe(true)
   })

@@ -28,6 +28,8 @@ export default async function Page({
   const horse = loaded !== null && loaded.ok ? loaded.value.horse : null
   const raceRecordJson =
     loaded !== null && loaded.ok ? JSON.stringify(loaded.value.raceRecord, null, 2) : '{}'
+  const pedigree = loaded !== null && loaded.ok ? loaded.value.pedigree : null
+  const pedigreeJson = pedigree === null ? '' : JSON.stringify(pedigree)
 
   return (
     <main className="grid gap-8">
@@ -67,16 +69,44 @@ export default async function Page({
 
         {loaded !== null && loaded.ok ? (
           <p className="mt-4 text-body text-muted">
-            Loaded {loaded.value.horse.legalName}, foaled {loaded.value.horse.foalingDate}.
+            Loaded {loaded.value.horse.legalName}, foaled {loaded.value.horse.foalingDate}, with
+            a 15-node pedigree (1 horse, 2 parents, 4 grandparents, 8 great-grandparents).
             Correct anything that is wrong before saving.
           </p>
         ) : null}
+
+        {pedigree === null ? null : (
+          <details className="mt-4 border-t border-line pt-4">
+            <summary className="cursor-pointer text-caption uppercase tracking-caption text-muted">
+              Review the pedigree snapshot
+            </summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((generation) => (
+                <div key={generation}>
+                  <p className="text-caption uppercase tracking-caption text-low">
+                    Generation {generation}
+                  </p>
+                  <ul className="mt-1 text-body text-muted">
+                    {pedigree.nodes
+                      .filter((node) => node.generation === generation)
+                      .map((node) => (
+                        <li key={node.path}>
+                          {node.name} <span className="text-low">#{node.horseId}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </section>
 
       <HorseForm
         action={createHorseAction}
         horse={horse}
         raceRecordJson={raceRecordJson}
+        pedigreeJson={pedigreeJson}
         submitLabel="Save horse"
         error={params.error ?? null}
       />

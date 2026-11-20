@@ -80,16 +80,20 @@ describe('the guard accepts exactly two hosts over https', () => {
   })
 })
 
-describe('the load makes one request to the guarded url', () => {
+describe('the load reads the guarded seed and follows its ancestry', () => {
   it('returns the parsed page', async () => {
-    const fetchImpl = stub(200, REGISTERED)
-    const result = await loadLoveracingPage('https://loveracing.nz/horse/123', fetchImpl)
+    const fetchImpl = pedigreeFetch()
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledTimes(7)
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.reason)
     expect(result.value.horse.legalName).toBe('Mulan The Brave (NZ)')
     expect(result.value.raceRecord.starts).toBe(0)
+    expect(result.value.pedigree.nodes).toHaveLength(15)
   })
 
   it('reads the loveracing id out of either URL shape', async () => {
@@ -97,19 +101,34 @@ describe('the load makes one request to the guarded url', () => {
       'https://loveracing.nz/Breeding/460867/Mulan-The-Brave-NZ-2023.aspx',
       'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
     ]) {
-      const result = await loadLoveracingPage(raw, stub(200, REGISTERED))
+      const result = await loadLoveracingPage(raw, pedigreeFetch())
       if (!result.ok) throw new Error(result.reason)
       expect(result.value.horse.loveracingId).toBe('460867')
     }
   })
 
   it('requests the guarded url itself, and refuses to follow a redirect', async () => {
-    const fetchImpl = stub(200, REGISTERED)
-    await loadLoveracingPage('https://loveracing.nz/horse/123', fetchImpl)
+    const fetchImpl = pedigreeFetch()
+    await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
 
     const [calledUrl, init] = fetchImpl.mock.calls[0]
-    expect(calledUrl).toBe('https://loveracing.nz/horse/123')
+    expect(calledUrl).toBe(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+    )
     expect(init?.redirect).toBe('error')
+  })
+
+  it('refuses a Loveracing page without a Stud Book HorseID before calling out', async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => new Response(REGISTERED, { status: 200 }))
+    const result = await loadLoveracingPage('https://loveracing.nz/horse/123', fetchImpl)
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a missing HorseID to be refused')
+    expect(result.reason).toMatch(/HorseID/)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('never calls out at all for a link the guard refuses', async () => {
@@ -121,7 +140,10 @@ describe('the load makes one request to the guarded url', () => {
   })
 
   it('refuses a non-200 answer', async () => {
-    const result = await loadLoveracingPage('https://loveracing.nz/horse/1', stub(404, 'gone'))
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      stub(404, 'gone'),
+    )
 
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected a refusal')
@@ -132,7 +154,10 @@ describe('the load makes one request to the guarded url', () => {
     const fetchImpl = vi.fn<FetchLike>(async () => {
       throw new Error('network down')
     })
-    const result = await loadLoveracingPage('https://loveracing.nz/horse/1', fetchImpl)
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
 
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected a refusal')
@@ -147,4 +172,99 @@ describe('the load makes one request to the guarded url', () => {
 
     expect(result.ok).toBe(false)
   })
+
+  it('captures exactly four generations in a 1/2/4/8 matrix', async () => {
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      pedigreeFetch(),
+    )
+    if (!result.ok) throw new Error(result.reason)
+
+    const generations = result.value.pedigree.nodes.reduce<Record<number, number>>(
+      (counts, node) => {
+        counts[node.generation] = (counts[node.generation] ?? 0) + 1
+        return counts
+      },
+      {},
+    )
+
+    expect(generations).toEqual({ 0: 1, 1: 2, 2: 4, 3: 8 })
+    expect(result.value.pedigree.nodes[0]).toMatchObject({
+      path: 'horse',
+      name: 'Mulan The Brave (NZ)',
+      horseId: '460867',
+    })
+    expect(result.value.pedigree.nodes.at(-1)?.generation).toBe(3)
+  })
+
+  it('refuses an incomplete pedigree rather than saving a partial tree', async () => {
+    const complete = pedigreeFetch()
+    const fetchImpl = vi.fn<FetchLike>(async (input, init) => {
+      const url = new URL(input)
+      if (url.searchParams.get('HorseID') === '250539') {
+        throw new Error('grandparent page unavailable')
+      }
+      return complete(input, init)
+    })
+
+    const result = await loadLoveracingPage(
+      'https://loveracing.nz/stud-book/460867/Mulan-The-Brave-NZ-2023.aspx',
+      fetchImpl,
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected an incomplete pedigree to be refused')
+    expect(result.reason).toMatch(/pedigree/i)
+    expect(result.reason).toMatch(/grandparent page unavailable/)
+  })
 })
+
+const ANCESTOR_PAGES: Record<string, string> = {
+  '290223': ancestorPage([
+    ['Sire', '255989', 'IFFRAAJ (GB) 2001'],
+    ['Dam', '234436', 'INDOMITABLE (NZ) 2003'],
+  ]),
+  '317105': ancestorPage([
+    ['Sire', '238456', 'SAVABEEL (AUS) 2001'],
+    ['Dam', '250539', 'PRINCESS UNO (AUS) 2003'],
+  ]),
+  '255989': ancestorPage([
+    ['Sire', '213094', 'ZAFONIC (USA) 1990'],
+    ['Dam', '255990', 'PASTORALE (GB) 1988'],
+  ]),
+  '234436': ancestorPage([
+    ['Sire', '300001', 'INDOMITABLE SIRE (NZ) 1990'],
+    ['Dam', '300002', 'INDOMITABLE DAM (NZ) 1995'],
+  ]),
+  '238456': ancestorPage([
+    ['Sire', '300003', 'ZABEEL (NZ) 1986'],
+    ['Dam', '300004', 'SAVANNAH SUCCESS (NZ) 1993'],
+  ]),
+  '250539': ancestorPage([
+    ['Sire', '151645', 'DANE HILL (USA) 1986'],
+    ['Dam', '250540', 'NUMERO PRIVEE (USA) 1990'],
+  ]),
+}
+
+function ancestorPage(
+  parents: ReadonlyArray<readonly ['Sire' | 'Dam', string, string]>,
+): string {
+  const rows = parents.map(
+    ([label, id, name]) =>
+      `<li><strong>${label}:</strong> <a href="/Common/SystemTemplates/Modal/EntryDetail.aspx?HorseID=${id}&DisplayContext=Modal">${name}</a></li>`,
+  )
+  return `<html><body><ul>${rows.join('')}</ul></body></html>`
+}
+
+function pedigreeFetch() {
+  return vi.fn<FetchLike>(async (input) => {
+    const url = new URL(input)
+    if (url.pathname.includes('460867')) return new Response(REGISTERED, { status: 200 })
+
+    const horseId = url.searchParams.get('HorseID')
+    const page = horseId === null ? null : ANCESTOR_PAGES[horseId]
+    return page === undefined || page === null
+      ? new Response('not found', { status: 404 })
+      : new Response(page, { status: 200 })
+  })
+}

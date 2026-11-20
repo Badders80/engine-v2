@@ -26,7 +26,23 @@
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 
-import { parseLoveracingPage, type LoveracingParseResult } from './loveracing'
+import {
+  parseLoveracingPage,
+  parseLoveracingParents,
+  type LoveracingHorse,
+  type LoveracingParent,
+  type LoveracingParents,
+  type RaceRecord,
+} from './loveracing'
+import {
+  PEDIGREE_PATHS,
+  PEDIGREE_VERSION,
+  isCompletePedigreeSnapshot,
+  pedigreeSnapshotProblem,
+  type PedigreeGeneration,
+  type PedigreeNode,
+  type PedigreeSnapshot,
+} from './pedigree'
 
 /** Exactly these two hosts, over https, with nothing before the host. */
 export const LOVERACING_HOSTS = ['loveracing.nz', 'www.loveracing.nz'] as const
@@ -34,6 +50,24 @@ export const LOVERACING_HOSTS = ['loveracing.nz', 'www.loveracing.nz'] as const
 export const LOVERACING_TIMEOUT_MS = 8000
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
+
+export type LoveracingLoadResult =
+  | {
+      ok: true
+      value: {
+        horse: LoveracingHorse
+        raceRecord: RaceRecord
+        parents: LoveracingParents
+        pedigree: PedigreeSnapshot
+      }
+    }
+  | { ok: false; reason: string }
+
+type HtmlResult = { ok: true; value: { url: URL; html: string } } | { ok: false; reason: string }
+
+type PendingNode = { node: PedigreeNode; parents: LoveracingParents }
+
+type ChildNode = { node: PedigreeNode; href: string }
 
 /** Where the TLS-impersonating fetcher lives. Overridable for a packaged build. */
 export function loveracingFetcherScript(): string {
@@ -99,17 +133,18 @@ export function loveracingIdFromUrl(url: URL): string | null {
   return match === null ? null : match[1]
 }
 
-export async function loadLoveracingPage(
-  raw: string,
-  fetchImpl: FetchLike = curlCffiFetch,
-): Promise<LoveracingParseResult> {
-  const url = loveracingUrlOrNull(raw)
-  if (url === null) {
-    return { ok: false, reason: 'that is not an https://loveracing.nz link' }
-  }
+function withoutHash(url: URL): URL {
+  const clean = new URL(url)
+  clean.hash = ''
+  return clean
+}
+
+async function fetchLoveracingHtml(raw: URL, fetchImpl: FetchLike): Promise<HtmlResult> {
+  const guarded = loveracingUrlOrNull(raw.toString())
+  if (guarded === null) return { ok: false, reason: 'ancestor link is not an https://loveracing.nz link' }
 
   try {
-    const response = await fetchImpl(url.toString(), {
+    const response = await fetchImpl(guarded.toString(), {
       redirect: 'error',
       signal: AbortSignal.timeout(LOVERACING_TIMEOUT_MS),
       headers: { accept: 'text/html' },
@@ -119,8 +154,158 @@ export async function loadLoveracingPage(
       return { ok: false, reason: `loveracing.nz answered ${response.status}` }
     }
 
-    return parseLoveracingPage(await response.text(), loveracingIdFromUrl(url))
+    return { ok: true, value: { url: withoutHash(guarded), html: await response.text() } }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : 'the load failed' }
+  }
+}
+
+function resolvedParent(
+  pageUrl: URL,
+  parent: LoveracingParent | null,
+  side: 'sire' | 'dam',
+): { ok: true; value: { parent: LoveracingParent; url: URL } } | { ok: false; reason: string } {
+  if (parent === null) {
+    return { ok: false, reason: `the page is missing a linked ${side} HorseID` }
+  }
+
+  let url: URL
+  try {
+    url = withoutHash(new URL(parent.href, pageUrl))
+  } catch {
+    return { ok: false, reason: `the linked ${side} HorseID is not a valid URL` }
+  }
+
+  if (loveracingUrlOrNull(url.toString()) === null) {
+    return { ok: false, reason: `the linked ${side} HorseID is not hosted by loveracing.nz` }
+  }
+
+  return { ok: true, value: { parent, url } }
+}
+
+async function loadPedigree(
+  root: { name: string; horseId: string; url: URL },
+  rootParents: LoveracingParents,
+  fetchImpl: FetchLike,
+): Promise<{ ok: true; value: PedigreeSnapshot } | { ok: false; reason: string }> {
+  const rootNode: PedigreeNode = {
+    path: 'horse',
+    generation: 0,
+    name: root.name,
+    horseId: root.horseId,
+    sourceUrl: withoutHash(root.url).toString(),
+  }
+
+  const nodes: PedigreeNode[] = [rootNode]
+  let pending: PendingNode[] = [{ node: rootNode, parents: rootParents }]
+
+  for (let generation = 1; generation <= 3; generation += 1) {
+    const children: ChildNode[] = []
+
+    for (const branch of pending) {
+      for (const side of ['sire', 'dam'] as const) {
+        const resolved = resolvedParent(
+          new URL(branch.node.sourceUrl),
+          branch.parents[side],
+          side,
+        )
+        if (!resolved.ok) {
+          return {
+            ok: false,
+            reason: `pedigree generation ${generation}: ${branch.node.name}: ${resolved.reason}`,
+          }
+        }
+
+        const childPath = branch.node.path === 'horse' ? side : `${branch.node.path}.${side}`
+        const node: PedigreeNode = {
+          path: childPath,
+          generation: generation as PedigreeGeneration,
+          name: resolved.value.parent.name,
+          horseId: resolved.value.parent.horseId,
+          sourceUrl: resolved.value.url.toString(),
+        }
+        nodes.push(node)
+        children.push({ node, href: resolved.value.url.toString() })
+      }
+    }
+
+    if (generation === 3) break
+
+    const loaded = await Promise.all(
+      children.map(async (child): Promise<{ ok: true; value: PendingNode } | { ok: false; reason: string }> => {
+        const page = await fetchLoveracingHtml(new URL(child.href), fetchImpl)
+        if (!page.ok) {
+          return {
+            ok: false,
+            reason: `pedigree generation ${generation + 1}: ${child.node.name}: ${page.reason}`,
+          }
+        }
+        return {
+          ok: true,
+          value: { node: child.node, parents: parseLoveracingParents(page.value.html) },
+        }
+      }),
+    )
+
+    const failed = loaded.find((entry) => !entry.ok)
+    if (failed !== undefined && !failed.ok) return failed
+    pending = loaded.flatMap((entry) => (entry.ok ? [entry.value] : []))
+  }
+
+  const snapshot: PedigreeSnapshot = {
+    version: PEDIGREE_VERSION,
+    source: 'loveracing_nz',
+    rootHorseId: root.horseId,
+    sourceUrl: withoutHash(root.url).toString(),
+    retrievedAt: new Date().toISOString(),
+    nodes,
+  }
+
+  if (!isCompletePedigreeSnapshot(snapshot)) {
+    const present = new Set(nodes.map((node) => node.path))
+    const missing = PEDIGREE_PATHS.filter((path) => !present.has(path))
+    return {
+      ok: false,
+      reason: `pedigree is incomplete or malformed; ${pedigreeSnapshotProblem(snapshot) ?? `missing ${missing.join(', ')}`}`,
+    }
+  }
+
+  return { ok: true, value: snapshot }
+}
+
+export async function loadLoveracingPage(
+  raw: string,
+  fetchImpl: FetchLike = curlCffiFetch,
+): Promise<LoveracingLoadResult> {
+  const url = loveracingUrlOrNull(raw)
+  if (url === null) {
+    return { ok: false, reason: 'that is not an https://loveracing.nz link' }
+  }
+
+  const horseId = loveracingIdFromUrl(url)
+  if (horseId === null) {
+    return { ok: false, reason: 'use a Loveracing Stud Book URL containing the horse HorseID' }
+  }
+
+  const page = await fetchLoveracingHtml(url, fetchImpl)
+  if (!page.ok) return page
+
+  const parsed = parseLoveracingPage(page.value.html, horseId)
+  if (!parsed.ok) return parsed
+
+  const pedigree = await loadPedigree(
+    {
+      name: parsed.value.horse.legalName,
+      horseId,
+      url: page.value.url,
+    },
+    parsed.value.parents,
+    fetchImpl,
+  )
+  if (!pedigree.ok) return pedigree
+
+  return {
+    ok: true,
+    value: { ...parsed.value, pedigree: pedigree.value },
   }
 }

@@ -35,6 +35,7 @@ import {
   type PartyRole,
   type PartyRow,
 } from './dslStore'
+import { isCompletePedigreeSnapshot } from './pedigree'
 
 export const SUPABASE_URL_ENV = 'SUPABASE_URL'
 export const SUPABASE_SERVICE_ROLE_KEY_ENV = 'SUPABASE_SERVICE_ROLE_KEY'
@@ -171,6 +172,7 @@ function toHorse(value: unknown): HorseRow {
     raceExpectation: strOrNull(row.race_expectation),
     imageCount: num(row.image_count),
     raceRecord: blob(row.race_record),
+    pedigree: isCompletePedigreeSnapshot(row.pedigree) ? row.pedigree : null,
   }
 }
 
@@ -256,6 +258,7 @@ function horseColumns(row: Partial<NewHorse>) {
     race_expectation: row.raceExpectation,
     image_count: row.imageCount,
     race_record: row.raceRecord,
+    pedigree: row.pedigree,
   })
 }
 

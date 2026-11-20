@@ -51,6 +51,17 @@ export type LoveracingHorse = Pick<
   | 'registered'
 >
 
+export type LoveracingParent = {
+  name: string
+  horseId: string
+  href: string
+}
+
+export type LoveracingParents = {
+  sire: LoveracingParent | null
+  dam: LoveracingParent | null
+}
+
 export type RaceResultLine = {
   date: string | null
   venue: string | null
@@ -67,7 +78,10 @@ export type RaceRecord = {
 }
 
 export type LoveracingParseResult =
-  | { ok: true; value: { horse: LoveracingHorse; raceRecord: RaceRecord } }
+  | {
+      ok: true
+      value: { horse: LoveracingHorse; raceRecord: RaceRecord; parents: LoveracingParents }
+    }
   | { ok: false; reason: string }
 
 function stripTags(fragment: string): string {
@@ -95,6 +109,30 @@ function fact(source: string, label: string): string | null {
 
   const value = stripTags(match[1])
   return value === '' || value === '-' ? null : value
+}
+
+/** A labelled ancestor link, including the stable HorseID in its href. */
+function linkedHorseFact(source: string, label: string): LoveracingParent | null {
+  const pattern = new RegExp(
+    `<strong>\\s*${label}\\s*:\\s*</strong>[\\s\\S]{0,200}?<a\\b[^>]*href=(?:"([^"]*)"|'([^']*)')[^>]*>([\\s\\S]*?)<\\/a>`,
+    'i',
+  )
+  const match = pattern.exec(source)
+  if (match === null) return null
+
+  const href = (match[1] ?? match[2] ?? '').replace(/&amp;/g, '&').trim()
+  const name = stripTags(match[3])
+  const id = /(?:[?&]HorseID=|\/(?:breeding|stud-book)\/)(\d+)/i.exec(href)?.[1]
+  if (href === '' || name === '' || id === undefined) return null
+
+  return { name, horseId: id, href }
+}
+
+export function parseLoveracingParents(source: string): LoveracingParents {
+  return {
+    sire: linkedHorseFact(source, 'Sire'),
+    dam: linkedHorseFact(source, 'Dam'),
+  }
 }
 
 /** `<li>Bay Filly</li>` — the only unlabelled line in the identity list. */
@@ -176,6 +214,7 @@ export function parseLoveracingPage(
   const { colour, sex } = readColourAndSex(source)
   const sireName = fact(source, 'Sire')
   const damName = fact(source, 'Dam')
+  const parents = parseLoveracingParents(source)
 
   const missing: string[] = []
   if (sireName === null) missing.push('sire')
@@ -208,6 +247,7 @@ export function parseLoveracingPage(
         registered: lifeNumber !== null,
       },
       raceRecord: { starts: 0, wins: 0, places: 0, resultLines: [] },
+      parents,
     },
   }
 }

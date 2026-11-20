@@ -13,6 +13,7 @@ import { redirect } from 'next/navigation'
 
 import { slugFromLegalName } from '@/lib/dsl'
 import type { LinkEntry, PartyRole } from '@/lib/dslStore'
+import { isCompletePedigreeSnapshot, type PedigreeSnapshot } from '@/lib/pedigree'
 
 import { recordStore } from './store'
 
@@ -217,6 +218,21 @@ function raceRecord(form: FormData): Result<Record<string, unknown>> {
   }
 }
 
+/** The hidden 15-node snapshot emitted by the Loveracing loader. */
+function pedigreeSnapshot(form: FormData): Result<PedigreeSnapshot | null> {
+  const raw = value(form, 'pedigree')
+  if (raw === '') return { ok: true, value: null }
+
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return isCompletePedigreeSnapshot(parsed)
+      ? { ok: true, value: parsed }
+      : { ok: false, reason: 'the pedigree snapshot is incomplete or malformed' }
+  } catch {
+    return { ok: false, reason: 'the pedigree snapshot is not valid json' }
+  }
+}
+
 /**
  * Horse-only create (U12). No owner and no DSL: a horse is a record. The
  * trainer is a link on the deal, so it is absent here (R1).
@@ -240,6 +256,8 @@ export async function createHorseAction(form: FormData): Promise<void> {
 
   const record = raceRecord(form)
   if (!record.ok) fail(back, record.reason)
+  const pedigree = pedigreeSnapshot(form)
+  if (!pedigree.ok) fail(back, pedigree.reason)
 
   const slug = slugFromLegalName(legalName)
   if (slug === '') fail(back, 'that legal name does not make a slug')
@@ -254,6 +272,12 @@ export async function createHorseAction(form: FormData): Promise<void> {
       : typedBarnName
 
   const store = recordStore()
+  const loveracingId = optional(form, 'loveracingId')
+  const registered = checked(form, 'registered')
+
+  if (registered && loveracingId !== null && pedigree.value === null) {
+    fail(back, 'a registered Loveracing horse needs the complete 15-node pedigree snapshot')
+  }
 
   const clash = await store.findHorseBySlug(slug)
   if (clash !== null) {
@@ -272,13 +296,14 @@ export async function createHorseAction(form: FormData): Promise<void> {
     damName,
     microchip: optional(form, 'microchip'),
     lifeNumber: optional(form, 'lifeNumber'),
-    loveracingId: optional(form, 'loveracingId'),
-    registered: checked(form, 'registered'),
+    loveracingId,
+    registered,
     aboutHorse: null,
     racingOutlookAndPedigree: null,
     raceExpectation: null,
     imageCount: 0,
     raceRecord: record.value,
+    pedigree: pedigree.value,
   })
 
   revalidatePath('/horses')
@@ -316,6 +341,8 @@ export async function updateHorseAction(form: FormData): Promise<void> {
 
   const record = raceRecord(form)
   if (!record.ok) fail(back, record.reason)
+  const pedigree = pedigreeSnapshot(form)
+  if (!pedigree.ok) fail(back, pedigree.reason)
 
   // A barn name equal to the official name is "there isn't one" (§4).
   const typedBarnName = optional(form, 'barnName')
@@ -338,6 +365,7 @@ export async function updateHorseAction(form: FormData): Promise<void> {
     loveracingId: optional(form, 'loveracingId'),
     registered: checked(form, 'registered'),
     raceRecord: record.value,
+    pedigree: pedigree.value,
   })
 
   revalidatePath('/horses')

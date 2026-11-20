@@ -10,6 +10,8 @@
  * CI, where no database and no credentials exist.
  */
 
+import type { PedigreeSnapshot } from './pedigree'
+
 export type PaymentModel = 'subscription_float' | 'upfront'
 export type CloseStyle = 'fourteen_day' | 'three_x_remaining'
 
@@ -78,6 +80,7 @@ export type NewHorse = {
   raceExpectation: string | null
   imageCount: number
   raceRecord: Record<string, unknown>
+  pedigree?: PedigreeSnapshot | null
 }
 
 export type HorseRow = NewHorse & { id: string }

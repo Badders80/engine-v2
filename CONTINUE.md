@@ -10,6 +10,18 @@ current acceptance contract. Do not work in the shared checkout.
 
 ## State — 2026-11-13
 
+- **Four-generation pedigree capture — done on
+  `pedigree-capture-2026-11-13`:** the add-horse Loveracing loader accepts a
+  Stud Book URL, follows the sire and dam profile links, and stores exactly 15
+  nodes with provenance: 1 horse, 2 parents, 4 grandparents and 8
+  great-grandparents. Migration `00032_horse_pedigree.sql` adds the versioned
+  `horses.pedigree` jsonb snapshot; the load, profile and edit screens consume
+  it. Live Mulan proof: `460867` persisted as `0:1, 1:2, 2:4, 3:8`.
+- **Race summary capture — done on the same branch:** the loader also calls
+  NZTR's pedigree endpoint for the exact aggregate summary (starts, wins,
+  seconds, thirds, stakes) and stores it with source and retrieval time inside
+  `race_record`. The runner-by-runner Performance Profile remains deferred; a
+  summary failure refuses the import rather than presenting a false zero.
 - **Landing parity is merged and pushed** on `dsl-sidequest` at merge commit
   `03ea397`; founder visual walk accepted.
 - **Shared page foundation is locked and pushed** at `ade0cc3`: global
@@ -103,6 +115,7 @@ pushed.
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-13 | Four-generation Loveracing pedigree capture, storage and live Mulan proof | engine_v2/website | — | done; uncommitted branch |
 | 2026-11-13 | Legal pack 1.0.4, Investor Pack presentation and checkout acceptance persistence | engine_v2/website | `dbd0184` | committed |
 | 2026-11-13 | Checkout scroll-mapping next-session plan created | sandbox/mvp | — | ready |
 | 2026-11-13 | F1 acceptance persistence: immutable PDS/SA declarations, typed signature and Stripe precondition | engine_v2/website | — | done |

@@ -40,6 +40,7 @@ export default async function Page({
         horse={horse}
         horseId={horse.id}
         raceRecordJson={JSON.stringify(horse.raceRecord, null, 2)}
+        pedigreeJson={horse.pedigree === null || horse.pedigree === undefined ? '' : JSON.stringify(horse.pedigree)}
         submitLabel="Save changes"
         error={query.error ?? null}
       />

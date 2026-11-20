@@ -28,9 +28,9 @@
  *   <div class="col-xs-3"><strong>Life no:</strong> NZ00460867</div>
  *   <div class="col-xs-3"><strong>Breeder:</strong> C W Kwok</div>
  *
- * It returns hard facts only. The race record lives on the Performance Profile
- * (`EntryDetail.aspx?HorseID=…`), which is a later item — the identity page has
- * no race table, so `raceRecord` comes back empty rather than guessed.
+ * It returns hard facts only. The identity page has no race table. The network
+ * loader captures NZTR's aggregate race summary separately and leaves the
+ * runner-by-runner Performance Profile lines empty until that source is parsed.
  */
 
 import type { NewHorse } from './dslStore'
@@ -51,6 +51,17 @@ export type LoveracingHorse = Pick<
   | 'registered'
 >
 
+export type LoveracingParent = {
+  name: string
+  horseId: string
+  href: string
+}
+
+export type LoveracingParents = {
+  sire: LoveracingParent | null
+  dam: LoveracingParent | null
+}
+
 export type RaceResultLine = {
   date: string | null
   venue: string | null
@@ -59,15 +70,31 @@ export type RaceResultLine = {
   result: number | null
 }
 
-export type RaceRecord = {
+export type RaceSummary = {
+  source: 'loveracing_nz'
+  sourceHorseId: string
+  retrievedAt: string
   starts: number
   wins: number
-  places: number
+  seconds: number
+  thirds: number
+  stakesNzd: number
+}
+
+export type RaceRecord = {
+  summary: RaceSummary | null
   resultLines: RaceResultLine[]
 }
 
+export type RaceSummaryParseResult =
+  | { ok: true; value: RaceSummary }
+  | { ok: false; reason: string }
+
 export type LoveracingParseResult =
-  | { ok: true; value: { horse: LoveracingHorse; raceRecord: RaceRecord } }
+  | {
+      ok: true
+      value: { horse: LoveracingHorse; raceRecord: RaceRecord; parents: LoveracingParents }
+    }
   | { ok: false; reason: string }
 
 function stripTags(fragment: string): string {
@@ -95,6 +122,120 @@ function fact(source: string, label: string): string | null {
 
   const value = stripTags(match[1])
   return value === '' || value === '-' ? null : value
+}
+
+/** A labelled ancestor link, including the stable HorseID in its href. */
+function linkedHorseFact(source: string, label: string): LoveracingParent | null {
+  const pattern = new RegExp(
+    `<strong>\\s*${label}\\s*:\\s*</strong>[\\s\\S]{0,200}?<a\\b[^>]*href=(?:"([^"]*)"|'([^']*)')[^>]*>([\\s\\S]*?)<\\/a>`,
+    'i',
+  )
+  const match = pattern.exec(source)
+  if (match === null) return null
+
+  const href = (match[1] ?? match[2] ?? '').replace(/&amp;/g, '&').trim()
+  const name = stripTags(match[3])
+  const id = /(?:[?&]HorseID=|\/(?:breeding|stud-book)\/)(\d+)/i.exec(href)?.[1]
+  if (href === '' || name === '' || id === undefined) return null
+
+  return { name, horseId: id, href }
+}
+
+export function parseLoveracingParents(source: string): LoveracingParents {
+  return {
+    sire: linkedHorseFact(source, 'Sire'),
+    dam: linkedHorseFact(source, 'Dam'),
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function summaryCount(row: Record<string, unknown>, key: string): number | null {
+  const value = row[key]
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+/** Parse the aggregate race summary embedded in NZTR's pedigree payload. */
+export function parseLoveracingRaceSummary(
+  source: string,
+  sourceHorseId: string,
+  retrievedAt: string,
+): RaceSummaryParseResult {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(source)
+  } catch {
+    return { ok: false, reason: 'the race summary response is not valid json' }
+  }
+
+  if (!isRecord(envelope) || typeof envelope.d !== 'string') {
+    return { ok: false, reason: 'the race summary response has no encoded payload' }
+  }
+
+  let payload: unknown
+  try {
+    payload = JSON.parse(envelope.d)
+  } catch {
+    return { ok: false, reason: 'the race summary payload is not valid json' }
+  }
+
+  if (!isRecord(payload) || !Array.isArray(payload.rows)) {
+    return { ok: false, reason: 'the race summary payload has no rows' }
+  }
+
+  const root = payload.rows.find(
+    (row) =>
+      isRecord(row) &&
+      row.Level === 0 &&
+      String(row.HorseID) === sourceHorseId,
+  )
+  if (!isRecord(root)) {
+    return {
+      ok: false,
+      reason: `the race summary has no root horse row for Loveracing HorseID ${sourceHorseId}`,
+    }
+  }
+
+  const starts = summaryCount(root, 'Starts')
+  const wins = summaryCount(root, 'Wins')
+  const seconds = summaryCount(root, 'Seconds')
+  const thirds = summaryCount(root, 'Thirds')
+  const stakesNzd = root.Stakes
+
+  for (const [label, value] of [
+    ['Starts', starts],
+    ['Wins', wins],
+    ['Seconds', seconds],
+    ['Thirds', thirds],
+  ] as const) {
+    if (value === null) {
+      return { ok: false, reason: `the race summary ${label} is not a non-negative integer` }
+    }
+  }
+
+  if (starts === null || wins === null || seconds === null || thirds === null) {
+    return { ok: false, reason: 'the race summary counts are invalid' }
+  }
+
+  if (typeof stakesNzd !== 'number' || !Number.isFinite(stakesNzd) || stakesNzd < 0) {
+    return { ok: false, reason: 'the race summary Stakes is not a non-negative number' }
+  }
+
+  return {
+    ok: true,
+    value: {
+      source: 'loveracing_nz',
+      sourceHorseId,
+      retrievedAt,
+      starts,
+      wins,
+      seconds,
+      thirds,
+      stakesNzd,
+    },
+  }
 }
 
 /** `<li>Bay Filly</li>` — the only unlabelled line in the identity list. */
@@ -176,6 +317,7 @@ export function parseLoveracingPage(
   const { colour, sex } = readColourAndSex(source)
   const sireName = fact(source, 'Sire')
   const damName = fact(source, 'Dam')
+  const parents = parseLoveracingParents(source)
 
   const missing: string[] = []
   if (sireName === null) missing.push('sire')
@@ -207,7 +349,8 @@ export function parseLoveracingPage(
         // operator can still untick the box before saving.
         registered: lifeNumber !== null,
       },
-      raceRecord: { starts: 0, wins: 0, places: 0, resultLines: [] },
+      raceRecord: { summary: null, resultLines: [] },
+      parents,
     },
   }
 }

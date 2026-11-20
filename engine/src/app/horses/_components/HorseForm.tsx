@@ -22,6 +22,7 @@ export function HorseForm({
   horse = null,
   horseId = null,
   raceRecordJson,
+  pedigreeJson,
   submitLabel,
   error = null,
 }: {
@@ -29,6 +30,7 @@ export function HorseForm({
   horse?: Partial<HorseRow> | null
   horseId?: string | null
   raceRecordJson: string
+  pedigreeJson: string
   submitLabel: string
   error?: string | null
 }) {
@@ -38,6 +40,7 @@ export function HorseForm({
 
       <form action={action} className="grid gap-8">
         {horseId === null ? null : <input type="hidden" name="id" value={horseId} />}
+        <input type="hidden" name="pedigree" value={pedigreeJson} />
 
         <FieldGroup legend="Identity">
           <Field label="Legal name" htmlFor="legalName">

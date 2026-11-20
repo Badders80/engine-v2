@@ -25,6 +25,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   const horse = await store.findHorseById(id)
   if (horse === null) notFound()
+  const pedigree = horse.pedigree ?? null
 
   // The trainer and the owner are derived through the horse's DSLs. Records
   // never author the link (R1, ruling 10).
@@ -93,6 +94,40 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <SummaryRow label="Life number" value={horse.lifeNumber ?? '—'} />
           <SummaryRow label="Loveracing id" value={horse.loveracingId ?? '—'} />
         </dl>
+      </section>
+
+      <section className="rounded-md border border-line bg-panel p-5">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+          <h3>Pedigree snapshot</h3>
+          {pedigree === null ? null : (
+            <p className="text-caption text-low">
+              Retrieved {pedigree.retrievedAt.slice(0, 10)} from Loveracing
+            </p>
+          )}
+        </div>
+        {pedigree === null ? (
+          <p className="text-body text-low">No 15-node pedigree snapshot is stored.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-4">
+            {[0, 1, 2, 3].map((generation) => (
+              <div key={generation}>
+                <h4 className="text-caption uppercase tracking-caption text-muted">
+                  Generation {generation}
+                </h4>
+                <ul className="mt-2 grid gap-2 text-body">
+                  {pedigree.nodes
+                    .filter((node) => node.generation === generation)
+                    .map((node) => (
+                      <li key={node.path}>
+                        <span>{node.name}</span>
+                        <span className="block font-figure text-caption text-low">#{node.horseId}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="grid gap-6 md:grid-cols-2">

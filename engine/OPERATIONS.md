@@ -156,6 +156,12 @@ The second statement only succeeds when the run is complete: the constraint trig
 
 Check the run before writing the count. A folder must be `01..NN` with no gap and no repeat, because that is what `image_count` means. `imageCountFromKeys(slug, keys)` in the storage module does that check over a listing: a stray `03` with no `02` is refused rather than counted, so the row cannot drift from the bucket.
 
+## Soft content
+
+The three PDS horse paragraphs are drafted outside the engine. Open the reusable brief at `/soft-content-guide.md` or `engine/public/soft-content-guide.md`, give it to a drafting chat with the horse record, pedigree snapshot, race summary and trainer details, and ask it to write the three blocks plus a separate `Facts used` list.
+
+Paste only the three plain-text blocks into **Soft content** on `/horses/<id>`. The save gate refuses empty fields, Markdown formatting and the legal compiler's banned terms. Section-length targets produce a warning after saving; they do not block a shorter true paragraph. The three columns are `about_horse`, `racing_outlook_and_pedigree` and `race_expectation`; the trainer bio remains on the trainer record.
+
 ## Documents
 
 The engine compiles the PDS and the SA as markdown from the horse, the trainer, and the DSL. The promoter line on every document is Alex Baddeley, Evolution Stables Ltd. The buyer accepts both in the buy flow, including the four declarations named in `PLAN.md`. The webhook stores the markdown and the hashes on the sale. A later edit to the horse does not change a document already sold.

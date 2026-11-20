@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { slugFromLegalName } from '@/lib/dsl'
 import type { LinkEntry, PartyRole } from '@/lib/dslStore'
 import { isCompletePedigreeSnapshot, type PedigreeSnapshot } from '@/lib/pedigree'
+import { softContentProblems, softContentWarnings } from '@/lib/softContent'
 
 import { recordStore } from './store'
 
@@ -389,12 +390,25 @@ export async function updateSoftContentAction(form: FormData): Promise<void> {
   const horse = await store.findHorseById(id)
   if (horse === null) fail('/horses', 'that horse no longer exists')
 
+  const content = {
+    aboutHorse: value(form, 'aboutHorse'),
+    racingOutlookAndPedigree: value(form, 'racingOutlookAndPedigree'),
+    raceExpectation: value(form, 'raceExpectation'),
+  }
+  const problems = softContentProblems(content)
+  if (problems.length > 0) fail(back, problems.join(' '))
+  const warnings = softContentWarnings(content)
+
   await store.updateHorse(id, {
-    aboutHorse: optional(form, 'aboutHorse'),
-    racingOutlookAndPedigree: optional(form, 'racingOutlookAndPedigree'),
-    raceExpectation: optional(form, 'raceExpectation'),
+    aboutHorse: content.aboutHorse,
+    racingOutlookAndPedigree: content.racingOutlookAndPedigree,
+    raceExpectation: content.raceExpectation,
   })
 
   revalidatePath(back)
-  redirect(back)
+  redirect(
+    warnings.length === 0
+      ? back
+      : `${back}?warning=${encodeURIComponent(warnings.join(' '))}`,
+  )
 }

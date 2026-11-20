@@ -22,6 +22,11 @@ current acceptance contract. Do not work in the shared checkout.
   seconds, thirds, stakes) and stores it with source and retrieval time inside
   `race_record`. The runner-by-runner Performance Profile remains deferred; a
   summary failure refuses the import rather than presenting a false zero.
+- **Soft-content authoring brief — integrated:** `engine/public/soft-content-guide.md`
+  is the reusable external-chat brief, linked from every horse profile. The
+  soft-content save now refuses empty fields, Markdown and compiler-banned terms;
+  section-length targets are warnings. The engine remains the store and gate, not
+  the prose generator.
 - **Landing parity is merged and pushed** on `dsl-sidequest` at merge commit
   `03ea397`; founder visual walk accepted.
 - **Shared page foundation is locked and pushed** at `ade0cc3`: global

@@ -19,8 +19,15 @@ function statusLabel(status: DslRow['status']): string {
   return status.replaceAll('_', ' ')
 }
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ warning?: string }>
+}) {
   const { id } = await params
+  const { warning = '' } = await searchParams
   const store = recordStore()
 
   const horse = await store.findHorseById(id)
@@ -167,11 +174,27 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       </div>
 
       <section className="rounded-md border border-line bg-panel p-5">
-        <h3 className="mb-3">Soft content</h3>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+          <h3>Soft content</h3>
+          <a
+            href="/soft-content-guide.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-caption uppercase tracking-caption text-muted underline"
+          >
+            Authoring brief
+          </a>
+        </div>
         <p className="mb-3 text-caption text-low">
           Records owns this text. A deal may override the three horse paragraphs locally; the
-          trainer bio always resolves from the party.
+          trainer bio always resolves from the party. Draft outside the engine, then paste the
+          three plain-text blocks using the authoring brief.
         </p>
+        {warning === '' ? null : (
+          <p role="status" className="mb-3 rounded-sm border border-line px-3 py-2 text-body text-muted">
+            Saved with length warning: {warning}
+          </p>
+        )}
 
         <form action={updateSoftContentAction} className="grid gap-3">
           <input type="hidden" name="id" value={horse.id} />

@@ -24,6 +24,12 @@ import { BLOCK_KEYS, SOFT_TOKEN_KEYS, TOKEN_KEYS } from '../src/lib/legal/tokens
 
 const REPO = new URL('../../', import.meta.url)
 const PREVIEW = new URL('../src/app/dsl/[id]/legal/page.tsx', import.meta.url)
+const PREVIEW_COMPILER = new URL('../src/lib/legal/draftPreview.ts', import.meta.url)
+const PDF_ROUTE = new URL(
+  '../src/app/api/dsl/[id]/legal-preview/route.ts',
+  import.meta.url,
+)
+const PDF_RENDERER = new URL('../src/lib/legal/renderDraftPdf.ts', import.meta.url)
 
 const corpus = loadLegalCorpus()
 
@@ -181,10 +187,12 @@ describe('the raw corpus carries no banned term', () => {
 })
 
 describe('the preview page is the compiler call site', () => {
-  it('imports compileLegalPack and calls it', () => {
+  it('uses the shared draft compiler, which calls compileLegalPack', () => {
     const page = readFileSync(PREVIEW, 'utf8')
-    expect(page).toMatch(/from '@\/lib\/legal\/compile'/)
-    expect(page).toMatch(/compileLegalPack\(/)
+    const compiler = readFileSync(PREVIEW_COMPILER, 'utf8')
+    expect(page).toMatch(/compileDraftPreview\(/)
+    expect(compiler).toMatch(/from '\.\/compile'/)
+    expect(compiler).toMatch(/compileLegalPack\(/)
   })
 
   it('loads the DSL through the existing view loader', () => {
@@ -192,12 +200,17 @@ describe('the preview page is the compiler call site', () => {
     expect(page).toMatch(/loadDslView\(/)
   })
 
-  it('writes no sale row and creates no PDF', () => {
-    // Comments document the fence; the assertion is about the code.
+  it('serves a real PDF without writing a sale row or storing the draft', () => {
     const code = readFileSync(PREVIEW, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '')
+    const route = readFileSync(PDF_ROUTE, 'utf8')
+    const renderer = readFileSync(PDF_RENDERER, 'utf8')
     expect(code).not.toMatch(/\binsertSale\b|\bsales\b.*\binsert\b/)
-    expect(code).not.toMatch(/\bpdf\b/i)
+    expect(route).toMatch(/['"]content-type['"]:\s*['"]application\/pdf['"]/i)
+    expect(route).toMatch(/x-pdf-sha256/i)
+    expect(route).not.toMatch(/\binsertSale\b|\bsales\b.*\binsert\b/)
+    expect(renderer).toMatch(/mkdtemp\(/)
+    expect(renderer).toMatch(/rm\(directory/)
   })
 })

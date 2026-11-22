@@ -58,6 +58,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <section className="rounded-md border border-line bg-panel p-5">
           <h3 className="mb-3">Owner</h3>
           <dl className="grid gap-0">
+            <SummaryRow label="Company / stable" value={party.company ?? '—'} />
+            <SummaryRow label="Location" value={party.location ?? '—'} />
             <SummaryRow label="Contact" value={party.contact ?? '—'} />
             <SummaryRow
               label="Website"

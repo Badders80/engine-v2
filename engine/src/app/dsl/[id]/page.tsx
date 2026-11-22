@@ -88,131 +88,185 @@ export default async function Page({
     : []
 
   return (
-    <main>
-      <h1>{horse.legalName}</h1>
-      <p>
-        Term sheet · <Link href={`/dsl/${dsl.id}/edit`}>Edit</Link> ·{' '}
-        <Link href={`/dsl/${dsl.id}/legal`}>PDS / SA preview</Link> ·{' '}
-        <Link href="/dsl">All listings</Link>
-      </p>
+    <main className="grid gap-8">
+      <header className="flex flex-wrap items-start justify-between gap-5 border-b border-line pb-6">
+        <div className="grid gap-1">
+          <h1>{horse.legalName}</h1>
+          <p className="text-body text-muted">DSL term sheet</p>
+        </div>
+        <nav aria-label="DSL actions" className="flex flex-wrap gap-2">
+          <Link
+            href={`/dsl/${dsl.id}/edit`}
+            className="inline-flex min-h-11 items-center rounded-sm border border-line bg-panel px-3 py-2 text-caption uppercase tracking-caption text-body hover:border-accent"
+          >
+            Edit
+          </Link>
+          <Link
+            href={`/dsl/${dsl.id}/legal`}
+            className="inline-flex min-h-11 items-center rounded-sm border border-line bg-panel px-3 py-2 text-caption uppercase tracking-caption text-body hover:border-accent"
+          >
+            PDS / SA preview
+          </Link>
+          <Link
+            href="/dsl"
+            className="inline-flex min-h-11 items-center rounded-sm border border-line bg-panel px-3 py-2 text-caption uppercase tracking-caption text-body hover:border-accent"
+          >
+            All listings
+          </Link>
+        </nav>
+      </header>
 
       {staleSlots.length > 0 ? (
         <div
           role="status"
-          className="mt-4 rounded-sm border border-line-strong bg-panel px-4 py-3 text-body"
+          className="rounded-sm border border-line-strong bg-panel px-4 py-3 text-body"
         >
           <p>
             Records changed since this deal overrode:{' '}
             {staleSlots.map((slot) => slot.replaceAll('_', ' ')).join('; ')}. The deal keeps its
             own text; this is informational.
           </p>
-          <form action={dismissNarrativeWarningAction}>
+          <form action={dismissNarrativeWarningAction} className="mt-3">
             <input type="hidden" name="dslId" value={dsl.id} />
             <button type="submit">Dismiss</button>
           </form>
         </div>
       ) : null}
 
-      <h2>Narrative</h2>
-      {dsl.narrativeApprovedHash === null ? (
-        <p className="text-body text-low">Not approved.</p>
-      ) : (
-        <p className="text-body text-low">
-          Approved {dsl.narrativeApprovedAt ?? ''} · SHA-256 {dsl.narrativeApprovedHash}
-        </p>
-      )}
-      <ul className="my-2 grid gap-1 text-caption text-low">
-        {(Object.keys(resolved) as (keyof typeof resolved)[]).map((slot) => (
-          <li key={slot}>
-            {slot.replaceAll('_', ' ')}:{' '}
-            {resolved[slot].text === null
-              ? 'empty'
-              : resolved[slot].overridden
-                ? 'deal-local override'
-                : 'from Records'}
-          </li>
-        ))}
-      </ul>
-      <form action={approveNarrativeAction}>
-        <input type="hidden" name="dslId" value={dsl.id} />
-        <button type="submit" disabled={emptySlots.length > 0}>
-          Approve narrative
-        </button>
-      </form>
-      {emptySlots.length > 0 ? (
-        <p className="mt-1 text-caption text-low">
-          Approval is refused while a slot is empty: {emptySlots.join(', ')}.
-        </p>
-      ) : null}
-
-      <h2>Publication</h2>
-      {error !== undefined && <p role="alert">{error}</p>}
-
-      {dsl.published && dsl.status === 'available' ? (
-        <>
-          <p>
-            Live. Listed at <Link href={`/marketplace/${horse.slug}`}>{horse.slug}</Link>,{' '}
-            {dsl.stakeRemaining ?? 0}% of {dsl.listedStake ?? 0}% remaining.
-          </p>
-          <form action={unpublishDslAction}>
-            <input type="hidden" name="dslId" value={dsl.id} />
-            <button type="submit">Take down</button>
-          </form>
-        </>
-      ) : (
-        <>
-          <p>{readiness.ok ? 'Ready to publish.' : readinessReason(readiness)}</p>
-          <form action={publishDslAction}>
-            <input type="hidden" name="dslId" value={dsl.id} />
-            <button type="submit" disabled={!readiness.ok}>
-              Publish
-            </button>
-          </form>
-          {dsl.published && (
-            <p>
-              Published with status {dsl.status}. Only an <code>available</code> listing is
-              buyable; take it down and publish again once the terms are fixed.
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h2 className="mb-4 text-heading-sm uppercase tracking-caption text-muted">Narrative</h2>
+          {dsl.narrativeApprovedHash === null ? (
+            <p className="text-body text-low">Not approved.</p>
+          ) : (
+            <p className="break-words text-body text-low">
+              Approved {dsl.narrativeApprovedAt ?? ''} · SHA-256 {dsl.narrativeApprovedHash}
             </p>
           )}
-        </>
-      )}
+          <ul className="my-4 grid gap-2 text-caption text-muted sm:grid-cols-2">
+            {(Object.keys(resolved) as (keyof typeof resolved)[]).map((slot) => (
+              <li key={slot} className="rounded-sm bg-row px-3 py-2">
+                <span className="block text-caption uppercase tracking-caption text-low">
+                  {slot.replaceAll('_', ' ')}
+                </span>
+                <span className="mt-1 block text-body text-ink">
+                  {resolved[slot].text === null
+                    ? 'Empty'
+                    : resolved[slot].overridden
+                      ? 'Deal-local override'
+                      : 'From Records'}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <form action={approveNarrativeAction}>
+            <input type="hidden" name="dslId" value={dsl.id} />
+            <button type="submit" disabled={emptySlots.length > 0}>
+              Approve narrative
+            </button>
+          </form>
+          {emptySlots.length > 0 ? (
+            <p className="mt-3 text-caption text-low">
+              Approval is refused while a slot is empty: {emptySlots.join(', ')}.
+            </p>
+          ) : null}
+        </section>
+
+        <section className="rounded-md border border-line bg-panel p-5">
+          <h2 className="mb-4 text-heading-sm uppercase tracking-caption text-muted">Publication</h2>
+          {error !== undefined && (
+            <p role="alert" className="mb-4 text-body text-ink">
+              {error}
+            </p>
+          )}
+
+          {dsl.published && dsl.status === 'available' ? (
+            <>
+              <p className="text-body">
+                Live. Listed at <Link href={`/marketplace/${horse.slug}`}>{horse.slug}</Link>,{' '}
+                {dsl.stakeRemaining ?? 0}% of {dsl.listedStake ?? 0}% remaining.
+              </p>
+              <form action={unpublishDslAction} className="mt-4">
+                <input type="hidden" name="dslId" value={dsl.id} />
+                <button type="submit">Take down</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="text-body text-muted">
+                {readiness.ok ? 'Ready to publish.' : readinessReason(readiness)}
+              </p>
+              <form action={publishDslAction} className="mt-4">
+                <input type="hidden" name="dslId" value={dsl.id} />
+                <button type="submit" disabled={!readiness.ok}>
+                  Publish
+                </button>
+              </form>
+              {dsl.published && (
+                <p className="mt-3 text-body text-low">
+                  Published with status {dsl.status}. Only an <code>available</code> listing is
+                  buyable; take it down and publish again once the terms are fixed.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      </div>
 
       {sections.map((section) => (
-        <section key={section.title}>
-          <h2>{section.title}</h2>
-          <dl>
+        <section key={section.title} className="rounded-md border border-line bg-panel p-5">
+          <h2 className="mb-4 text-heading-sm uppercase tracking-caption text-muted">
+            {section.title}
+          </h2>
+          <dl className="grid">
             {section.rows.map((row) => (
-              <div key={row.label}>
-                <dt>{row.label}</dt>
-                <dd>{row.value}</dd>
+              <div
+                key={row.label}
+                className="grid gap-1 border-b border-line py-3 last:border-b-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4"
+              >
+                <dt className="text-caption uppercase tracking-caption text-muted">{row.label}</dt>
+                <dd
+                  className={`min-w-0 whitespace-pre-wrap break-words text-body ${
+                    row.value.length > 120
+                      ? 'max-w-[72ch] leading-relaxed text-muted'
+                      : 'font-figure'
+                  }`}
+                >
+                  {row.value}
+                </dd>
               </div>
             ))}
           </dl>
         </section>
       ))}
 
-      <h2>Images</h2>
-      <p>
-        {horse.imageCount} in the bucket. Images are authored on the horse&apos;s Records page and
-        flow through here; they never block a listing. KYC and proof of address never come through
-        here. <Link href={`/horses/${horse.id}`}>Manage images on the horse profile</Link>.
-      </p>
-      {images.length > 0 && (
-        <ol>
-          {images.map((image) => (
-            <li key={image.key}>
-              {/* The bucket serves the object; Next's image optimiser has no
-                  origin configured for it, so a plain img is correct here. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.url}
-                alt={`${horse.legalName} image ${String(image.imageNumber)}`}
-                width={160}
-              />
-            </li>
-          ))}
-        </ol>
-      )}
+      <section className="rounded-md border border-line bg-panel p-5">
+        <h2 className="mb-4 text-heading-sm uppercase tracking-caption text-muted">Images</h2>
+        <p className="max-w-[70ch] text-body text-muted">
+          {horse.imageCount} in the bucket. Images are authored on the horse&apos;s Records page and
+          flow through here; they never block a listing. KYC and proof of address never come through
+          here.{' '}
+          <Link href={`/horses/${horse.id}`}>Manage images on the horse profile</Link>.
+        </p>
+        {images.length > 0 && (
+          <ol className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            {images.map((image) => (
+              <li key={image.key} className="overflow-hidden rounded-sm border border-line bg-row">
+                {/* The bucket serves the object; Next's image optimiser has no
+                    origin configured for it, so a plain img is correct here. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.url}
+                  alt={`${horse.legalName} image ${String(image.imageNumber)}`}
+                  width={320}
+                  height={220}
+                  className="h-28 w-full object-cover"
+                />
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
     </main>
   )
 }

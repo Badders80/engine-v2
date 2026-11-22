@@ -1,57 +1,19 @@
 /**
- * The legal preview. PLAN.md step 7; chunk 3, U10.
+ * The legal preview. This is the compiler's production call site: it resolves
+ * one draft DSL through the same legal compiler and ReportLab renderer used by
+ * the executed Investor Pack.
  *
- * This is the compiler's production call site: a server page that loads one
- * DSL, compiles the PDS and the SA from the locked templates, and shows both
- * documents with their hashes.
- *
- * Chunk 3 additions: the **DRAFT — not executed** banner, and the blocking
- * list on refusal. A chunk-3 deal stores no start (the sale stamps it), so the
- * draft is compiled against the current month's first day, clearly labelled as
- * a preview of what the buyer would receive.
- *
- * It is a preview only. It writes no sale row, stores no document, and creates
- * no PDF.
+ * The response is a real, page-navigable PDF preview. It writes no sale row and
+ * stores no document.
  */
 
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { compileLegalPack, type LegalPack } from '@/lib/legal/compile'
-import { isPricedDsl } from '@/lib/dslStore'
-import { resolveNarrative } from '@/lib/narrative'
-import { validateStake } from '@/lib/pricing'
-import { currentMonthKey, firstDayOfMonthKey } from '@/lib/term'
+import { compileDraftPreview } from '@/lib/legal/draftPreview'
 
 import { loadDslView } from '../../data'
-
-type StakeCheck = { ok: true; stake: number } | { ok: false; reason: string }
-
-function present(value: string | null | undefined): boolean {
-  return typeof value === 'string' && value.trim() !== ''
-}
-
-function parseStake(raw: string, minStake: number, remaining: number, step: number): StakeCheck {
-  const stake = Number(raw)
-
-  if (!Number.isFinite(stake) || stake <= 0) {
-    return { ok: false, reason: `stake '${raw}' is not a positive number` }
-  }
-  if (stake < minStake) {
-    return { ok: false, reason: `stake ${stake} is below the minimum of ${minStake}` }
-  }
-  if (stake > remaining) {
-    return { ok: false, reason: `stake ${stake} is above the remaining ${remaining}` }
-  }
-
-  try {
-    validateStake(stake, step)
-  } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : 'invalid stake' }
-  }
-
-  return { ok: true, stake }
-}
+import { LegalPdfPreview } from './LegalPdfPreview'
 
 export default async function Page({
   params,
@@ -66,7 +28,7 @@ export default async function Page({
 
   if (!view.ok) {
     return (
-      <main>
+      <main className="grid gap-6">
         <h1>Legal preview</h1>
         <p role="alert">{view.reason}</p>
         <p>
@@ -78,140 +40,94 @@ export default async function Page({
 
   if (!view.found) notFound()
 
-  const { dsl, horse, trainer, owner } = view
-  const resolved = resolveNarrative(horse, dsl, trainer)
+  const preview = compileDraftPreview({
+    dsl: view.dsl,
+    horse: view.horse,
+    trainer: view.trainer,
+    owner: view.owner,
+    stakeRaw: query.stake,
+    buyer: query.buyer,
+    executedDate: query.date,
+  })
 
-  // Chunk 3 stores the expiry and no start. The draft prices the remaining
-  // months from today, using the current month's first day. The sale (chunk 4)
-  // stamps the buyer's real start and re-compiles with it.
-  const previewStart = dsl.termStart ?? firstDayOfMonthKey(currentMonthKey())
-  const previewDsl =
-    previewStart === null || previewStart === dsl.termStart
-      ? dsl
-      : { ...dsl, termStart: previewStart }
-
-  const blocking: string[] = []
-  const add = (missing: boolean, label: string) => {
-    if (missing) blocking.push(label)
-  }
-
-  add(owner === null, 'the owner on the term sheet')
-  add(trainer === null, 'the trainer on the term sheet')
-  add(dsl.endDate === null, 'the expiry')
-  add(dsl.paymentModel === null, 'the payment model')
-  add(dsl.closeStyle === null, 'the close style')
-  add(dsl.wholesaleMonthlyPerPercent === null, 'the wholesale cost per 1%')
-  add(dsl.investorSplit === null, "the investor's split")
-  add(dsl.listedStake === null, 'the listed stake')
-  add(dsl.minStake === null, 'the minimum stake')
-  add(dsl.step === null, 'the stake step')
-  add(!present(dsl.distributionSchedule), 'the distribution schedule')
-  add(!present(resolved['horse.about_horse'].text), 'the about-the-horse paragraph')
-  add(
-    !present(resolved['horse.racing_outlook_and_pedigree'].text),
-    'the racing outlook and pedigree paragraph',
-  )
-  add(!present(resolved['horse.race_expectation'].text), 'the race expectation paragraph')
-  add(!present(resolved['trainer.bio'].text), "the trainer's bio")
-
-  const stakeRaw =
-    typeof query.stake === 'string' && query.stake !== ''
-      ? query.stake
-      : String(dsl.minStake ?? '')
-  const buyer =
-    typeof query.buyer === 'string' && query.buyer !== '' ? query.buyer : 'Preview'
-  const date =
-    typeof query.date === 'string' && query.date !== ''
-      ? query.date
-      : new Date().toISOString().slice(0, 10)
-
-  let pack: LegalPack | null = null
-  let error: string | null = null
-
-  if (blocking.length > 0) {
-    error = 'the documents are blocked until the fields below are filled in'
-  } else if (!isPricedDsl(previewDsl)) {
-    error = 'this listing does not have its commercial terms yet, so the documents cannot be compiled'
-  } else if (trainer === null) {
-    error = 'this horse has no trainer row, so the documents cannot be compiled'
-  } else if (owner === null) {
-    error = 'this horse has no owner row, so the documents cannot be compiled'
-  } else {
-    const checked = parseStake(stakeRaw, previewDsl.minStake, previewDsl.stakeRemaining, previewDsl.step)
-    if (!checked.ok) {
-      error = checked.reason
-    } else {
-      try {
-        pack = compileLegalPack({
-          account: { fullName: buyer },
-          dsl: previewDsl,
-          horse,
-          trainer,
-          owner,
-          sale: { stake: checked.stake, executedDate: date },
-        })
-      } catch (caught) {
-        error = caught instanceof Error ? caught.message : 'the compile failed'
-      }
-    }
-  }
+  const previewParams = new URLSearchParams({
+    stake: preview.stakeRaw,
+    buyer: preview.buyer,
+    date: preview.executedDate,
+  })
+  const pdfEndpoint = `/api/dsl/${id}/legal-preview?${previewParams.toString()}`
 
   return (
-    <main>
+    <main className="grid gap-6">
       <p
         role="note"
         className="rounded-sm border border-line-strong bg-panel px-4 py-3 text-body"
       >
-        <strong>DRAFT — not executed.</strong> This preview is compiled from the deal as it
-        stands now. No sale row is written and no document is stored.
+        <strong>DRAFT — not executed.</strong> This PDF is compiled from the deal as it stands now.
+        No sale row is written and no document is stored.
       </p>
 
-      <h1 className="mt-4">Legal preview</h1>
-      <p>
-        <Link href={`/dsl/${id}`}>Back to the DSL</Link> · Expiry{' '}
-        {dsl.endDate ?? '—'} · Draft start {previewDsl.termStart ?? '—'}
-      </p>
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+        <div className="grid gap-1">
+          <h1>Legal preview</h1>
+          <p className="text-body text-muted">
+            {view.horse.legalName} · Expiry {view.dsl.endDate ?? '—'} · Draft start{' '}
+            {preview.previewDsl.termStart ?? '—'}
+          </p>
+        </div>
+        <Link
+          href={`/dsl/${id}`}
+          className="inline-flex min-h-11 items-center rounded-sm border border-line bg-panel px-3 py-2 text-caption uppercase tracking-caption text-body hover:border-accent"
+        >
+          Back to the DSL
+        </Link>
+      </header>
 
-      {blocking.length > 0 ? (
-        <section className="mt-4 rounded-sm border border-line-strong bg-panel p-4">
-          <h2 className="mb-2">Still needed</h2>
+      {preview.blocking.length > 0 ? (
+        <section className="rounded-sm border border-line-strong bg-panel p-4">
+          <h2 className="mb-2 text-heading-sm uppercase tracking-caption text-muted">Still needed</h2>
           <ul className="grid list-disc gap-1 pl-5 text-body">
-            {blocking.map((field) => (
+            {preview.blocking.map((field) => (
               <li key={field}>{field}</li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      {error !== null ? <p role="alert">{error}</p> : null}
+      {preview.error !== null ? (
+        <p role="alert" className="rounded-sm border border-line-strong bg-panel p-4 text-body">
+          {preview.error}
+        </p>
+      ) : null}
 
-      <form method="get" className="mt-4 grid gap-3">
-        <label>
-          Stake %
-          <input name="stake" defaultValue={stakeRaw} />
-        </label>
-        <label>
-          Buyer name
-          <input name="buyer" defaultValue={buyer} />
-        </label>
-        <label>
-          Execution date
-          <input type="date" name="date" defaultValue={date} />
-        </label>
-        <button type="submit">Compile</button>
-      </form>
+      <section className="rounded-md border border-line bg-panel p-5">
+        <h2 className="mb-4 text-heading-sm uppercase tracking-caption text-muted">
+          Preview assumptions
+        </h2>
+        <form method="get" className="grid items-end gap-4 md:grid-cols-3">
+          <label className="grid gap-2 text-body">
+            <span className="text-caption uppercase tracking-caption text-muted">Stake %</span>
+            <input name="stake" defaultValue={preview.stakeRaw} inputMode="decimal" />
+          </label>
+          <label className="grid gap-2 text-body">
+            <span className="text-caption uppercase tracking-caption text-muted">Buyer name</span>
+            <input name="buyer" defaultValue={preview.buyer} />
+          </label>
+          <label className="grid gap-2 text-body">
+            <span className="text-caption uppercase tracking-caption text-muted">
+              Execution date
+            </span>
+            <input type="date" name="date" defaultValue={preview.executedDate} />
+          </label>
+          <div className="md:col-span-3">
+            <button type="submit">Compile PDF preview</button>
+          </div>
+        </form>
+      </section>
 
-      {pack === null ? null : (
-        <>
-          <h2>Product Disclosure Statement</h2>
-          <p>SHA-256 {pack.pds.hash}</p>
-          <pre>{pack.pds.markdown}</pre>
-
-          <h2>Syndicate Agreement</h2>
-          <p>SHA-256 {pack.sa.hash}</p>
-          <pre>{pack.sa.markdown}</pre>
-        </>
-      )}
+      {preview.ok ? (
+        <LegalPdfPreview endpoint={pdfEndpoint} horseName={view.horse.legalName} />
+      ) : null}
     </main>
   )
 }

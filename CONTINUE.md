@@ -2,9 +2,65 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open `engine/public/soft-content-guide.md` and draft Mulan's
-three missing soft-content blocks in a separate chat. Paste the returned blocks
-through the horse profile preflight; do not hand-write them into the DB.
+**Next action:** open `engine/src/app/dsl/[id]/legal/page.tsx`, then review the
+draft PDF at
+`http://localhost:3001/dsl/ff316bf4-dce2-4160-b502-c89b58adf632/legal` page by
+page, starting with pages 1, 2, 8–10 and 15.
+
+## State — 2026-11-22
+
+- **Mulan soft content is founder-approved and locked locally.** The three
+  Records blocks pass preflight at 121, 136 and 58 words. Their source hashes
+  are `13d7b6ac…3432`, `3f7e2517…d784` and `1455ef9c…9240`.
+- **Mulan race record refreshed from Loveracing:** one start, ninth over 1300m
+  in the Central ITM Carterton Maiden at Tauherenikau on 2026-11-08, with
+  NZ$370 stakes recorded.
+- **Barbara Kennedy trainer profile refreshed from official sources.** The bio,
+  achievements, contact block, Facebook presence and five source links are
+  updated. Loveracing snapshot at 2026-11-22: 28 wins from 209 starts,
+  NZ$838,810 stakes and one Group or Listed win; 25 horses in training.
+- **Wexford and Stephen Gray trainer profiles refreshed from official sources.**
+  Both pages now carry dated achievements, verified stable biographies,
+  contacts, social links and official source links. X is linked to
+  `@WexfordStables` and `@copperbelt_stc`. Loveracing snapshots at 2026-11-22:
+  O'Sullivan & Scott have 612 wins from 4,619 starts and 82 horses in training;
+  the Kevin & Stephen Gray partnership has 64 wins from 490 starts and 78
+  horses. The Stephen Gray website is linked over HTTP because its HTTPS
+  certificate does not match the hostname. The Records display name is
+  **Stephen Gray Racing**, the stable company is **Stephen Gray Racing (SGR)**,
+  and the licensed trainer partnership is recorded as Kevin & Stephen Gray.
+- **Stephen Gray Racing is the first owner record.** The existing SGR party now
+  holds both `trainer` and `owner` roles; there is no duplicate owner party.
+  Both `/trainers/{id}` and `/owners/{id}` resolve the same shared profile.
+- **B.A.X Bloodstock is the second owner record, with Kylie Bax as contact.**
+  The profile was migrated from `engine/content/owners/kylie-bax.md` and
+  `bax-bloodstock.md`: the legal owner is B.A.X Bloodstock Achieving Xcellence
+  Limited, the public/display name is B.A.X Bloodstock, and Kylie Bax is the
+  principal and manager. No duplicate person-as-owner row was created. Her two
+  verified X accounts are recorded: `@BAXLTD` as the primary social handle and
+  `@conistonlodge` in the owner links. The profile now includes her Cambridge /
+  Waikato base, official website, Facebook, Instagram, public contact details,
+  boutique ownership and lease-syndication model, and the notable winners
+  published by B.A.X. NZTR authorised-syndicator status and horse purchase
+  prices are not asserted because the current official sources do not verify
+  them.
+- **Owner profile parity restored.** The owner view now shows company/stable and
+  location alongside contact and website, so shared SGR fields no longer drop
+  when switching from the trainer route to the owner route.
+- **DSL term-sheet layout polished.** Header actions now meet 44px touch
+  targets, narrative/publication are grouped as responsive panels, term rows
+  use compact labels with constrained prose measure, and horse images render
+  as a responsive gallery. No DSL business logic changed.
+- **Legal preview is now a real draft Investor Pack PDF.** `/dsl/{id}/legal`
+  compiles through the shared draft resolver, renders the same cover + contents
+  + PDS + SA ReportLab pack as execution, and serves it through a no-store PDF
+  endpoint. The page displays the exact PDF SHA-256 and page count, downloads
+  the draft bytes and embeds a page-navigable PDF viewer. Current Mulan preview:
+  15 A4 pages with declarations on PDS pages 8–9 and SA page 15. It writes no
+  sale row and stores no document.
+- This approval pins the three Records paragraphs only. No DSL exists, so the
+  DSL-level four-slot `narrative_signoff` is not set. Identity, pedigree and
+  images were not changed.
 
 ## State — 2026-11-21
 
@@ -140,8 +196,8 @@ continues through the horse-intake work above.**
   density tuning. `ES-DSL-2026-900014` remains the density proof before the
   declarations and proof-of-address wording were aligned. None may be overwritten.
 - **Mulan terms:** $60 wholesale / $65 retail per 1% per month; 75% investor
-  return; 5% listed; 1% minimum; 0.5% step; subscription float; 14-day break;
-  quarterly distributions; expiry 30 Jun 2028. Status remains `coming_soon` and
+  return; 5% listed; 0.5% minimum; 0.5% step; subscription float; 14-day break;
+  quarterly distributions; expiry 30 Jun 2027. Status remains `coming_soon` and
   unpublished.
 - **Expense pricing:** expense rates are additive against wholesale. The current
   5% margin + 3% platform fee applies `ceil(wholesale × 1.08)`, not
@@ -168,6 +224,15 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-22 | Real draft Investor Pack PDF preview with page navigation, hash and download | engine_v2/website | `8efdbeb` | verified; 15-page PDF, typecheck/lint/426 tests and production build pass |
+| 2026-11-22 | DSL term-sheet formatting improved for desktop and mobile | engine_v2/website | local uncommitted | verified; typecheck, lint, detector and 426 tests pass |
+| 2026-11-22 | B.A.X / Kylie Bax owner profile enriched from official BAX and public sources | engine_v2/website; local Supabase | — | verified; unconfirmed syndicator-status and purchase-price claims omitted |
+| 2026-11-22 | B.A.X Bloodstock migrated as second owner; Kylie Bax stored as contact | engine_v2/website; local Supabase | — | done; legacy profile and locked entity name preserved |
+| 2026-11-22 | Owner profile now displays shared company/stable and location fields | engine_v2/website | local uncommitted | verified; engine typecheck, lint and 426 tests pass |
+| 2026-11-22 | Stephen Gray Racing added as first owner without duplicating the trainer party | engine_v2/website; local Supabase | — | role `owner` added; shared party holds trainer + owner |
+| 2026-11-22 | Wexford and Stephen Gray trainer profiles enriched and source-linked | engine_v2/website; local Supabase | — | done; official stats snapshot dated 2026-11-22 |
+| 2026-11-22 | Barbara Kennedy trainer profile enriched and source-linked | engine_v2/website; local Supabase | — | done; official stats snapshot dated 2026-11-22 |
+| 2026-11-22 | Mulan soft content approved and source-hashed; race record refreshed | engine_v2/website; local Supabase | — | locked locally; DSL sign-off pending when a DSL exists |
 | 2026-11-21 | Horse image cover/order vector: migration `00033`, drag-and-drop edit mode, accessible arrows, engine and public hero/gallery consumption | engine_v2/website | local uncommitted | done; founder walk passed with Prudentia `{5,2,3,1,4}` |
 | 2026-11-21 | Prudentia fifth-image upload founder-walked; local DB count and public R2 object verified | engine_v2/website | local DB/R2 | done |
 | 2026-11-20 | Horse intake end-to-end: pedigree + race summary, soft-content brief/preflight, three local horse proofs and clean R2 image sets | engine_v2/website | `8432fd4`, `7b55702`; local DB/R2 | done; hosted replay pending |

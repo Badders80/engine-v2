@@ -295,6 +295,11 @@ continues through the horse-intake work above.**
 
 ## Blocked
 
+- **Lifecycle implementation is still uncommitted.** The lifecycle utility,
+  tests, operator-surface wiring and legal-gate correction are present on
+  `dsl-sidequest` but not committed. Preserve them with the pre-existing
+  `engine/tsconfig.json` and `website/.impeccable/` worktree changes; do not reset
+  the branch before reviewing and committing that code.
 - **Hosted v2 replay** — `rkcptsghxovoeaycabah.supabase.co` is unreachable from
   this environment. Re-run migrations and verify the six horse rows, R2 counts,
   soft content, trainer/owner parties and the Mulan DSL against the hosted target

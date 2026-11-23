@@ -2,8 +2,8 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open `engine/public/soft-content-guide.md` and draft I Stole A
-Manolo's three PDS soft-content blocks from the saved Loveracing record.
+**Next action:** open `engine/public/soft-content-guide.md` and draft
+Hottathanafantasy's three PDS soft-content blocks from the saved Loveracing record.
 
 ## State — 2026-11-23
 
@@ -15,9 +15,10 @@ Manolo's three PDS soft-content blocks from the saved Loveracing record.
   counts and order are recorded on the horse rows.
 - **Current local database count:** six horses, three trainer roles, two owner
   roles across four party rows (Stephen Gray Racing is trainer and owner), one
-  **Published DSL** (Mulan), zero sales and zero checkouts. Manolo and
-  Hottathanafantasy have no DSL or soft content yet. The operating rule is one
-  horse, one DSL for the pilot; no schema constraint is being added.
+  **Published DSL** (Mulan), zero sales and zero checkouts. Manolo's three soft
+  sections are approved and saved; Hottathanafantasy still needs soft content.
+  Neither horse has a DSL yet. The operating rule is one horse, one DSL for the
+  pilot; no schema constraint is being added.
 - **Existing production cover images live in the legacy build at
   `/home/evo/evolution/engine/website/apps/web/public/images/content/horses/`.**
   Horse gallery images live separately at
@@ -251,6 +252,7 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-23 | I Stole A Manolo soft content approved and saved | engine_v2/website; local Supabase | this commit | done; 112 / 139 / 52 words |
 | 2026-11-23 | Six-horse local seed, canonical covers and approved First Gear soft content | engine_v2/website; local Supabase/R2 | this commit | done; one published DSL, zero sales; cloud replay pending |
 | 2026-11-23 | DSL / Published DSL / Executed DSL lifecycle wired into operator surfaces | engine_v2/website | local uncommitted | verified; 434 engine / 1 skipped, 66 website, both builds |
 | 2026-11-22 | Real draft Investor Pack PDF preview with page navigation, hash and download | engine_v2/website | `8efdbeb` | verified; 15-page PDF, typecheck/lint/426 tests and production build pass |

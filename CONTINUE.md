@@ -2,8 +2,17 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open `engine/public/soft-content-guide.md` and draft
-Hottathanafantasy's three PDS soft-content blocks from the saved Loveracing record.
+**Next action:** open this file's **Approved Hottathanafantasy copy** under
+Blocked, then re-enter the three blocks on the horse profile and save.
+
+## State — 2026-11-24
+
+- **Hottathanafantasy soft content was founder-approved but did not save.** The
+  browser action was interrupted before submission; all three local DB fields
+  remain null. The exact approved text is preserved under Blocked below.
+- The other five horses have soft content. Local totals remain six horses, three
+  trainer roles, two owner roles across four party rows, one **Published DSL**
+  (Mulan), zero sales and zero checkouts.
 
 ## State — 2026-11-23
 
@@ -252,6 +261,7 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-24 | Wrap after interrupted Hottathanafantasy soft-content save | engine_v2/website; local Supabase | this commit | approved copy preserved; DB remains unfilled |
 | 2026-11-23 | I Stole A Manolo soft content approved and saved | engine_v2/website; local Supabase | this commit | done; 112 / 139 / 52 words |
 | 2026-11-23 | Six-horse local seed, canonical covers and approved First Gear soft content | engine_v2/website; local Supabase/R2 | this commit | done; one published DSL, zero sales; cloud replay pending |
 | 2026-11-23 | DSL / Published DSL / Executed DSL lifecycle wired into operator surfaces | engine_v2/website | local uncommitted | verified; 434 engine / 1 skipped, 66 website, both builds |
@@ -296,6 +306,26 @@ continues through the horse-intake work above.**
 | 2026-11-09 | Wrap | engine_v2/website | — | done |
 
 ## Blocked
+
+- **Hottathanafantasy soft-content save is incomplete.** All three fields are
+  null. Re-enter this founder-approved copy:
+
+```text
+About the horse
+Hottathanafantasy is a New Zealand-bred bay filly foaled on 24 October 2023, by Contributer out of Whiffle. Bred by Goldeye Trust, she is prepared by Lance O’Sullivan and Andrew Scott at Wexford Stables in Matamata.
+
+She remains unraced. Wexford’s Andrew Scott described her as “a snappy little filly who came a long way very quickly,” reflecting the regard for her early development within the stable.
+
+Wexford Stables continues the legacy of Hall of Fame trainer Dave O’Sullivan, with the O’Sullivan–Scott partnership having prepared more than 600 winners and Group 1 winners including Waitak, Molly Bloom and Rocket Spade. Hottathanafantasy is developing inside that established programme.
+
+Racing outlook and pedigree
+Contributer was a dual Group 1 winner, taking the Chipping Norton Stakes over 1600m and Ranvet Stakes over 2000m in Australia. By High Chaparral and out of Serisia, he brings the Sadler’s Wells and European classic-distance influence associated with his sire line. His other notable wins included the Group 2 Apollo Stakes, Group 3 David Jones Cup and Listed Wolferton Handicap.
+
+Whiffle is by Red Ransom, while the next dam, Whist, is by Mr. Prospector. The family continues through Wajd, by Northern Dancer, and Dahlia, winner of 15 races across four countries, including two King George VI and Queen Elizabeth Stakes. That background gives Hottathanafantasy a pedigree shaped by proven middle-distance and staying influences. Her distance range will be determined by the Wexford team as she develops.
+
+Race expectation
+Hottathanafantasy remains unraced, with no official starts recorded. Her trial and race programme will be set by the Wexford team according to fitness, education and nominations. No debut date or target is fixed. Members will receive stable updates as her preparation develops and will be notified once the next step is confirmed and entered in the race record.
+```
 
 - **Lifecycle implementation is still uncommitted.** The lifecycle utility,
   tests, operator-surface wiring and legal-gate correction are present on

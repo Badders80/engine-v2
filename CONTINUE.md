@@ -2,10 +2,33 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open `engine/src/app/dsl/[id]/legal/page.tsx`, then review the
-draft PDF at
-`http://localhost:3001/dsl/ff316bf4-dce2-4160-b502-c89b58adf632/legal` page by
-page, starting with pages 1, 2, 8–10 and 15.
+**Next action:** open `engine/public/soft-content-guide.md` and draft I Stole A
+Manolo's three PDS soft-content blocks from the saved Loveracing record.
+
+## State — 2026-11-23
+
+- **The local horse set now contains all six production horses:** First Gear,
+  Hottathanafantasy, I Stole A Manolo, Lady Ketchikan, Mulan The Brave and
+  Prudentia. First Gear's three soft-content paragraphs are approved and saved.
+  Every horse's R2 image `01` is byte-identical to the corresponding production
+  cover in `engine/website/apps/web/public/images/content/horses`; gallery image
+  counts and order are recorded on the horse rows.
+- **Current local database count:** six horses, three trainer roles, two owner
+  roles across four party rows (Stephen Gray Racing is trainer and owner), one
+  **Published DSL** (Mulan), zero sales and zero checkouts. Manolo and
+  Hottathanafantasy have no DSL or soft content yet. The operating rule is one
+  horse, one DSL for the pilot; no schema constraint is being added.
+- **Existing production cover images live in the legacy build at
+  `/home/evo/evolution/engine/website/apps/web/public/images/content/horses/`.**
+  Horse gallery images live separately at
+  `/home/evo/evolution/engine/website/apps/web/public/horses/{slug}/`. Use these
+  local production assets when migrating media; do not scrape the live website.
+- **DSL lifecycle terminology is live across operator surfaces.** The DSL list,
+  term sheet, horse profile and sales ledger now render **DSL**, **Published
+  DSL** or **Executed DSL**. The state is derived from the existing `published`
+  flag plus the presence of at least one sale; inventory status remains intact.
+- **Gate:** `pnpm verify` exit 0; engine **434 passed / 1 skipped**, website
+  **66 passed**, both production builds pass.
 
 ## State — 2026-11-22
 
@@ -58,6 +81,10 @@ page, starting with pages 1, 2, 8–10 and 15.
   the draft bytes and embeds a page-navigable PDF viewer. Current Mulan preview:
   15 A4 pages with declarations on PDS pages 8–9 and SA page 15. It writes no
   sale row and stores no document.
+- **Operator lifecycle terminology is locked and derived in code:** **DSL**
+  means assembled but not live, **Published DSL** means live on the website,
+  and **Executed DSL** means at least one completed investment has written a
+  sale. The stored inventory status and `published` flag remain unchanged.
 - This approval pins the three Records paragraphs only. No DSL exists, so the
   DSL-level four-slot `narrative_signoff` is not set. Identity, pedigree and
   images were not changed.
@@ -224,6 +251,8 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-23 | Six-horse local seed, canonical covers and approved First Gear soft content | engine_v2/website; local Supabase/R2 | this commit | done; one published DSL, zero sales; cloud replay pending |
+| 2026-11-23 | DSL / Published DSL / Executed DSL lifecycle wired into operator surfaces | engine_v2/website | local uncommitted | verified; 434 engine / 1 skipped, 66 website, both builds |
 | 2026-11-22 | Real draft Investor Pack PDF preview with page navigation, hash and download | engine_v2/website | `8efdbeb` | verified; 15-page PDF, typecheck/lint/426 tests and production build pass |
 | 2026-11-22 | DSL term-sheet formatting improved for desktop and mobile | engine_v2/website | local uncommitted | verified; typecheck, lint, detector and 426 tests pass |
 | 2026-11-22 | B.A.X / Kylie Bax owner profile enriched from official BAX and public sources | engine_v2/website; local Supabase | — | verified; unconfirmed syndicator-status and purchase-price claims omitted |
@@ -267,8 +296,9 @@ continues through the horse-intake work above.**
 ## Blocked
 
 - **Hosted v2 replay** — `rkcptsghxovoeaycabah.supabase.co` is unreachable from
-  this environment. Re-run migrations and verify the three horse rows, R2 counts,
-  soft content and trainer parties against the hosted target before relying on it.
+  this environment. Re-run migrations and verify the six horse rows, R2 counts,
+  soft content, trainer/owner parties and the Mulan DSL against the hosted target
+  before relying on it.
 - **Local proof data is not migration-backed** — horse rows, trainer parties and
   saved soft content live in local Supabase only. A reset removes them; preserve
   them in an idempotent seed or re-enter through the operator UI.

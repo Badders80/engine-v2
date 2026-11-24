@@ -2,11 +2,36 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open this file's **Approved Hottathanafantasy copy** under
-Blocked, then re-enter the three blocks on the horse profile and save.
+**Next action:** once cloud Supabase migration finishes on `dsl-sidequest`, merge
+`website-visual-polish` (`63ff803`) into `dsl-sidequest` (zero `website/` conflicts),
+then open `website/src/components/HorseDetailsTabs.tsx` to wire live `parties`
+trainer profiles once an `anon` read policy is added.
 
 ## State — 2026-11-24
 
+- **V2 Marketplace and Horse Page visual polish committed on `website-visual-polish`
+  (`63ff803`, isolated worktree `/home/evo/evolution/engine_v2-worktrees/website-visual-polish`):**
+  - `/marketplace` rebuilt on live `dsls` -> `horses!inner` reads with `font-light`
+    intro, `All Thoroughbreds / Available / Coming Soon` filter bar, stacked
+    horizontal row cards using global `.listing-aperture` / `.listing-aperture-stage`
+    (`210px` fixed height, `clamp(210px, 36%, 360px)` fluid width on `md+`, full-width
+    `16:9` below `md`), `hover:-translate-y-1 hover:shadow-card-hover`, zero-to-four
+    `rounded-pill` highlight tags, accessible single-anchor stretched click-through,
+    and Ownership FAQ accordion.
+  - `/marketplace/[slug]` rebuilt on live `horses` + `dsls` data with single `h1`,
+    `16:10` `object-contain` `HorseGallery` (brightness-only active thumbnail, no
+    gold border, lightbox), untruncated proportional 5-fact strip, approved story,
+    five reactive `flex-wrap` detail tabs (zero scrollbars) including a live 15-node
+    4-generation `PedigreeTree` and live `race_record` table, sticky desktop
+    `HorseOfferRail`, and fixed mobile conversion bar.
+  - **Single global design authority updated & pinned:** `website/DESIGN.md` is the
+    sole `DESIGN.md` in the repo (Rules 1–27, including Rule 26 aperture frame and
+    Rule 27 no-scrollbar navigation); `website/tests/page-foundation.test.ts` pins
+    `DESIGN.md`, `globals.css`, `MarketplaceBrowser.tsx`, `HorseGallery.tsx`, and
+    `HorseDetailsTabs.tsx`.
+  - **Gate:** `pnpm run verify` exit 0 (all 8 `assert-*` checks, engine + website
+    typecheck/lint/builds, 73 website tests passed). Zero `supabase/` or `engine/`
+    changes; `dsl-sidequest` untouched.
 - **Hottathanafantasy soft content was founder-approved but did not save.** The
   browser action was interrupted before submission; all three local DB fields
   remain null. The exact approved text is preserved under Blocked below.
@@ -261,6 +286,7 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-24 | V2 Marketplace & horse-page production visual alignment, 4-gen pedigree tree, global `DESIGN.md` Rules 26–27 & `.listing-aperture` | engine_v2/website (`website-visual-polish`) | `63ff803` | done; `pnpm verify` exit 0 (73 website tests, both builds); awaiting merge to `dsl-sidequest` post cloud DB migration |
 | 2026-11-24 | Wrap after interrupted Hottathanafantasy soft-content save | engine_v2/website; local Supabase | this commit | approved copy preserved; DB remains unfilled |
 | 2026-11-23 | I Stole A Manolo soft content approved and saved | engine_v2/website; local Supabase | this commit | done; 112 / 139 / 52 words |
 | 2026-11-23 | Six-horse local seed, canonical covers and approved First Gear soft content | engine_v2/website; local Supabase/R2 | this commit | done; one published DSL, zero sales; cloud replay pending |
@@ -307,6 +333,11 @@ continues through the horse-intake work above.**
 
 ## Blocked
 
+- **Public Trainer tab live read (`parties` RLS):** `HorseDetailsTabs.tsx` renders
+  a clean fallback until a post-migration policy grants `anon` read on public
+  trainer fields in `parties`.
+- **Merge `website-visual-polish` into `dsl-sidequest`:** deferred deliberately
+  while local → cloud Supabase migration completes on `dsl-sidequest`.
 - **Hottathanafantasy soft-content save is incomplete.** All three fields are
   null. Re-enter this founder-approved copy:
 

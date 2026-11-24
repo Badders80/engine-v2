@@ -80,6 +80,11 @@ describe('the listing projection', () => {
       step: 0.1,
       stakeRemaining: 62.5,
       retailMonthlyPerPercent: 109,
+      narrative: {
+        aboutHorse: null,
+        racingOutlook: null,
+        raceExpectation: null,
+      },
       horse: {
         id: 'horse-1',
         slug: 'lady-ketchikan',
@@ -87,6 +92,18 @@ describe('the listing projection', () => {
         registered: true,
         imageCount: 4,
         imageOrder: [3, 1, 4, 2],
+        foalingDate: null,
+        sex: null,
+        colour: null,
+        breeder: null,
+        sireName: null,
+        damName: null,
+        loveracingId: null,
+        aboutHorse: null,
+        racingOutlookAndPedigree: null,
+        raceExpectation: null,
+        raceRecord: null,
+        pedigree: null,
       },
     })
   })

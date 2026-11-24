@@ -549,21 +549,32 @@ must cover the bar. No component invents a value at or above 30.
 
 ### Listing card — the marketplace unit
 
-**Anatomy:** status badge (required, top-right of the image frame) · image frame (required) · name
-(required, one line) · hook (required, one paragraph) · CTA link (required, exactly one) · highlight
-tags (optional, zero to three) · no-photo placeholder.
+**Anatomy:** status badge (required, top-right of the image frame) · aperture image frame (required,
+`.listing-aperture` + `.listing-aperture-stage` in `globals.css`) · name (required, one line) · hook
+(required, one paragraph) · CTA link (required, exactly one) · highlight tags (optional, zero to four,
+`rounded-pill`) · no-photo placeholder.
+
+**Aperture frame:** from `md` (`768px`) upward, `.listing-aperture` locks height at `210px` with a
+fluid width of `clamp(210px, 36%, 360px)` while `.listing-aperture-stage` stays centered at full height
+(`16:9`, `object-contain`), so narrowing the viewport trims only horizontal black deadspace without
+shrinking the horse or changing card height. Below `md`, the frame falls back to full-width `16:9` so
+narrow phone viewports never clip the horse cutout.
 
 **Variants:** `standard`, and `featured` which differs only by **gap and image width** — one per grid
 at most.
 
-**States:** `default` · `hover` · `focus-visible` · `active` · `loading` (skeleton, same footprint) ·
-`image-error` (falls back to the placeholder, never a broken frame). **There is no `disabled` card** —
+**States:** `default` · `hover` (`-translate-y-1`, `shadow-card-hover`, `border-edge/40`, using
+`duration-hover` and `ease-enter`) · `focus-visible` · `active` · `loading` (skeleton, same footprint)
+· `image-error` (falls back to the placeholder, never a broken frame). **There is no `disabled` card** —
 an unsellable offering is a *status*, not an absent card.
 
 **Rules.** Siblings never differ in padding. The name never wraps and never truncates. The hook has a
-hard maximum and never expands the card. Tags describe the horse, never the offer's terms. **No price,
-no percentage, no figures inside the card** — financials belong to the horse page, where mono is the
-ruled face for them. **The card is never a link**: one anchor inside it, not a card-shaped one.
+hard maximum and never expands the card. Tags are `rounded-pill` (`border-border bg-canvas/60`,
+`label-spec`) and describe the horse, never the offer's terms. **No price, no percentage, no figures
+inside the card** — financials belong to the horse page, where mono is the ruled face for them. **The
+card is never a link**: one `<Link>` inside `<article>`, extended across the full card and image frame
+via `after:absolute after:inset-0` so clicking the card or horse image navigates cleanly with zero
+nested links.
 
 ### Status badge — one component, one map
 
@@ -618,6 +629,28 @@ point. The top edge separates the footer from content; the bottom edge only has 
 **Rules.** Column headings are the eyebrow role; links are never headings. **The compliance line is
 not design content** — a regulatory claim carries legal weight and is confirmed by the founder or it is
 not published.
+
+### Horse page — gallery, pedigree and offer rail
+
+**Layout:** one semantic `<h1>` carrying the horse's legal name; breadcrumb + `Back to Marketplace`
+header above a two-column desktop grid (`lg:grid-cols-[minmax(0,1fr)_340px]`, `lg:items-start`).
+
+**Gallery and facts:** `16:10` `object-contain` recessed stage with 44px previous/next controls,
+`01 · NN` counter pill, keyboard-accessible lightbox, and a proportional five-fact strip
+(`Age · Sex · Colour · Sire · Dam`) directly beneath the hero so Sire and Dam never truncate, followed
+by the thumbnail strip (thumbnails indicate the active frame by brightness, never a gold border).
+
+**Detail tabs and pedigree:** five accessible tabs (`Overview`, `Pedigree`, `Trainer`, `Race record`,
+`Documents`) in a reactive `flex-wrap` strip (never `overflow-x-auto` or scrollbars) with `text-gold`
+and `border-gold` on the active tab. The `Pedigree` tab renders a
+four-generation bracket tree (`Subject → Parents → Grandparents → Great-grandparents`) from the
+15-node `horses.pedigree` snapshot (`spot-mint` for Horse/Sire, `gold` for Dam), a `Broodmare sire`
+pill above, and a summary footer linking to the official breeding record.
+
+**Sticky offer rail:** desktop `lg:sticky lg:top-28` surface card (`shadow-panel`) carrying `StatusBadge`,
+light editorial heading, `spot-mint` `Price` and `Return` micro labels, single-line `Mon YYYY` campaign
+term, icon benefit rows, and the white `rounded-pill` primary CTA (`bg-heading text-on-light`), paired
+with the mobile conversion bar below `lg`.
 
 ### Mobile conversion bar
 
@@ -903,6 +936,19 @@ user hostage. Elapsed time is bounded by the API, never by a clock we invented.
 content hierarchy.**
 *Drift:* full-width `border-t` separators cut the landing page into stacked panels and visually detached
 the FAQ from the footer. Borders remain valid inside controls and data rows, but never as page chrome.
+
+**26 · Don't shrink or crop horse cutouts on marketplace card resize. Do use the `.listing-aperture`
+fixed-height fluid-width frame (`md+`) with a full-width `16:9` fallback below `md`.**
+*Drift:* a fixed-column `aspect-video` frame either stayed rigid across desktop widths or shrank the
+horse and jumped card height on resize, while an unguarded `flex-shrink-0` inner frame clipped horse
+noses and tails on 390px phones. The global `.listing-aperture` / `.listing-aperture-stage` classes in
+`globals.css` trim only horizontal deadspace on desktop/tablet while keeping phones unclipped.
+
+**27 · Don't put scrollbars or horizontal slide-bars on navigation controls (tablists, filter bars).
+Do lay them out as reactive `flex-wrap` strips so every control stays visible and tappable.**
+*Drift:* `overflow-x-auto` paired with `-mb-px` on the horse detail tabs triggered an unwanted vertical
+scrollbar on desktop and hid trailing tabs behind a horizontal slide-bar on narrow screens. Navigation
+bars wrap cleanly onto a second row on narrow viewports with zero overflow scrollbars.
 
 ---
 

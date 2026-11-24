@@ -289,6 +289,41 @@ body {
   line-height: var(--leading-body);
 }
 
+@media (max-width: 1023px) {
+  body.has-horse-conversion-bar {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Listing card aperture window (DESIGN.md §8 Listing card & Rule 26).
+   Below md: full-width 16:9 so horse cutouts never clip on phones.
+   From md upward: constant 210px height with fluid width clamp(210px, 36%, 360px)
+   so narrowing the viewport trims only horizontal deadspace around the centered horse. */
+.listing-aperture {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.listing-aperture-stage {
+  height: 100%;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .listing-aperture {
+    aspect-ratio: auto;
+    height: 210px;
+    width: clamp(210px, 36%, 360px);
+    flex-shrink: 0;
+  }
+
+  .listing-aperture-stage {
+    aspect-ratio: 16 / 9;
+    width: auto;
+    flex-shrink: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

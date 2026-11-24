@@ -28,12 +28,53 @@ export const DSL_STATUS_VALUES = [
 
 export type DslStatus = (typeof DSL_STATUS_VALUES)[number]
 
+export type PedigreeNode = {
+  path: string
+  generation: 0 | 1 | 2 | 3
+  name: string
+  horseId: string
+  sourceUrl: string
+}
+
+export type PedigreeSnapshot = {
+  version: number
+  source: string
+  rootHorseId: string
+  sourceUrl: string
+  retrievedAt: string
+  nodes: PedigreeNode[]
+}
+
+export type RaceSummary = {
+  source?: string
+  sourceHorseId?: string
+  retrievedAt?: string
+  starts: number
+  wins: number
+  seconds: number
+  thirds: number
+  stakesNzd: number
+}
+
+export type RaceResultLine = {
+  date?: string
+  race?: string
+  venue?: string
+  distance?: number | string | null
+  result?: number | string | null
+}
+
+export type RaceRecord = {
+  summary?: RaceSummary | null
+  resultLines?: RaceResultLine[]
+}
+
 /** The shape PostgREST returns for the select below. Not exported: callers take a Listing. */
 export type ListingRow = {
   id: string
   status: string
   end_date: string
-  term_start: string
+  term_start: string | null
   payment_model: string
   close_style: string
   investor_split: number | null
@@ -42,6 +83,9 @@ export type ListingRow = {
   step: number
   stake_remaining: number
   retail_monthly_per_percent: number
+  narrative_about_horse?: string | null
+  narrative_racing_outlook?: string | null
+  narrative_race_expectation?: string | null
   horses: {
     id: string
     slug: string
@@ -49,6 +93,18 @@ export type ListingRow = {
     registered: boolean
     image_count: number
     image_order: number[]
+    foaling_date?: string | null
+    sex?: string | null
+    colour?: string | null
+    breeder?: string | null
+    sire_name?: string | null
+    dam_name?: string | null
+    loveracing_id?: string | null
+    about_horse?: string | null
+    racing_outlook_and_pedigree?: string | null
+    race_expectation?: string | null
+    race_record?: RaceRecord | null
+    pedigree?: PedigreeSnapshot | null
   }
 }
 
@@ -56,7 +112,7 @@ export type Listing = {
   id: string
   status: DslStatus
   endDate: string
-  termStart: string
+  termStart: string | null
   paymentModel: string
   closeStyle: string
   investorSplit: number | null
@@ -65,6 +121,11 @@ export type Listing = {
   step: number
   stakeRemaining: number
   retailMonthlyPerPercent: number
+  narrative: {
+    aboutHorse: string | null
+    racingOutlook: string | null
+    raceExpectation: string | null
+  }
   horse: {
     id: string
     slug: string
@@ -72,6 +133,18 @@ export type Listing = {
     registered: boolean
     imageCount: number
     imageOrder: number[]
+    foalingDate: string | null
+    sex: string | null
+    colour: string | null
+    breeder: string | null
+    sireName: string | null
+    damName: string | null
+    loveracingId: string | null
+    aboutHorse: string | null
+    racingOutlookAndPedigree: string | null
+    raceExpectation: string | null
+    raceRecord: RaceRecord | null
+    pedigree: PedigreeSnapshot | null
   }
 }
 
@@ -94,7 +167,10 @@ const LISTING_SELECT = [
   'step',
   'stake_remaining',
   'retail_monthly_per_percent',
-  'horses!inner(id, slug, legal_name, registered, image_count, image_order)',
+  'narrative_about_horse',
+  'narrative_racing_outlook',
+  'narrative_race_expectation',
+  'horses!inner(id, slug, legal_name, registered, image_count, image_order, foaling_date, sex, colour, breeder, sire_name, dam_name, loveracing_id, about_horse, racing_outlook_and_pedigree, race_expectation, race_record, pedigree)',
 ].join(', ')
 
 /**
@@ -116,6 +192,11 @@ export function toListing(row: ListingRow): Listing {
     step: row.step,
     stakeRemaining: row.stake_remaining,
     retailMonthlyPerPercent: row.retail_monthly_per_percent,
+    narrative: {
+      aboutHorse: row.narrative_about_horse ?? null,
+      racingOutlook: row.narrative_racing_outlook ?? null,
+      raceExpectation: row.narrative_race_expectation ?? null,
+    },
     horse: {
       id: row.horses.id,
       slug: row.horses.slug,
@@ -123,6 +204,18 @@ export function toListing(row: ListingRow): Listing {
       registered: row.horses.registered,
       imageCount: row.horses.image_count,
       imageOrder: row.horses.image_order,
+      foalingDate: row.horses.foaling_date ?? null,
+      sex: row.horses.sex ?? null,
+      colour: row.horses.colour ?? null,
+      breeder: row.horses.breeder ?? null,
+      sireName: row.horses.sire_name ?? null,
+      damName: row.horses.dam_name ?? null,
+      loveracingId: row.horses.loveracing_id ?? null,
+      aboutHorse: row.horses.about_horse ?? null,
+      racingOutlookAndPedigree: row.horses.racing_outlook_and_pedigree ?? null,
+      raceExpectation: row.horses.race_expectation ?? null,
+      raceRecord: row.horses.race_record ?? null,
+      pedigree: row.horses.pedigree ?? null,
     },
   }
 }

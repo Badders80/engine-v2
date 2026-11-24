@@ -1,13 +1,18 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import BuyFlowModal from '../../../components/BuyFlowModal'
-import { PageContainer, PageSection, PageShell } from '../../../components/PagePrimitives'
-import StatusBadge from '../../../components/StatusBadge'
+import {
+  HorseMobileBar,
+  HorseOfferRail,
+  type HorseOfferSummary,
+} from '../../../components/HorseConversion'
+import { HorseDetailsTabs, type HorseDetailsData } from '../../../components/HorseDetailsTabs'
+import { HorseGallery } from '../../../components/HorseGallery'
+import { PageSection, PageShell } from '../../../components/PagePrimitives'
 import { AUTH_TOKEN_COOKIE } from '../../../lib/auth'
 import {
   canRenderBuyNow,
@@ -16,7 +21,14 @@ import {
   WEBSITE_BUY_ENABLED_ENV,
   WEBSITE_ENGINE_URL_ENV,
 } from '../../../lib/engineClient'
-import { getListingsBySlug, type Listing } from '../../../lib/listings'
+import { getListingsBySlug, sortForMarketplace, type Listing } from '../../../lib/listings'
+import {
+  formatFullDate,
+  formatHorseName,
+  formatMonthYear,
+  formatThoroughbredAge,
+  splitParagraphs,
+} from '../../../lib/marketplace'
 import { readMyStable, type AccountProfile } from '../../../lib/mystable'
 import {
   galleryImageUrls,
@@ -28,38 +40,48 @@ import {
 import { viewForStatus } from '../../../lib/status'
 
 /**
- * The horse page. PLAN.md step 6b-ii, deliverable D3.
+ * The horse page.
  *
- * One URL per horse (`PLAN.md:297`), and the horse may carry more than one DSL —
- * the unique constraint on `dsls` is `(horse_id, end_date)`, not `horse_id` — so
- * every published DSL on the horse gets its own block. Dropping one would discard
- * a published offering, which is the one reading the law does not support.
- *
- * Two rules shape the page. **Exactly one `h1`**, carrying the horse's legal name
- * (`PLAN.md:86`); the per-DSL blocks are `h2`. And **no checkout control of any
- * kind** — ruled 2026-10-17. The purchase modal and the buy wiring are Step 8
- * (`PLAN.md:299`) and the buy path stays off until Step 10 (`PLAN.md:301`), so an
- * Available listing shows its status and its terms and nothing to click. A
- * disabled button would still be a control, so there is not one of those either.
- *
- * `force-dynamic` for the reason given on the marketplace page: CI builds with no
- * environment variables, and the read client throws rather than degrading.
+ * One URL per horse (`PLAN.md:297`), one semantic `h1` carrying the horse's
+ * legal name, and `force-dynamic` so CI builds without database env vars while
+ * runtime requests render live published DSL data on first response.
  */
-
 export const dynamic = 'force-dynamic'
 
-/**
- * React's per-request memo, so `generateMetadata` and the page share one query
- * rather than issuing two against the same row set.
- */
 const readListings = cache(async (slug: string): Promise<Listing[]> => getListingsBySlug(slug))
 
-/** Composed from stored facts. The horse's own prose is not in the read layer's projection. */
 function describe(listing: Listing): string {
   const { horse } = listing
   const { label } = viewForStatus(listing.status)
+  const endDisplay = formatMonthYear(listing.endDate) ?? listing.endDate
+  const startDisplay = formatMonthYear(listing.termStart)
+  const termClause = startDisplay
+    ? `term from ${startDisplay} to ${endDisplay}`
+    : `campaign through ${endDisplay}`
 
-  return `${horse.legalName} — ${label} on the Evolution Stables marketplace. Listed stake ${String(listing.listedStake)}%, minimum ${String(listing.minStake)}%, term from ${listing.termStart} to ${listing.endDate}.`
+  return `${horse.legalName} — ${label} on the Evolution Stables marketplace. Listed stake ${String(listing.listedStake)}%, minimum ${String(listing.minStake)}%, ${termClause}.`
+}
+
+function ctaLabelForStatus(status: Listing['status']): string {
+  if (status === 'available') return 'Become an owner'
+  if (status === 'coming_soon') return 'Register interest'
+  return 'Notify me'
+}
+
+function buildOfferSummary(listing: Listing): HorseOfferSummary {
+  const splitDisplay =
+    listing.investorSplit !== null ? `${String(requireInvestorSplit(listing.investorSplit))}%` : null
+
+  return {
+    status: listing.status,
+    price: `$${String(listing.retailMonthlyPerPercent)}`,
+    priceUnit: 'per month per 1%',
+    investorReturn: splitDisplay,
+    listedStake: `${String(listing.listedStake)}%`,
+    expiry: formatMonthYear(listing.endDate),
+    ctaLabel: ctaLabelForStatus(listing.status),
+    ctaHref: `/login?next=${encodeURIComponent(`/marketplace/${listing.horse.slug}`)}`,
+  }
 }
 
 export async function generateMetadata({
@@ -93,115 +115,47 @@ export async function generateMetadata({
   }
 }
 
-/**
- * One figure. DESIGN.md's figure-row variant `default`: the label is muted, the
- * value is in `heading`, and **the unit is never inside the value string** so it
- * can be positioned at all.
- *
- * The value is mono at weight 500 — a token decision, not a styling choice, because
- * a proportional face stops figures aligning down a column. The `money` variant is
- * deliberately not used: green there means a positive return, and none of these is
- * a return.
- */
-function Figure({
-  label,
-  value,
-  unit,
-  sub,
-}: {
-  label: string
-  value: string
-  unit?: string
-  sub?: string
-}) {
-  return (
-    <div className="border-t border-border py-5">
-      <dt className="label-spec text-muted-foreground">{label}</dt>
-      <dd className="mt-2 flex items-baseline gap-2">
-        <span className="font-mono text-card-heading font-medium text-heading">{value}</span>
-        {unit ? <span className="label-spec text-muted-foreground">{unit}</span> : null}
-      </dd>
-      {sub ? <p className="label-spec mt-2 text-muted-foreground">{sub}</p> : null}
-    </div>
-  )
-}
-
-async function DslBlock({
-  listing,
-  account,
-}: {
-  listing: Listing
-  account: AccountProfile | null
-}) {
+async function renderBuyFlowIfEnabled(listing: Listing, account: AccountProfile | null) {
   const buyEnabled = canRenderBuyNow(
     listing.status,
     process.env[WEBSITE_BUY_ENABLED_ENV],
     listing.stakeRemaining,
   )
-  const initialQuote = buyEnabled ? await fetchEngineQuote({ dslId: listing.id }) : null
-  const splitDisplay =
-    listing.investorSplit !== null ? `${String(requireInvestorSplit(listing.investorSplit))}%` : null
+  if (!buyEnabled) return null
 
+  const initialQuote = await fetchEngineQuote({ dslId: listing.id })
   return (
-    <section className="mt-16 rounded-lg border border-border bg-surface p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="label-eyebrow text-muted-foreground">Offer</h2>
-        <StatusBadge status={listing.status} />
-      </div>
-
-      <dl className="mt-8 grid gap-x-16 sm:grid-cols-2">
-        <Figure label="Listed stake" value={`${String(listing.listedStake)}%`} sub="Of the horse, in total" />
-        <Figure label="Minimum stake" value={`${String(listing.minStake)}%`} />
-        <Figure label="Step" value={`${String(listing.step)}%`} sub="Each additional stake moves in steps of this size" />
-        <Figure label="Remaining" value={`${String(listing.stakeRemaining)}%`} sub="Not yet taken" />
-        <Figure
-          label="Retail rate"
-          value={`$${String(listing.retailMonthlyPerPercent)}`}
-          unit="per 1% / month"
-        />
-        {splitDisplay ? <Figure label="Investor split" value={splitDisplay} /> : null}
-        <Figure label="Term start" value={listing.termStart} />
-        <Figure label="End date" value={listing.endDate} />
-        <Figure label="Payment model" value={listing.paymentModel} />
-        <Figure label="Close style" value={listing.closeStyle} />
-      </dl>
-
-      {buyEnabled && initialQuote ? (
-        <BuyFlowModal
-          dslId={listing.id}
-          status={listing.status}
-          horseSlug={listing.horse.slug}
-          horseLegalName={listing.horse.legalName}
-          investorSplit={listing.investorSplit}
-          initialQuote={initialQuote}
-          accountId={account?.id ?? null}
-          accountFullName={account?.fullName ?? null}
-          accountKycStatus={account?.kycStatus ?? null}
-          engineBaseUrl={process.env[WEBSITE_ENGINE_URL_ENV]}
-          buyEnabled={buyEnabled}
-        />
-      ) : null}
-    </section>
+    <BuyFlowModal
+      dslId={listing.id}
+      status={listing.status}
+      horseSlug={listing.horse.slug}
+      horseLegalName={listing.horse.legalName}
+      investorSplit={listing.investorSplit}
+      initialQuote={initialQuote}
+      accountId={account?.id ?? null}
+      accountFullName={account?.fullName ?? null}
+      accountKycStatus={account?.kycStatus ?? null}
+      engineBaseUrl={process.env[WEBSITE_ENGINE_URL_ENV]}
+      buyEnabled={buyEnabled}
+    />
   )
 }
 
 export default async function HorsePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const listings = await readListings(slug)
-  const first = listings.at(0)
+  const listings = sortForMarketplace(await readListings(slug))
+  const primary = listings.at(0)
 
-  // An unpublished DSL is a 404, never an empty page. The read layer filters on
-  // `published`, so a slug that names only unpublished work arrives here as an
-  // empty array and leaves as a not-found.
-  if (!first) notFound()
+  if (!primary) notFound()
 
   const anyBuyEnabled = listings.some((listing) =>
     canRenderBuyNow(
-    listing.status,
-    process.env[WEBSITE_BUY_ENABLED_ENV],
-    listing.stakeRemaining,
-  ),
+      listing.status,
+      process.env[WEBSITE_BUY_ENABLED_ENV],
+      listing.stakeRemaining,
+    ),
   )
+
   let account: AccountProfile | null = null
   if (anyBuyEnabled) {
     const cookieStore = await cookies()
@@ -212,99 +166,161 @@ export default async function HorsePage({ params }: { params: Promise<{ slug: st
     }
   }
 
-  const { horse } = first
-  const hero = heroImageUrl(
-    horse.slug,
-    horse.imageCount,
-    process.env[R2_PUBLIC_URL_ENV],
-    horse.imageOrder,
+  const { horse } = primary
+  const r2PublicUrl = process.env[R2_PUBLIC_URL_ENV]
+  const hero = heroImageUrl(horse.slug, horse.imageCount, r2PublicUrl, horse.imageOrder)
+  const galleryTail = galleryImageUrls(horse.slug, horse.imageCount, r2PublicUrl, horse.imageOrder)
+  const allImages = hero ? [hero, ...galleryTail] : galleryTail
+
+  const age = formatThoroughbredAge(horse.foalingDate)
+  const foaled = formatFullDate(horse.foalingDate)
+
+  const facts = [
+    { label: 'Age', value: age ?? '—' },
+    { label: 'Sex', value: horse.sex ?? '—' },
+    { label: 'Colour', value: horse.colour ?? '—' },
+    { label: 'Sire', value: formatHorseName(horse.sireName).display },
+    { label: 'Dam', value: formatHorseName(horse.damName).display },
+  ] as const
+
+  const storyParagraphs = splitParagraphs(primary.narrative.aboutHorse ?? horse.aboutHorse)
+  const overviewParagraphs = splitParagraphs(
+    primary.narrative.racingOutlook ?? horse.racingOutlookAndPedigree,
   )
-  const gallery = galleryImageUrls(
-    horse.slug,
-    horse.imageCount,
-    process.env[R2_PUBLIC_URL_ENV],
-    horse.imageOrder,
+  const raceExpectationParagraphs = splitParagraphs(
+    primary.narrative.raceExpectation ?? horse.raceExpectation,
   )
 
-  /**
-   * The horse, at its real page (`PLAN.md:85` — the current site points structured
-   * data at a path that does not exist).
-   *
-   * No `offers` and no price. The law does not rule which stored figure is the
-   * public price, and `listed_stake` is a percentage rather than money, so emitting
-   * one would mean inventing the very fact a buyer would rely on.
-   */
+  const details: HorseDetailsData = {
+    legalName: horse.legalName,
+    sireName: horse.sireName,
+    damName: horse.damName,
+    sex: horse.sex,
+    colour: horse.colour,
+    age,
+    foaled,
+    breeder: horse.breeder,
+    pedigree: horse.pedigree,
+    overviewParagraphs,
+    raceRecord: horse.raceRecord,
+    raceExpectationParagraphs,
+  }
+
+  const railEntries = await Promise.all(
+    listings.map(async (listing) => ({
+      id: listing.id,
+      offer: buildOfferSummary(listing),
+      buyFlow: await renderBuyFlowIfEnabled(listing, account),
+    })),
+  )
+
+  const primaryOffer = railEntries[0]?.offer ?? buildOfferSummary(primary)
+
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: horse.legalName,
-    description: describe(first),
+    description: describe(primary),
     url: `${SITE_URL}/marketplace/${horse.slug}`,
     ...(hero ? { image: [hero] } : {}),
     additionalProperty: [
-      { '@type': 'PropertyValue', name: 'Status', value: viewForStatus(first.status).label },
+      { '@type': 'PropertyValue', name: 'Status', value: viewForStatus(primary.status).label },
     ],
   }
 
+  const factsStrip = (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-md border border-border bg-surface px-5 py-4 sm:grid-cols-3 lg:grid-cols-[auto_auto_auto_minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-8">
+      {facts.map((fact) => (
+        <div key={fact.label} className="min-w-0">
+          <dt className="label-spec text-muted-foreground">{fact.label}</dt>
+          <dd className="mt-1.5 text-body-small font-light text-heading">{fact.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+
   return (
-    <PageShell>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-      />
+    <>
+      <PageShell className="pb-28 lg:pb-0">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
 
-      <PageSection className="pt-32 pb-16">
-        <Link href="/marketplace" className="label-action text-muted-foreground">
-          Marketplace
-        </Link>
-
-        <h1 className="mt-8 max-w-3xl text-display leading-display tracking-display text-heading">
-          {horse.legalName}
-        </h1>
-
-        {hero ? (
-          <div className="relative mt-16 h-80 w-full overflow-hidden rounded-lg bg-raised">
-            <Image
-              src={hero}
-              alt={horse.legalName}
-              fill
-              priority
-              sizes="(max-width: 1280px) 100vw, 1152px"
-              className="object-cover"
-            />
-          </div>
-        ) : null}
-
-        {gallery.length > 0 ? (
-          <ul
-            aria-label={`${horse.legalName} gallery`}
-            className="mt-4 flex gap-3 overflow-x-auto pb-2"
-          >
-            {gallery.map((src, index) => (
-              <li
-                key={src}
-                className="relative h-32 w-48 shrink-0 overflow-hidden rounded-lg bg-raised"
+        <PageSection className="pt-28 pb-32 md:pt-32">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <nav
+              aria-label="Breadcrumb"
+              className="label-eyebrow flex flex-wrap items-center gap-2 text-muted-foreground"
+            >
+              <Link
+                href="/marketplace"
+                className="inline-flex min-h-11 items-center text-muted-foreground transition-colors duration-hover hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
               >
-                <Image
-                  src={src}
-                  alt={`${horse.legalName} image ${String(index + 2)}`}
-                  fill
-                  sizes="192px"
-                  className="object-cover"
-                />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </PageSection>
+                Marketplace
+              </Link>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page" className="text-heading">
+                {horse.legalName}
+              </span>
+            </nav>
 
-      <PageContainer className="pb-32">
-        {/* More than one block is a legal state, not a data error: one horse may
-            carry a separate DSL per end date (`PLAN.md:297`). */}
-        {listings.map((listing) => (
-          <DslBlock key={listing.id} listing={listing} account={account} />
-        ))}
-      </PageContainer>
-    </PageShell>
+            <Link
+              href="/marketplace"
+              className="label-action inline-flex min-h-11 items-center gap-1.5 text-muted-foreground transition-colors duration-hover hover:text-heading focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-edge"
+            >
+              <span aria-hidden="true">←</span> Back to Marketplace
+            </Link>
+          </div>
+
+          <div
+            className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-12"
+            data-reveal
+            data-reveal-mode="fade"
+          >
+            <div className="min-w-0 space-y-12">
+              <HorseGallery
+                images={allImages}
+                horseName={horse.legalName}
+                factsSlot={factsStrip}
+              />
+
+              <section aria-labelledby="horse-story-heading">
+                <p className="label-eyebrow text-muted-foreground">The story</p>
+                <h1
+                  id="horse-story-heading"
+                  className="mt-3 text-section-heading font-light leading-display tracking-display text-heading"
+                >
+                  {horse.legalName}
+                </h1>
+                {storyParagraphs.length > 0 ? (
+                  <div className="mt-6 max-w-2xl space-y-4 text-body-small font-light leading-body text-ink">
+                    {storyParagraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-6 max-w-2xl text-body-small font-light leading-body text-muted-foreground">
+                    Campaign story notes will appear here once published.
+                  </p>
+                )}
+              </section>
+
+              <section aria-label="Campaign details">
+                <HorseDetailsTabs details={details} />
+              </section>
+            </div>
+
+            <div className="space-y-6 lg:sticky lg:top-28">
+              {railEntries.map((entry) => (
+                <HorseOfferRail key={entry.id} offer={entry.offer} buyFlow={entry.buyFlow} />
+              ))}
+            </div>
+          </div>
+        </PageSection>
+      </PageShell>
+
+      <HorseMobileBar offer={primaryOffer} />
+    </>
   )
 }

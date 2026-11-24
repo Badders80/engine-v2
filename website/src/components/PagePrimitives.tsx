@@ -46,7 +46,7 @@ export function PageIntro({
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">{actions}</div>
       ) : null}
       {eyebrow ? <p className="label-eyebrow text-muted-foreground">{eyebrow}</p> : null}
-      <h1 className="mt-6 max-w-3xl text-display leading-display tracking-display text-heading">
+      <h1 className="mt-6 max-w-3xl text-display font-light leading-display tracking-display text-heading">
         {title}
       </h1>
       {description ? (

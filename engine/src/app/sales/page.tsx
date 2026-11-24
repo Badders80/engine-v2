@@ -5,6 +5,7 @@ import {
   capTableIdentityHolds,
   unresolvedPaidUnfulfilled,
 } from '@/lib/ledger'
+import { dslLifecycle, dslLifecycleLabel } from '@/lib/dslLifecycle'
 import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 
 import { closeListingAction, resolveCheckoutAction } from './actions'
@@ -126,11 +127,12 @@ export default async function Page({
             dsl.status === 'available' ||
             dsl.status === 'fully_allocated') &&
           exceptions.length === 0
-        const statusLabel =
-          dsl.closedAt !== null && rows.length === 0
-            ? 'archived'
-            : dsl.status.replaceAll('_', ' ')
-
+        const lifecycleLabel = dslLifecycleLabel(
+          dslLifecycle({
+            published: dsl.published,
+            hasExecutedSale: rows.length > 0,
+          }),
+        )
         return (
           <section key={dsl.id} className="mb-12 border-t border-line pt-6">
             <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
@@ -144,8 +146,7 @@ export default async function Page({
               </div>
               <div className="text-right">
                 <p className="text-caption uppercase tracking-caption text-muted">
-                  {statusLabel}
-                  {dsl.published ? ' · published' : ''}
+                  {lifecycleLabel}
                 </p>
                 <p className="font-figure text-caption text-muted">
                   ends {cap.termEnd ?? '—'}

@@ -22,6 +22,7 @@ import { checkDslReadiness, readinessReason } from '@/lib/readiness'
 import { effectiveImageOrder } from '@/lib/imageOrder'
 import { imageKey, publicImageUrl } from '@/lib/storage'
 import { buildTermSheet } from '@/lib/termSheet'
+import { dslLifecycle, dslLifecycleLabel } from '@/lib/dslLifecycle'
 
 import {
   approveNarrativeAction,
@@ -56,9 +57,17 @@ export default async function Page({
 
   if (!view.found) notFound()
 
-  const { dsl, horse, trainer, owner } = view
+  const { dsl, horse, trainer, owner, hasExecutedSale } = view
   const resolved = resolveNarrative(horse, dsl, trainer)
-  const sections = buildTermSheet({ dsl, horse, trainer, owner, narrative: resolved })
+  const lifecycle = dslLifecycle({ published: dsl.published, hasExecutedSale })
+  const sections = buildTermSheet({
+    dsl,
+    horse,
+    trainer,
+    owner,
+    narrative: resolved,
+    hasExecutedSale,
+  })
   const staleSlots = staleOverrideSlots(horse, dsl)
   const emptySlots = missingNarrativeSlots(resolved)
   const readiness = checkDslReadiness({
@@ -92,7 +101,9 @@ export default async function Page({
       <header className="flex flex-wrap items-start justify-between gap-5 border-b border-line pb-6">
         <div className="grid gap-1">
           <h1>{horse.legalName}</h1>
-          <p className="text-body text-muted">DSL term sheet</p>
+          <p className="text-body text-muted">
+            {dslLifecycleLabel(lifecycle)} · Term sheet
+          </p>
         </div>
         <nav aria-label="DSL actions" className="flex flex-wrap gap-2">
           <Link
@@ -111,7 +122,7 @@ export default async function Page({
             href="/dsl"
             className="inline-flex min-h-11 items-center rounded-sm border border-line bg-panel px-3 py-2 text-caption uppercase tracking-caption text-body hover:border-accent"
           >
-            All listings
+            All DSLs
           </Link>
         </nav>
       </header>
@@ -204,8 +215,9 @@ export default async function Page({
               </form>
               {dsl.published && (
                 <p className="mt-3 text-body text-low">
-                  Published with status {dsl.status}. Only an <code>available</code> listing is
-                  buyable; take it down and publish again once the terms are fixed.
+                  This is a Published DSL with inventory status {dsl.status}. Only an{' '}
+                  <code>available</code> listing is buyable; take it down and publish again once
+                  the terms are fixed.
                 </p>
               )}
             </>

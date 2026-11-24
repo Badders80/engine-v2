@@ -8,7 +8,7 @@
  */
 
 import type { DslRow, HorseRow, PartyRow } from '@/lib/dslStore'
-import { createSupabaseDslStore, supabaseClientFromEnv } from '@/lib/dslStoreSupabase'
+import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 
 export type DslView =
   | {
@@ -18,13 +18,14 @@ export type DslView =
       horse: HorseRow
       trainer: PartyRow | null
       owner: PartyRow | null
+      hasExecutedSale: boolean
     }
   | { ok: true; found: false }
   | { ok: false; reason: string }
 
 export async function loadDslView(id: string): Promise<DslView> {
   try {
-    const store = createSupabaseDslStore(supabaseClientFromEnv())
+    const store = createSupabasePurchaseStore()
 
     const dsl = await store.findDslById(id)
     if (dsl === null) return { ok: true, found: false }
@@ -36,8 +37,9 @@ export async function loadDslView(id: string): Promise<DslView> {
 
     const trainer = dsl.trainerId === null ? null : await store.findPartyById(dsl.trainerId)
     const owner = dsl.ownerId === null ? null : await store.findPartyById(dsl.ownerId)
+    const hasExecutedSale = await store.hasExecutedSale(dsl.id)
 
-    return { ok: true, found: true, dsl, horse, trainer, owner }
+    return { ok: true, found: true, dsl, horse, trainer, owner, hasExecutedSale }
   } catch (error) {
     return {
       ok: false,

@@ -1,6 +1,6 @@
 /**
  * The legal preview. This is the compiler's production call site: it resolves
- * one draft DSL through the same legal compiler and ReportLab renderer used by
+ * one assembled DSL through the same legal compiler and ReportLab renderer used by
  * the executed Investor Pack.
  *
  * The response is a real, page-navigable PDF preview. It writes no sale row and

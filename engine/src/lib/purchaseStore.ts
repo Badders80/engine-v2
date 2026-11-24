@@ -159,6 +159,8 @@ export interface PurchaseStore extends DslStore {
   insertAccount(row: NewAccount): Promise<AccountRow>
   updateAccountKycStatus(id: string, kycStatus: KycStatus): Promise<AccountRow>
   findSaleByStripeSessionId(stripeSessionId: string): Promise<SaleRow | null>
+  /** True once the first completed investment has written a sale for this DSL. */
+  hasExecutedSale(dslId: string): Promise<boolean>
   listSalesByUserId(userId: string): Promise<SaleRow[]>
   /** Every sale, newest first. The operator's read-only Sales section. */
   listSales(): Promise<SaleRow[]>
@@ -544,6 +546,10 @@ export function createInMemoryPurchaseStore(): InMemoryPurchaseStore {
     async findSaleByStripeSessionId(stripeSessionId) {
       const found = sales.find((row) => row.stripeSessionId === stripeSessionId)
       return found === undefined ? null : { ...found }
+    },
+
+    async hasExecutedSale(dslId) {
+      return sales.some((row) => row.dslId === dslId)
     },
 
     async listSalesByUserId(userId) {

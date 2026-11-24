@@ -114,7 +114,7 @@ describe('the term sheet has the five sections, in order', () => {
       '2. Syndicate Stake & Commercials',
       '3. Payment Structure & Float',
       '4. Prize Money & Exit Terms',
-      '5. Execution & Approvals',
+      '5. Lifecycle & Execution',
     ])
   })
 
@@ -134,6 +134,10 @@ describe('the term sheet has the five sections, in order', () => {
   it('quotes the float in per-1% terms and never the buyer figures', () => {
     expect(row(sheets, '3.', 'Initial payment, per 1% stake')).toBe('$355.00')
     expect(row(sheets, '3.', 'Monthly thereafter, per 1% stake')).toBe('$71.00')
+  })
+
+  it('shows the DSL lifecycle without a sale', () => {
+    expect(row(sheets, '5.', 'Lifecycle')).toBe('DSL')
   })
 
   it('says GST is included, and promises no timeline', () => {

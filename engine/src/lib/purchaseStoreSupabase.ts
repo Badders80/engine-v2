@@ -223,6 +223,17 @@ export function createSupabasePurchaseStore(
       return data === null ? null : toSale(data)
     },
 
+    async hasExecutedSale(dslId) {
+      const { data, error } = await client
+        .from('sales')
+        .select('id')
+        .eq('dsl_id', dslId)
+        .limit(1)
+        .maybeSingle()
+      if (error) fail('sales', error.message)
+      return data !== null
+    },
+
     async listSalesByUserId(userId) {
       const { data, error } = await client
         .from('sales')

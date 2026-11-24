@@ -149,7 +149,7 @@ export function DslForm({
           </select>
         </label>
 
-        {/* Status and published are not form fields. A new DSL is a draft, and
+        {/* Status and published are not form fields. A new DSL starts unpublished, and
             it goes live from the term sheet with Publish, after a look. */}
 
         <label>

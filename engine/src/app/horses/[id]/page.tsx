@@ -1,22 +1,18 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import type { DslRow } from '@/lib/dslStore'
+import { dslLifecycle, dslLifecycleLabel } from '@/lib/dslLifecycle'
 import { effectiveImageOrder } from '@/lib/imageOrder'
+import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 import { imageKeys, publicImageUrl } from '@/lib/storage'
 
 import { SummaryRow } from '../../_components/forms'
 import { recountHorseImagesAction, uploadHorseImageAction } from '../../dsl/actions'
 import { updateSoftContentAction } from '../../records/actions'
-import { recordStore } from '../../records/store'
 
 import { ImageOrderEditor } from './ImageOrderEditor'
 
 export const dynamic = 'force-dynamic'
-
-function statusLabel(status: DslRow['status']): string {
-  return status.replaceAll('_', ' ')
-}
 
 export default async function Page({
   params,
@@ -27,7 +23,7 @@ export default async function Page({
 }) {
   const { id } = await params
   const { warning = '', error = '' } = await searchParams
-  const store = recordStore()
+  const store = createSupabasePurchaseStore()
 
   const horse = await store.findHorseById(id)
   if (horse === null) notFound()
@@ -35,9 +31,14 @@ export default async function Page({
 
   // The trainer and the owner are derived through the horse's DSLs. Records
   // never author the link (R1, ruling 10).
-  const [dsls, parties] = await Promise.all([store.listDsls(), store.listParties()])
+  const [dsls, parties, sales] = await Promise.all([
+    store.listDsls(),
+    store.listParties(),
+    store.listSales(),
+  ])
 
   const horseDsls = dsls.filter((dsl) => dsl.horseId === horse.id)
+  const executedDsls = new Set(sales.map((sale) => sale.dslId))
   const partyById = new Map(parties.map((party) => [party.id, party]))
   const ownerNames = new Map(parties.map((party) => [party.id, party.displayName]))
 
@@ -310,7 +311,12 @@ export default async function Page({
                 className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0"
               >
                 <Link href={`/dsl/${dsl.id}`} className="text-body">
-                  {statusLabel(dsl.status)}
+                  {dslLifecycleLabel(
+                    dslLifecycle({
+                      published: dsl.published,
+                      hasExecutedSale: executedDsls.has(dsl.id),
+                    }),
+                  )}
                 </Link>
                 <span className="font-figure text-caption text-muted">
                   {dsl.listedStake === null ? 'stake not set' : `${dsl.listedStake}%`}

@@ -23,6 +23,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATES="$ROOT/engine/src/templates"
 BLOCKS="$TEMPLATES/blocks"
 PREVIEW="$ROOT/engine/src/app/dsl/[id]/legal/page.tsx"
+DRAFT_PREVIEW="$ROOT/engine/src/lib/legal/draftPreview.ts"
 COMPILE_TEST="$ROOT/engine/tests/legal-compile.test.ts"
 
 RED=$'\033[31m'; GREEN=$'\033[32m'; OFF=$'\033[0m'
@@ -181,10 +182,15 @@ for file in "${FILES[@]}"; do
 done
 [ "$token_fail" -eq 0 ] && ok "token union exhaustive and matched, braces balanced"
 
-# 6. The compiler is wired to a production consumer and its tests.
+# 6. The preview is wired through the shared draft compiler, which calls the
+#    legal compiler, and the compiler tests remain connected.
 wiring_fail=0
-if ! grep -q "from '@/lib/legal/compile'" "$PREVIEW" || ! grep -q 'compileLegalPack(' "$PREVIEW"; then
-  bad "the preview page does not import and call compileLegalPack"
+if ! grep -q "from '@/lib/legal/draftPreview'" "$PREVIEW" || ! grep -q 'compileDraftPreview(' "$PREVIEW"; then
+  bad "the preview page does not import and call compileDraftPreview"
+  wiring_fail=1
+fi
+if ! grep -q "from './compile'" "$DRAFT_PREVIEW" || ! grep -q 'compileLegalPack(' "$DRAFT_PREVIEW"; then
+  bad "the draft preview does not call compileLegalPack"
   wiring_fail=1
 fi
 if ! grep -q "src/lib/legal/" "$COMPILE_TEST"; then

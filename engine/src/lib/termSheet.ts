@@ -15,6 +15,7 @@
 
 import { resolveNarrative, type ResolvedNarrative } from './narrative'
 import { durationFromCurrentMonth, termMonthsBetween } from './term'
+import { dslLifecycle, dslLifecycleLabel } from './dslLifecycle'
 import {
   EVOLUTION_MARGIN_PCT,
   PLATFORM_FEE_PCT,
@@ -134,10 +135,16 @@ export type TermSheetInput = {
   owner: PartyRow | null
   /** The resolved soft content, when the caller already has it. */
   narrative?: ResolvedNarrative | null
+  /** Whether a completed investment has already written a sale for this DSL. */
+  hasExecutedSale?: boolean
 }
 
 export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
   const { dsl, horse, trainer, owner } = input
+  const lifecycle = dslLifecycle({
+    published: dsl.published,
+    hasExecutedSale: input.hasExecutedSale ?? false,
+  })
 
   // The resolver is the single source of the four soft slots: an overridden
   // slot shows the deal-local text, an untouched slot reads through live.
@@ -229,13 +236,15 @@ export function buildTermSheet(input: TermSheetInput): TermSheetSection[] {
       ],
     },
     {
-      title: '5. Execution & Approvals',
+      title: '5. Lifecycle & Execution',
       rows: [
-        { label: 'Status', value: `${dsl.status}, ${dsl.published ? 'published' : 'not published'}` },
+        { label: 'Lifecycle', value: dslLifecycleLabel(lifecycle) },
         {
           label: 'Execution',
           value:
-            'Executed online by the buyer at Checkout. The PDS and SA are compiled per buyer and hashed onto the sale.',
+            lifecycle === 'executed_dsl'
+              ? 'At least one completed investment has written a sale for this DSL.'
+              : 'An investment executes at Checkout when the investor accepts the PDS, signs the SA and the sale records the completed terms.',
         },
       ],
     },

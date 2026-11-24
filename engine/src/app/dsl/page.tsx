@@ -1,13 +1,19 @@
 import Link from 'next/link'
 
-import { recordStore } from '../records/store'
+import { dslLifecycle, dslLifecycleLabel } from '@/lib/dslLifecycle'
+import { createSupabasePurchaseStore } from '@/lib/purchaseStoreSupabase'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Page() {
-  const store = recordStore()
-  const [dsls, horses] = await Promise.all([store.listDsls(), store.listHorses()])
+  const store = createSupabasePurchaseStore()
+  const [dsls, horses, sales] = await Promise.all([
+    store.listDsls(),
+    store.listHorses(),
+    store.listSales(),
+  ])
   const horseName = new Map(horses.map((horse) => [horse.id, horse.legalName]))
+  const executedDsls = new Set(sales.map((sale) => sale.dslId))
 
   return (
     <main>
@@ -31,7 +37,7 @@ export default async function Page() {
               Investor return %
             </th>
             <th className="py-3 text-caption uppercase tracking-caption text-muted">Expiry</th>
-            <th className="py-3 text-caption uppercase tracking-caption text-muted">Status</th>
+            <th className="py-3 text-caption uppercase tracking-caption text-muted">Lifecycle</th>
             <th className="py-3" />
           </tr>
         </thead>
@@ -51,7 +57,14 @@ export default async function Page() {
                 {dsl.investorSplit === null ? '—' : `${dsl.investorSplit}%`}
               </td>
               <td className="py-3 font-figure">{dsl.endDate ?? '—'}</td>
-              <td className="py-3">{dsl.status.replaceAll('_', ' ')}</td>
+              <td className="py-3">
+                {dslLifecycleLabel(
+                  dslLifecycle({
+                    published: dsl.published,
+                    hasExecutedSale: executedDsls.has(dsl.id),
+                  }),
+                )}
+              </td>
               <td className="py-3">
                 <Link href={`/dsl/${dsl.id}`}>Open</Link>
               </td>

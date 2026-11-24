@@ -2,14 +2,34 @@
 
 > Shape (LOCKED): **Next action · State · Ledger · Blocked**. Chat is not storage.
 
-**Next action:** open this file's **Approved Hottathanafantasy copy** under
-Blocked, then re-enter the three blocks on the horse profile and save.
+**Next action:** open `audits/cloud-supabase-pilot-2026-11-24/chunk-6/result.json`,
+review the last saved failure, then rerun `scripts/run-chunk.sh 6`; the runner now
+uses migrations plus a data-only backup restore and automatically recovers the pilot.
+
+## State — 2026-11-25
+
+- **Cloud pilot Chunks 4 and 5 are accepted.** Chunk 4 passes 18/18 checks on
+  pilot `sjzhbssggonojtodcuzb` with 6 horses, 4 parties, 5 roles, 1 DSL, 0 sales
+  and 0 checkouts. Chunk 5 passes 27/27 cloud smoke checks, including the
+  browser walk, Mulan-only public visibility, private-row denial, disabled buying
+  and a real draft Investor Pack PDF.
+- **Chunk 5 gate:** `pnpm verify` passes; engine 434 passed / 1 skipped, website
+  66 passed, both builds compile. The Supabase SSR read, cookie, and Vitest alias
+  defects found during the walk are fixed in the worktree.
+- **Chunk 6 is wrapped mid-proof.** Free-plan PITR and preview branches are
+  unavailable. A data-only backup exists, disposable project
+  `bnxytinikttypaxixemw` is paused, and the active pilot is healthy, relinked and
+  still at 6/4/5/1/0/0. The saved Chunk 6 evidence is the earlier restore failure;
+  rerun the fixed runner tomorrow.
+- **Protected local source is unchanged:** normalized checksum
+  `87022bbd77b62fff4a17926d0b09fed05b1f7fc4906ce366e576d12232450ee1`.
 
 ## State — 2026-11-24
 
-- **Hottathanafantasy soft content was founder-approved but did not save.** The
-  browser action was interrupted before submission; all three local DB fields
-  remain null. The exact approved text is preserved under Blocked below.
+- **Hottathanafantasy soft content is founder-approved and saved locally.** All
+  three DB fields match the approved source hashes; the paragraphs are 105 / 127
+  / 58 words. The exact approved text remains preserved under Blocked for replay
+  because the local proof data is not migration-backed.
 - The other five horses have soft content. Local totals remain six horses, three
   trainer roles, two owner roles across four party rows, one **Published DSL**
   (Mulan), zero sales and zero checkouts.
@@ -261,6 +281,8 @@ continues through the horse-intake work above.**
 
 | date | what | repo | commit | state |
 |---|---|---|---|---|
+| 2026-11-25 | Cloud pilot Chunks 4–5 accepted; Chunk 6 durability proof wrapped mid-run | engine_v2/website; Supabase cloud | this commit | Chunk 5 PASS 27/27; pilot healthy; Chunk 6 BLOCKED pending rerun |
+| 2026-11-24 | Hottathanafantasy soft content founder-approved and saved | engine_v2/website; local Supabase | this commit | done; DB hashes match approved source; 105 / 127 / 58 words |
 | 2026-11-24 | Wrap after interrupted Hottathanafantasy soft-content save | engine_v2/website; local Supabase | this commit | approved copy preserved; DB remains unfilled |
 | 2026-11-23 | I Stole A Manolo soft content approved and saved | engine_v2/website; local Supabase | this commit | done; 112 / 139 / 52 words |
 | 2026-11-23 | Six-horse local seed, canonical covers and approved First Gear soft content | engine_v2/website; local Supabase/R2 | this commit | done; one published DSL, zero sales; cloud replay pending |
@@ -307,8 +329,19 @@ continues through the horse-intake work above.**
 
 ## Blocked
 
-- **Hottathanafantasy soft-content save is incomplete.** All three fields are
-  null. Re-enter this founder-approved copy:
+- **Chunk 6 durability proof is incomplete.** The last saved
+  `audits/cloud-supabase-pilot-2026-11-24/chunk-6/result.json` is the old restore
+  failure. The runner now replays schema into the disposable target before a
+  data-only restore, then resets/replays/seeds and checks parity twice. Rerun
+  `scripts/run-chunk.sh 6`; do not treat the temporary project as accepted yet.
+- **Disposable durability project** `bnxytinikttypaxixemw` is paused. Its mode-600
+  password is `/home/evo/.supabase/pilots/bnxytinikttypaxixemw.dbpass`. Chunk 6
+  reuses this project, pauses it at exit and resumes/relinks the pilot.
+- **Chunk 7 remains locked** until Chunk 6 produces a PASS and is accepted.
+
+- **Hottathanafantasy's approved soft-content copy remains unseeded.** It is
+  saved in local Supabase, but the local proof data is not migration-backed.
+  Preserve this copy for replay after a reset or hosted migration:
 
 ```text
 About the horse
